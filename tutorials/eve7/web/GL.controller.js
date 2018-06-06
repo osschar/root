@@ -96,34 +96,25 @@ sap.ui.define([
            if (allok) this.drawGeometry();
         },
         
-        
         drawGeometry: function() {
            
            console.log("start geometry drawing", this.getView().getId()); 
            
            var shape = {
               _typename: "TGeoBBox",
-              fUniqueID: 0,
-              fBits: 0x3000000,
-              fName: "BOX",
-              fTitle: "",
-              fShapeId: 256,
-              fShapeBits: 1024,
-              fDX: 200,
-              fDY: 300,
-              fDZ: 400,
-              fOrigin: [0,0,0]
+              fUniqueID: 0, fBits: 0x3000000, fName: "BOX", fTitle: "",
+              fShapeId: 256, fShapeBits: 1024, fDX: 200, fDY: 300, fDZ: 400, fOrigin: [0,0,0]
            };
            
-           var obj = JSROOT.extend(JSROOT.Create("TEveGeoShapeExtract"),
+           var geom_obj = JSROOT.extend(JSROOT.Create("TEveGeoShapeExtract"),
                  { fTrans: null, fShape: shape, fRGBA: [0, 1, 0, 0.2], fElements: null, fRnrSelf: true });
            
-           JSROOT.draw(this.getView().getDomRef(), obj, "", this.onGeomertyDrawn.bind(this));
+           this.geo_painter = JSROOT.Painter.CreateGeoPainter(this.getView().getDomRef(), null, "");
            
-        },
-        
-        onGeomertyDrawn: function(painter) {
-           this.geo_painter = painter;
+           // assign callback function - when needed 
+           this.geo_painter.WhenReady(this.onGeomertyDrawn.bind(this));
+           
+           // now loop over all  scene and create three.js objects
            
            // top scene element
            var element = this.mgr.GetElement(this.elementid);
@@ -135,26 +126,43 @@ sap.ui.define([
               var realscene = this.mgr.GetElement(scene.fSceneId);
               
               console.log("check scene", scene.fSceneId);
-              if (realscene && realscene.childs && (k>0)) 
-                 this.drawExtras(realscene.childs, true); 
+              if (realscene && realscene.childs) 
+                 this.createExtras(realscene.childs); 
            }
+
+           // if geometry detected in the scenes, it will be used to display 
+           geom_obj = null;
+
+           this.geo_painter.AssignObject(geom_obj);
+           
+           this.geo_painter.prepareObjectDraw(geom_obj); // and now start everything
+           
+           // JSROOT.draw(this.getView().getDomRef(), obj, "", this.onGeomertyDrawn.bind(this));
+           
         },
         
-        drawExtras: function(arr, toplevel) {
+        onGeomertyDrawn: function(painter) {
+           console.log("Drawing completed");
+        },
+        
+        createExtras: function(arr, toplevel) {
            if (!arr) return;
            for (var k=0;k<arr.length;++k) {
               var elem = arr[k];
               if (elem.render_data) {
-                 var fname = elem.render_data.rnr_func;
-                 var obj3d = this.creator[fname](elem, elem.render_data);
-                 if (obj3d) this.geo_painter.getExtrasContainer().add(obj3d);
-                 
+                 var fname = elem.render_data.rnr_func, obj3d = null;
+                 if (!this.creator[fname])
+                    console.error("Function " +fname + " missing in creator");
+                 else
+                    obj3d = this.creator[fname](elem, elem.render_data);
+                 if (obj3d) {
+                    obj3d._typename = "THREE.Mesh";
+                    this.geo_painter.addExtra(obj3d);
+                 }
               }
               
-              this.drawExtras(elem.childs);
+              this.createExtras(elem.childs);
            }
-           
-           if (toplevel) this.geo_painter.Render3D();
         },
         
         geometry:function(data) {
