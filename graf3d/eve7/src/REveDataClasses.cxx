@@ -22,6 +22,8 @@ using namespace ROOT::Experimental;
 namespace REX = ROOT::Experimental;
 
 
+Color_t  REveDataCollection::fgDefaultColor  = kBlue;
+
 //==============================================================================
 // REveDataCollection
 //==============================================================================
@@ -30,6 +32,10 @@ REveDataCollection::REveDataCollection(const char* n, const char* t) :
    REveElementList(n, t)
 {
    fChildClass = REveDataItem::Class();
+
+   fCanEditMainColor        = kTRUE;
+   fCanEditMainTransparency = kTRUE;
+   SetMainColorPtr(&fgDefaultColor);
 }
 
 void REveDataCollection::AddItem(void *data_ptr, const char *n, const char *t)
@@ -76,6 +82,7 @@ void REveDataCollection::ApplyFilter()
    }
 }
 
+//______________________________________________________________________________
 
 Int_t REveDataCollection::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
 {
@@ -96,6 +103,16 @@ Int_t REveDataCollection::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
 
    return ret;
 }
+
+//______________________________________________________________________________
+
+void REveDataCollection::SetMainColor(Color_t color)
+{
+   // fMainColor = color;
+   REveElement::SetMainColor(color);
+}
+
+
 //==============================================================================
 // REveDataItem
 //==============================================================================
@@ -246,5 +263,5 @@ std::string REveDataColumn::EvalExpr(void *iptr)
          return fStringFoo(iptr);
       }
    }
-   return "XYZZ";
+   return "XYZ";
 }

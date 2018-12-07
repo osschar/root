@@ -29,8 +29,16 @@ class REveDataItem;
 //==============================================================================
 
 class REveDataCollection : public REveElementList {
-protected:
 public:
+   typedef std::vector<int> Ids_t;
+private:
+
+   std::function<void (const REveDataCollection*)> _handler_func;
+   std::function<void (const REveDataCollection*, const Ids_t&)> _handler_func_ids;
+
+   static Color_t fgDefaultColor;
+public:
+
    TClass *fItemClass{nullptr}; // so far only really need class name
 
    struct ItemInfo_t {
@@ -45,7 +53,6 @@ public:
    TString fFilterExpr;
    std::function<bool(void *)> fFilterFoo = [](void *) { return true; };
 
-public:
    REveDataCollection(const char *n = "REveDataCollection", const char *t = "");
    virtual ~REveDataCollection() {}
 
@@ -63,6 +70,17 @@ public:
    REveDataItem *GetDataItem(Int_t i) const { return fItems[i].fItemPtr; }
 
    virtual Int_t WriteCoreJson(nlohmann::json &cj, Int_t rnr_offset);
+
+   virtual void SetMainColor(Color_t color);
+
+   void setHandlerFunc (std::function<void (const REveDataCollection*)> handler_func)
+   {
+      _handler_func = handler_func;
+   }
+   void setHandlerFuncIds (std::function<void (const REveDataCollection*, const Ids_t&)> handler_func)
+   {
+      _handler_func_ids= handler_func;
+   }
 
    ClassDef(REveDataCollection, 0);
 };
@@ -94,14 +112,14 @@ public:
 class REveDataTable : public REveElementList // XXXX
 {
 protected:
-   REveDataCollection *fCollection{nullptr};
+   const REveDataCollection *fCollection{nullptr};
 
 public:
    REveDataTable(const char *n = "REveDataTable", const char *t = "");
    virtual ~REveDataTable() {}
 
-   void SetCollection(REveDataCollection *col) { fCollection = col; }
-   REveDataCollection *GetCollection() const { return fCollection; }
+   void SetCollection(const REveDataCollection *col) { fCollection = col; }
+   const REveDataCollection *GetCollection() const { return fCollection; }
 
    void PrintTable();
    virtual Int_t WriteCoreJson(nlohmann::json &cj, Int_t rnr_offset);
@@ -142,6 +160,7 @@ public:
 
    ClassDef(REveDataColumn, 0);
 };
+
 
 } // namespace Experimental
 } // namespace ROOT
