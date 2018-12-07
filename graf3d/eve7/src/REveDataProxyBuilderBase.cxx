@@ -1,0 +1,327 @@
+#include <ROOT/REveDataProxyBuilderBase.hxx>
+#include <ROOT/REveProjectionManager.hxx>
+#include <ROOT/REveDataCollectionManager.hxx>
+#include <ROOT/REveCompound.hxx>
+
+using namespace ROOT::Experimental;
+namespace REX = ROOT::Experimental;
+
+
+REveDataProxyBuilderBase::Product::Product(const REveViewContext* c) : m_viewContext(c), m_elements(0)
+{
+   m_elements = new REveElementList("ProxyProduct");
+   m_elements->IncDenyDestroy();
+}
+
+
+REveDataProxyBuilderBase::Product::~Product()
+{
+   // remove product from projected scene (RhoPhi or RhoZ)
+   REveProjectable* pable = dynamic_cast<REveProjectable*>(m_elements);
+   // don't have to check cast, because TEveElementList is TEveProjectable
+   for (REveProjectable::ProjList_i i = pable->BeginProjecteds(); i != pable->EndProjecteds(); ++i)
+   {
+      REveElement* projected  = (*i)->GetProjectedAsElement();
+      (*projected->BeginParents())->RemoveElement(projected);
+   }
+
+   // remove from 3D scenes
+   while (m_elements->HasParents())
+   {
+      REveElement* parent = *m_elements->BeginParents();
+      parent->RemoveElement(m_elements);
+   }
+
+   m_elements->Annihilate();
+}
+
+//______________________________________________________________________________
+
+
+REveDataProxyBuilderBase::REveDataProxyBuilderBase():
+   m_collection(0),
+   m_haveWindow(false)
+{
+}
+
+//______________________________________________________________________________
+void REveDataProxyBuilderBase::SetCollection(REveDataCollection* c)
+{
+   m_collection = c;
+}
+
+//______________________________________________________________________________
+
+void
+REveDataProxyBuilderBase::SetInteractionList(REveDataInteractionList* l, const std::string& /*purpose*/ )
+{
+   // Called if willHandleInteraction() returns false. Purpose ignored by default.
+
+   m_interactionList = l;
+}
+
+
+//______________________________________________________________________________
+void REveDataProxyBuilderBase::Build()
+{
+   if (m_collection)
+   {
+      try
+      {
+         size_t itemSize = (size_t)m_collection->GetNItems(); //cashed
+
+         Clean();
+         for (Product_it i = m_products.begin(); i != m_products.end(); ++i)
+         {
+             //printf("build() %s \n", m_collection->name().c_str());
+            REveElementList* elms = (*i)->m_elements;
+            size_t oldSize = elms->NumChildren();
+
+            Build(m_collection, elms, (*i)->m_viewContext);
+
+            // Project all children of current product.
+            // If product is not registered into any projection-manager,
+            // this does nothing.
+            REveProjectable* pable = dynamic_cast<REveProjectable*>(elms);
+            if (pable->HasProjecteds())
+            {
+               // loop projected holders
+               for (REveProjectable::ProjList_i pi = pable->BeginProjecteds(); pi != pable->EndProjecteds(); ++pi)
+               {
+                  REveProjectionManager *pmgr = (*pi)->GetManager();
+                  Float_t oldDepth = pmgr->GetCurrentDepth();
+                  pmgr->SetCurrentDepth(m_layer);
+                  size_t cnt = 0;
+
+                  REveElement* projectedAsElement = (*pi)->GetProjectedAsElement();
+                  REveElement::List_i parentIt = projectedAsElement->BeginChildren();
+                  for (REveElement::List_i prodIt = elms->BeginChildren(); prodIt != elms->EndChildren(); ++prodIt, ++cnt)
+                  {
+                      // reused projected holder
+                     if (cnt < oldSize)
+                     {
+                        if ((*parentIt)->NumChildren()) {
+                            // update projected (mislleading name)
+                           for ( REveElement::List_i pci = (*parentIt)->BeginChildren(); pci != (*parentIt)->EndChildren(); pci++)
+                               pmgr->ProjectChildrenRecurse(*parentIt);
+                        }
+                        else {
+                            // import projectable
+                           pmgr->SubImportChildren(*prodIt, *parentIt);
+                        }
+
+                        ++parentIt;
+                     }
+                     else if (cnt < itemSize)
+                     {
+                        // new product holder
+                        pmgr->SubImportElements(*prodIt, projectedAsElement);
+                     }
+                     else
+                     {
+                        break;
+                     }
+                  }
+                  pmgr->SetCurrentDepth(oldDepth);
+               }
+            }
+
+
+            if (m_interactionList && itemSize > oldSize)
+            {
+               REveElement::List_i elIt = elms->BeginChildren();
+               for (size_t cnt = 0; cnt < itemSize; ++cnt, ++elIt)
+               {
+                  if (cnt >= oldSize )
+                     m_interactionList->Added(*elIt, cnt);
+               }
+            }
+         }
+      }
+      catch (const std::runtime_error& iException)
+      {
+         std::cout << "Caught exception in build function for item " << m_collection->GetElementName() << ":\n"
+                              << iException.what() << std::endl;
+         exit(1);
+      }
+   }
+}
+
+//______________________________________________________________________________
+void
+REveDataProxyBuilderBase::Build(const REveDataCollection*, REveElementList*, const REveViewContext*)
+{
+   assert("virtual build(const REveEventItem*, REveElementList*, const REveViewContext*) not implemented by inherited class");
+}
+
+
+//______________________________________________________________________________
+
+
+REveElementList*
+REveDataProxyBuilderBase::CreateProduct( const REveViewContext* viewContext)
+{
+   if ( m_products.empty() == false)
+   {
+         return m_products.back()->m_elements;
+   }
+
+
+   Product* product = new Product(viewContext);
+   m_products.push_back(product);
+
+   if (m_collection)
+   {
+      // debug info in eve browser
+      product->m_elements->SetElementName(Form("product %s", m_collection->GetElementName()));
+   }
+   return product->m_elements;
+}
+
+//______________________________________________________________________________
+void
+REveDataProxyBuilderBase::ModelChanges(const REveDataCollection::Ids_t& iIds, Product* p)
+{
+   REveElementList* elms = p->m_elements;
+   assert(m_collection && static_cast<int>(m_collection->GetNItems()) <= elms->NumChildren() && "can not use default modelChanges implementation");
+
+   REveElement::List_i itElement = elms->BeginChildren();
+
+   for (REveDataCollection::Ids_t::const_iterator it = iIds.begin(); it != iIds.end(); ++it, ++itElement)
+   {
+      if (VisibilityModelChanges(*it, *itElement, p->m_viewContext))
+      {
+         elms->ProjectChild(*itElement);
+      }
+   }
+}
+
+//______________________________________________________________________________
+
+
+void
+REveDataProxyBuilderBase::ModelChanges(const REveDataCollection::Ids_t& iIds)
+{
+  if(m_haveWindow) {
+    for (Product_it i = m_products.begin(); i!= m_products.end(); ++i)
+    {
+       ModelChanges(iIds, *i);
+    }
+    m_modelsChanged=false;
+  } else {
+    m_modelsChanged=true;
+  }
+}
+
+//______________________________________________________________________________
+void
+REveDataProxyBuilderBase::CollectionChanged(const REveDataCollection* /*iItem*/)
+{
+   if(m_haveWindow) {
+      Build();
+   }
+}
+
+//------------------------------------------------------------------------------
+
+void
+REveDataProxyBuilderBase::SetupAddElement(REveElement* el, REveElement* parent, bool color) const
+{
+   SetupElement(el, color);
+   parent->AddElement(el);
+}
+
+/** This method is invoked to setup the per element properties of the various
+    objects being drawn.
+  */
+void
+REveDataProxyBuilderBase::SetupElement(REveElement* el, bool color) const
+{
+   el->CSCTakeAnyParentAsMaster();
+   el->SetPickable(true);
+   el->SetMainColor(m_collection->GetMainColor());
+   if (color)
+   {
+      el->CSCApplyMainColorToMatchingChildren();
+      el->CSCApplyMainTransparencyToMatchingChildren();
+      el->SetMainColor(m_collection->GetMainColor());
+      el->SetMainTransparency(m_collection->GetMainTransparency());
+   }
+}
+
+
+
+REveCompound*
+REveDataProxyBuilderBase::CreateCompound(bool set_color, bool propagate_color_to_all_children) const
+{
+   REveCompound* c = new REveCompound();
+   c->CSCTakeAnyParentAsMaster();
+   c->CSCImplySelectAllChildren();
+   c->SetPickable(true);
+   if (set_color)
+   {
+      c->SetMainColor(m_collection->GetMainColor());
+      c->SetMainTransparency(m_collection->GetMainTransparency());
+   }
+   if (propagate_color_to_all_children)
+   {
+      c->CSCApplyMainColorToAllChildren();
+      c->CSCApplyMainTransparencyToAllChildren();
+   }
+   else
+   {
+      c->CSCApplyMainColorToMatchingChildren();
+      c->CSCApplyMainTransparencyToMatchingChildren();
+   }
+   return c;
+}
+
+//______________________________________________________________________________
+
+void
+REveDataProxyBuilderBase::Clean()
+{
+   // Cleans local common element list.
+   for (Product_it i = m_products.begin(); i != m_products.end(); ++i)
+   {
+      if ((*i)->m_elements)
+         (*i)->m_elements->DestroyElements();
+   }
+
+   CleanLocal();
+}
+
+void
+REveDataProxyBuilderBase::CleanLocal()
+{
+   // Cleans local common element list.
+}
+
+void
+REveDataProxyBuilderBase::CollectionBeingDestroyed(const REveDataCollection* /*iItem*/)
+{
+   m_collection = 0;
+
+   CleanLocal();
+
+   for (Product_it i = m_products.begin(); i!= m_products.end(); i++)
+   {
+
+      // (*i)->m_scaleConnection.disconnect();
+      delete (*i);
+   }
+
+   m_products.clear();
+}
+
+bool
+REveDataProxyBuilderBase::VisibilityModelChanges(int, REveElement*, const REveViewContext*)
+{
+   return false;
+}
+
+void
+REveDataProxyBuilderBase::SetHaveAWindow(bool iHaveAWindow)
+{
+   m_haveWindow = iHaveAWindow;
+}
