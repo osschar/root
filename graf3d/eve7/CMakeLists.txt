@@ -3,6 +3,9 @@ ROOT_STANDARD_LIBRARY_PACKAGE(ROOTEve
      inc/ROOT/REveClient.hxx
      inc/ROOT/REveCompound.hxx
      inc/ROOT/REveDataClasses.hxx
+     inc/ROOT/REveDataCollectionManager.hxx
+     inc/ROOT/REveDataProxyBuilderBase.hxx
+     inc/ROOT/REveDataSimpleProxyBuilder.hxx
      inc/ROOT/REveElement.hxx
      inc/ROOT/REveGeoPolyShape.hxx
      inc/ROOT/REveGeoShapeExtract.hxx
@@ -48,6 +51,9 @@ ROOT_STANDARD_LIBRARY_PACKAGE(ROOTEve
      glu/tessmono.c
      src/REveCompound.cxx
      src/REveDataClasses.cxx
+     src/REveDataCollectionManager.cxx
+     src/REveDataProxyBuilderBase.cxx
+     src/REveDataSimpleProxyBuilder.cxx
      src/REveElement.cxx
      src/REveGeoPolyShape.cxx
      src/REveGeoShape.cxx
