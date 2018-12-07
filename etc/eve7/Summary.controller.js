@@ -119,6 +119,8 @@ sap.ui.define([
                _type   : "Color"
             }],
             "REveElementList" : [ {sub: ["REveElement"]}],
+            "REveGeoShape" : [ {sub: ["REveElement"]}],
+            "REveCompound" : [ {sub: ["REveElement"]}],
             "REvePointSet" : [
             {
                sub: ["REveElement" ]
@@ -137,9 +139,7 @@ sap.ui.define([
                name : "LineWidth",
                _type   : "Number"
             }],
-           "REveDataCollection" : [{
-               name : "Filter",
-               _type   : "String"
+           "REveDataGeoShape" : [{
             }],
            "REveDataItem" : [{
                name : "Filtered",
