@@ -43,15 +43,25 @@ sap.ui.define([
          
          this.mgr.RegisterUpdate(this, "setEveData");
       },
-      
+
+      findTable: function(holder) {
+         if ( holder.fRnrSelf && holder._typename == "ROOT::Experimental::REveDataTable" )
+            return holder;
+         
+         for (var i = 0; i < holder.childs.length; ++i)
+         {
+            return this.findTable(holder.childs[i]);
+         }
+            
+      },
       
       setEveData: function() {
          var element = this.mgr.GetElement(this.elementid);
          console.log("table ", element);
          for (var k=0;k<element.childs.length;++k) {
             var sceneInfo = element.childs[k];
-            var abc = this.mgr.GetElement(sceneInfo.fSceneId);
-            this.tableEveElement = abc.childs[0];
+            var scene = this.mgr.GetElement(sceneInfo.fSceneId);
+            this.tableEveElement = this.findTable(scene)
             this.setupTable(this.tableEveElement);
          }
       },
