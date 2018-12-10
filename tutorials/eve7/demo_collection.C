@@ -23,6 +23,7 @@
 #include "TParticle.h"
 #include "TRandom.h"
 #include "TGeoTube.h"
+Color_t trackColor = kGreen + 2;
 
 namespace REX = ROOT::Experimental;
 
@@ -89,7 +90,6 @@ public:
    TableHandle(std::string collectionName, TableSpecs &specs)
       :m_name(collectionName), m_specs(specs) 
    {
-      printf("------- table habndle %s \n", collectionName.c_str());
       m_specs[collectionName].clear();
    }
    
@@ -147,7 +147,7 @@ public:
       if (!GetHaveAWindow())
          return;
 
-      printf("====== build table element %s\n", collection->GetElementName());
+      // printf("====== build table element %s\n", collection->GetElementName());
 
       auto table = new REX::REveDataTable("testTable");
       table->SetCollection(collection);
@@ -158,7 +158,6 @@ public:
          std::string exp  = "i." + spec.fExpression + "()";
          c->SetExpressionAndType(exp.c_str(), spec.fType);
          c->SetPrecision(spec.fPrecision);
-         printf("cccccccccccccccccccccccc added a column %s\n", c->GetElementName());
       }
 
       product->AddElement(table);
@@ -166,12 +165,9 @@ public:
 
    void SetTableEntries(TableHandle::TableEntries& iSpecs)
    {
-      printf("SetTableEntries 22222 table  proxy builder soecs %lu\n", iSpecs.size());
        for (TableEntry& spec : iSpecs) {
-          spec.Print();
+          // spec.Print();
           m_specs.push_back(spec);
-          //  m_specs.back().fName = x.fName;
-          //m_specs.back().fExpression = x.fExpression;
        }
 
    }
@@ -200,12 +196,12 @@ public:
       createScenesAndViews();
       
       // table specs
-      table("TracksXY").
+      table("XYTracks").
          column("pt", 1, "Pt").
          column("eta", 3, "Eta").
          column("phi", 3, "Phi");
       
-      table("JetsXY").
+      table("XYJets").
          column("eta", 1, "Eta").
          column("phi", 1, "Phi").
          column("etasize", 2, "GetEtaSize").
@@ -263,20 +259,14 @@ public:
    void addCollection(REX::REveDataCollection* collection)
    {
       // GL view types
-      std::cerr << "add GL PB begin\n";
       auto glBuilder = makeGLBuilderForType(collection->GetItemClass());
       glBuilder->SetCollection(collection);
-      auto interactionList = new REX::REveDataInteractionList(collection);
-      glBuilder->SetInteractionList(interactionList, collection->GetElementName());
       glBuilder->SetHaveAWindow(true);
       REX::REveElementList* product = glBuilder->CreateProduct(m_viewContext);
-      std::cerr << "add GL PB begin loop\n";
       for (REX::REveScene* scene : m_scenes) {         
          if (strncmp(scene->GetTitle(), "Table", 5) == 0) continue;
          if (!strncmp(scene->GetTitle(), "RhoZ", 3)) {
-            printf("add product to projected --- %s to %s \n", product->GetElementName(), scene->GetElementName());
             m_mngRhoZ->ImportElements(product, scene);
-            printf("nchilde %d\n", scene->NumChildren());
          }
          else {
             scene->AddElement(product);
@@ -333,8 +323,8 @@ REX::REveDataCollection* makeTrackCollection(const char* name, int N)
 {
    REX::REveDataCollection* collection = new REX::REveDataCollection(name);
    collection->SetItemClass(TParticle::Class());
-   collection->SetMainColorRGB((UChar_t)100, 0, 0);
-
+   //collection->SetMainColorRGB((UChar_t)100, 0, 0);
+   collection->SetMainColorPtr(&trackColor);
    TRandom &r = * gRandom;
    r.SetSeed(0);
 
@@ -357,8 +347,10 @@ REX::REveDataCollection* makeTrackCollection(const char* name, int N)
       int pdg = 11 * (r.Integer(2) > 0 ? 1 : -1);
       particle->SetPdgCode(pdg);
       
-      TString pname; pname.Form("Particle %2d", i++);
+
+      TString pname; pname.Form("TrackXY %2d", i);
       collection->AddItem(particle, pname.Data(), "");
+      collection->GetDataItem(i-1)->SetMainColorPtr(collection->GetMainColorPtr());
    }
 
    return collection;
@@ -388,7 +380,7 @@ REX::REveDataCollection* makeJetCollection(const char* name, int N)
       jet->SetEtaSize(r.Uniform(0.02, 0.2));
       jet->SetPhiSize(r.Uniform(0.01, 0.3));
                            
-      TString pname; pname.Form("Jet %2d", i++);
+      TString pname; pname.Form("JetXY %2d", i);
       collection->AddItem(jet, pname.Data(), "");
    }
 
@@ -407,11 +399,13 @@ void demo_collection()
    REX::REveElementList* collections = new REX::REveElementList("Collections");
    REX::gEve->GetWorld()->AddElement(collections);
 
-   auto trackCollection = makeTrackCollection("TracksXY", 10);
+   auto trackCollection = makeTrackCollection("XYTracks", 10);
+   trackCollection->SetFilterExpr("i.Pt() > 1 && std::abs(i.Eta()) < 1");
+   trackCollection->ApplyFilter();
    xyManager->addCollection(trackCollection);
    collections->AddElement(trackCollection);
    
-   auto jetCollection = makeJetCollection("JetsXY", 4);
+   auto jetCollection = makeJetCollection("XYJets", 4);
    xyManager->addCollection(jetCollection);
    collections->AddElement(jetCollection);
 
