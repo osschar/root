@@ -119,7 +119,7 @@ sap.ui.define([
                _type   : "Color"
             }],
             "REveElementList" : [ {sub: ["REveElement"]}],
-            "REveGeoShape" : [ {sub: ["REveElement"]}],
+            "REveGeoShape" : [ {sub: ["REveElement"]}, ],
             "REveCompound" : [ {sub: ["REveElement"]}],
             "REvePointSet" : [
             {
@@ -128,13 +128,41 @@ sap.ui.define([
                name : "MarkerSize",
                _type   : "Number"
             }],
-            "REveJetCone" : [{sub: ["REveElement"]},{
+             "REveJetCone" : [
+            {
+               name : "RnrSelf",
+               _type   : "Bool"
+            }, {
+               name : "ConeColor",
+               member: "fMainColor",
+               srv  : "SetMainColorRGB",
+                _type   : "Color"
+            }, {
                name : "NDiv",
                _type   : "Number"
             }],
-            "REveTrack" : [ 
+            "REveDataCollection" : [{
+               name : "FilterExpr",
+               _type   : "String"
+            },{
+                name : "CollectionVisible",
+                member:"fRnrSelf",
+               _type   : "Bool"
+            }, {
+               name : "Collection Color",
+               member: "fMainColor",
+               srv  : "SetMainColorRGB",
+               _type   : "Color"
+           }],
+           "REveTrack" : [
             {
-               sub: ["REveElement"]
+               name : "RnrSelf",
+               _type   : "Bool"
+            }, {
+               name : "LineColor",
+               member: "fMainColor",
+               srv  : "SetMainColorRGB",
+               _type   : "Color"
             }, {
                name : "LineWidth",
                _type   : "Number"
@@ -142,9 +170,19 @@ sap.ui.define([
            "REveDataGeoShape" : [{
             }],
            "REveDataItem" : [{
-               name : "Filtered",
+               name : "ItemColor",
+               member: "fMainColor",
+               _type   : "Color"
+           },{
+               name : "ItemRnrSelf",
+               member: "fRnrSel",
                _type   : "Bool"
-            }]
+           },{
+               name : "PassFilter",
+               member: "fFiltered",
+               _type   : "Bool"
+                             
+           }]
          };
 
       },
@@ -483,7 +521,6 @@ sap.ui.define([
             widget = new sap.ui.jsroot.EVEColorButton(sId, {
                //  text:"x",
                icon: "sap-icon://palette",
-               attrcolorXXX:  colVal,
 
                press: function () {
 
