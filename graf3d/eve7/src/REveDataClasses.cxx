@@ -120,6 +120,7 @@ void REveDataCollection::SetMainColor(Color_t color)
 REveDataItem::REveDataItem(const char* n, const char* t) :
    REveElementList(n, t)
 {
+   SetMainColorPtr(&REveDataCollection::fgDefaultColor);
 }
 
 Int_t REveDataItem::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)

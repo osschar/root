@@ -36,8 +36,8 @@ private:
    std::function<void (const REveDataCollection*)> _handler_func;
    std::function<void (const REveDataCollection*, const Ids_t&)> _handler_func_ids;
 
-   static Color_t fgDefaultColor;
 public:
+   static Color_t fgDefaultColor;
 
    TClass *fItemClass{nullptr}; // so far only really need class name
 
