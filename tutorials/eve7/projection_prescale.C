@@ -131,5 +131,7 @@ void projection_prescale(std::string type = "RhPhi")
       makeProjectedViewsAndScene(REX::REveProjection::kPT_RhoZ, true);
       makeProjectedViewsAndScene(REX::REveProjection::kPT_RhoZ, false);
    }
+
+   REX::gEve->Show();
 }
  
