@@ -75,7 +75,8 @@ REveDataSimpleProxyBuilder::VisibilityModelChanges(int idx, REveElement* iCompou
    bool returnValue = false;
    if (item->GetRnrSelf() && iCompound->NumChildren()==0)
    {
-      Build(item, iCompound, vc);
+      printf("REveDataSimpleProxyBuilder::VisibilityModelChanges BUILD %d \n", idx);
+      Build(Collection()->GetDataPtr(idx), iCompound, vc);
       returnValue=true;
    }
    return returnValue;
