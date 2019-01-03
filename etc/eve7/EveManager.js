@@ -36,20 +36,20 @@
    EveManager.prototype.GetElement = function(id) {
       return this.map[id];
    }
-   
+
    /** Attach websocket handle to manager, all communication runs through manager */
    EveManager.prototype.UseConnection = function(handle) {
       this.handle = handle;
-      
+
       handle.SetReceiver(this);
       handle.Connect();
    }
-   
+
    /** Called when data comes via the websocket */
    EveManager.prototype.OnWebsocketMsg = function(handle, msg, offset) {
 
       // if (this.ignore_all) return;
-      
+
       if (typeof msg != "string") {
          // console.log('ArrayBuffer size ',
          // msg.byteLength, 'offset', offset);
@@ -59,7 +59,7 @@
       }
 
       console.log("msg len=", msg.length, " txt:", msg.substr(0,120), "...");
-      
+
       var resp = JSON.parse(msg);
 
       if (resp && resp[0] && resp[0].content == "REveManager::DestroyElementsOf") {
@@ -69,14 +69,14 @@
       } else if (resp && resp[0] && resp[0].content == "REveScene::StreamElements") {
 
          this.Update(resp);
-         
+
       } else if (resp && resp.header && resp.header.content == "ElementsRepresentaionChanges") {
-         
+
          this.SceneChanged(resp);
-         
+
       }
    }
-   
+
    EveManager.prototype.executeCommand = function(cmd) {
       if (!cmd || !this.handle) return;
       var obj = { "mir": cmd.func, "fElementId": cmd.elementid, "class": cmd.elementclass };
@@ -115,17 +115,17 @@
       entry[kind] = func_name;
       this.hrecv.push(entry);
    }
-   
+
    /** Register object with function, which is called when manager structure is updated */
    EveManager.prototype.RegisterUpdate = function(receiver, func_name) {
-      this.RegisterReceiver("update", receiver, func_name);   
+      this.RegisterReceiver("update", receiver, func_name);
    }
-   
+
    /** Register object with function, which is called when element is highlighted */
    EveManager.prototype.RegisterHighlight = function(receiver, func_name) {
       this.RegisterReceiver("highlight", receiver, func_name);
    }
-   
+
    /** Register object with function, which is called when manager structure is updated */
    EveManager.prototype.RegisterElementUpdate = function(receiver, func_name) {
       this.RegisterReceiver("elem_update", receiver, func_name);
@@ -150,7 +150,7 @@
          }
       }
    }
-   
+
 
    /** Invoke highlight on all dependent views.
     * One specifies element id and on/off state.
@@ -212,7 +212,7 @@
       // remember commands in manager
       if (arr[0].commands && !this.commands)
          this.commands = arr[0].commands;
-      
+
       if (arr[0].fTotalBinarySize)
          this.last_json = arr;
 
@@ -264,83 +264,98 @@
       // notify scenes for beginning of changes and
       // notify for element removal
       var removedIds = msg.header["removedElements"];
-      
+
       if (scene.$receivers)
          for (var i=0; i<scene.$receivers.length; i++) {
             var controller =  scene.$receivers[i].obj;
             controller.beginChanges();
             for (var r=0; r != removedIds.length; ++r)
-               controller.elementRemoved(removedIds[r]);
+
+
+                controller.elementRemoved(removedIds[r]);
          }
 
       // wait for binary if needed
-      if (arr[0].fTotalBinarySize) {
-         this.last_json = arr;
+      if (msg.header.fTotalBinarySize) {
+          this.last_json = [1];
+          for (var i = 0; i < arr.length; ++i)
+              this.last_json.push(arr[i]);
+
       } else {
          this.PostProcessSceneChanges();
       }
    }
 
-   EveManager.prototype.PostProcessSceneChanges = function() {
-      if (!this.scene_changes) return;
-      
-      var arr = this.scene_changes.arr;
-      var header = this.scene_changes.header;
-      var scene = this.GetElement(header.fSceneId);
-      var nModified = header["numRepresentationChanged"];
-      
-      this.scene_changes = null;
-      
-      if (scene.$receivers) {
-         for (var i=0; i != scene.$receivers.length; i++) {
-            var receiver = scene.$receivers[i].obj;
+   //______________________________________________________________________________
 
-            for (var n=0; n<arr.length; ++n) {
-               var em = arr[n];
 
-               // update existing
-               if (n < nModified ) {
-                  var obj = this.map[em.fElementId];
-
-                  if (em.changeBit & this.EChangeBits.kCBVisibility) {
-                     if (obj.fRnrSelf != em.fRnrSelf) {
-                        obj.fRnrSelf = em.fRnrSelf;
-                        receiver.visibilityChanged(obj, em);
-                     }
-                     if (obj.fRnrChildren != em.fRnrChildren) {
-                        obj.fRnrChildren = em.fRnrSelfchildren;
-                        receiver.visibilityChildrenChanged(obj, em);
-                     }
-                  }
-
-                  if (em.changeBit & this.EChangeBits.kCBColorSelection) {
-                     delete em.render_data;
-                     JSROOT.extend(obj, em);
-                     receiver.colorChanged(obj, em);
-                  }
-
-                  if (em.changeBit & this.EChangeBits.kCBObjProps) {
-                     delete em.render_data;
-                     jQuery.extend(obj, em);
-                     receiver.replaceElement(obj);
-                  }
-
-                  // rename updateGED to checkGED???
-                  this.InvokeReceivers("elem_update", null, 0, em.fElementId);
-               }
-               else {
-                  // create new
-                  this.map[em.fElementId] = em;
-                  var parent = this.map[em.fMotherId];
-                  if (!parent.childs)
-                     parent.childs = [];
-
-                  parent.childs.push(em);
-                  receiver.elementAdded(obj);
-               }
+    EveManager.prototype.callSceneReceivers = function (scene, fname, el) {
+        if (scene.$receivers) {
+            for (var i=0; i != scene.$receivers.length; i++) {
+                var receiver = scene.$receivers[i].obj;
+                receiver[fname](el);
             }
-         }
+        }
+    }
 
+
+    EveManager.prototype.PostProcessSceneChanges = function() {
+        if (!this.scene_changes) return;
+
+        var arr = this.scene_changes.arr;
+        var header = this.scene_changes.header;
+        var scene = this.GetElement(header.fSceneId);
+        var nModified = header["numRepresentationChanged"];
+
+        this.scene_changes = null;
+
+
+        for (var n=0; n<arr.length; ++n) {
+            var em = arr[n];
+
+            // update existing
+            if (n < nModified ) {
+                var obj = this.map[em.fElementId];
+
+                if (em.changeBit & this.EChangeBits.kCBVisibility) {
+                    if (obj.fRnrSelf != em.fRnrSelf) {
+                        obj.fRnrSelf = em.fRnrSelf;
+                        this.callSceneReceivers(scene, "visibilityChanged", obj);
+                    }
+                    if (obj.fRnrChildren != em.fRnrChildren) {
+                        obj.fRnrChildren = em.fRnrSelfChildren;
+                        this.callSceneReceivers(scene, "visibilityChildrenChanged", obj);
+                    }
+                }
+
+                if (em.changeBit & this.EChangeBits.kCBColorSelection) {
+                    delete em.render_data;
+                    JSROOT.extend(obj, em);
+                    this.callSceneReceivers(scene, "colorChanged", obj);
+                }
+
+                if (em.changeBit & this.EChangeBits.kCBObjProps) {
+                   delete obj.render_data;
+                    jQuery.extend(obj, em);
+                    this.callSceneReceivers(scene, "replaceElement", obj);
+                }
+
+                // rename updateGED to checkGED???
+                this.InvokeReceivers("elem_update", null, 0, em.fElementId);
+            }
+            else {
+                // create new
+                this.map[em.fElementId] = em;
+                var parent = this.map[em.fMotherId];
+                if (!parent.childs)
+                    parent.childs = [];
+
+                parent.childs.push(em);
+                this.callSceneReceivers(scene, "elementAdded", obj);
+            }
+        }
+
+      if (scene.$receivers) {
          for (var i=0; i != scene.$receivers.length; i++) {
             var ctrl =  scene.$receivers[i].obj;
             if (ctrl) ctrl.endChanges();
@@ -348,7 +363,7 @@
       }
 
       var treeRebuild = header.removedElements.length || (arr.length != nModified );
-      
+
       if (treeRebuild) this.ProcessUpdate(300);
    },
 
@@ -374,14 +389,14 @@
             console.log("try to delete non-existing element with id", ids[n]);
             continue;
          }
-         
+
          this.DeleteChildsOf(element);
          element.$modified = true;
          this.ProcessModified(ids[n]);
       }
-      
+
       // this.ignore_all = true;
-      
+
       this.ProcessUpdate(300);
    }
 
