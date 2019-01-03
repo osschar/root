@@ -14,6 +14,8 @@
 #include "TROOT.h"
 #include "TMethod.h"
 #include "TMethodArg.h"
+#include "TColor.h"
+
 
 #include "json.hpp"
 
@@ -35,7 +37,10 @@ REveDataCollection::REveDataCollection(const char* n, const char* t) :
 
    fCanEditMainColor        = kTRUE;
    fCanEditMainTransparency = kTRUE;
-   SetMainColorPtr(&fgDefaultColor);
+   SetMainColorPtr(new Color_t(REveDataCollection::fgDefaultColor));
+
+   _handler_func = 0;
+   _handler_func_ids = 0;
 }
 
 void REveDataCollection::AddItem(void *data_ptr, const char *n, const char *t)
@@ -63,23 +68,33 @@ void REveDataCollection::SetFilterExpr(const TString& filter)
    // printf("%s\n", s.Data());
    try {
       gROOT->ProcessLine(s.Data());
+      // AMT I don't know why ApplyFilter call is separated
+      ApplyFilter();
    }
    catch (const std::exception &exc)
    {
       std::cerr << "EveDataCollection::SetFilterExpr" << exc.what();
    }
+
 }
 
 void REveDataCollection::ApplyFilter()
 {
+   Ids_t ids;
+   int idx = 0;
    for (auto &ii : fItems)
    {
       bool res = fFilterFoo(ii.fDataPtr);
 
-      // printf("Item:%s -- filter result = %d\n", ii.fItemPtr->GetElementName(), res);
+      printf("Item:%s -- filter result = %d\n", ii.fItemPtr->GetElementName(), res);
 
       ii.fItemPtr->SetFiltered( ! res );
+
+      // AMT : not sure if ApplyFilter is the right place to set visibility
+      ii.fItemPtr->SetRnrSelf( res );
+      ids.push_back(idx++);
    }
+   if ( _handler_func_ids) _handler_func_ids( this , ids);
 }
 
 //______________________________________________________________________________
@@ -106,12 +121,62 @@ Int_t REveDataCollection::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
 
 //______________________________________________________________________________
 
-void REveDataCollection::SetMainColor(Color_t color)
+void REveDataCollection::SetCollectionColorRGB(UChar_t r, UChar_t g, UChar_t b)
 {
-   // fMainColor = color;
-   REveElement::SetMainColor(color);
+   Color_t oldv = GetMainColor();
+   Color_t newv = TColor::GetColor(r, g, b);
+   int idx = 0;
+   Ids_t ids;
+   for (auto & chld : fChildren)
+   {
+      // if (chld->GetMainColor() == oldv) {
+         chld->SetMainColor(newv);
+         printf(" REveDataCollection::SetCollectionColorRGB going to change color for idx %d --------------------\n", idx);
+         ids.push_back(idx);
+         // }
+
+      idx++;
+   }
+
+   REveElement::SetMainColor(newv);
+   printf("REveDataCollection::SetCollectionColorRGB color ched to %d ->%d\n", oldv, GetMainColor());
+   _handler_func_ids( this , ids);
 }
 
+//______________________________________________________________________________
+
+void REveDataCollection::SetCollectionVisible(bool iRnrSelf)
+{
+   SetRnrSelf(iRnrSelf);
+
+   Ids_t ids;
+
+   for (int i = 0; i < GetNItems(); ++i ) {
+      ids.push_back(i);
+      GetDataItem(i)->SetRnrSelf(fRnrSelf);
+   }
+
+   _handler_func_ids( this , ids);
+}
+
+
+
+//______________________________________________________________________________
+
+void REveDataCollection::ItemChanged(REveDataItem* iItem)
+{
+   int idx = 0;
+   Ids_t ids;
+   for (auto & chld : fChildren)
+   {
+      if (chld == iItem) {
+         ids.push_back(idx);
+         _handler_func_ids( this , ids);
+         return;
+      }
+      idx++;
+   }
+}
 
 //==============================================================================
 // REveDataItem
@@ -120,7 +185,7 @@ void REveDataCollection::SetMainColor(Color_t color)
 REveDataItem::REveDataItem(const char* n, const char* t) :
    REveElementList(n, t)
 {
-   SetMainColorPtr(&REveDataCollection::fgDefaultColor);
+   SetMainColorPtr(new Color_t(REveDataCollection::fgDefaultColor));
 }
 
 Int_t REveDataItem::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
@@ -129,6 +194,24 @@ Int_t REveDataItem::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
    j["fFiltered"] = fFiltered;
    return ret;
 }
+
+void REveDataItem::SetItemColorRGB(UChar_t r, UChar_t g, UChar_t b)
+{
+   Color_t color = TColor::GetColor(r, g, b);
+   REveElement::SetMainColor(color);
+   REveDataCollection* c = dynamic_cast<REveDataCollection*>(*fParents.begin());
+   c->ItemChanged(this);
+}
+
+
+
+void REveDataItem::SetItemRnrSelf(bool iRnrSelf)
+{
+   REveElement::SetRnrSelf(iRnrSelf);
+   REveDataCollection* c = dynamic_cast<REveDataCollection*>(*fParents.begin());
+   c->ItemChanged(this);
+}
+
 
 //==============================================================================
 // REveDataTable

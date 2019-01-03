@@ -33,8 +33,8 @@ public:
    typedef std::vector<int> Ids_t;
 private:
 
-   std::function<void (const REveDataCollection*)> _handler_func;
-   std::function<void (const REveDataCollection*, const Ids_t&)> _handler_func_ids;
+   std::function<void (REveDataCollection*)> _handler_func;
+   std::function<void (REveDataCollection*, const Ids_t&)> _handler_func_ids;
 
 public:
    static Color_t fgDefaultColor;
@@ -71,13 +71,15 @@ public:
 
    virtual Int_t WriteCoreJson(nlohmann::json &cj, Int_t rnr_offset);
 
-   virtual void SetMainColor(Color_t color);
+   virtual void SetCollectionColorRGB(UChar_t r, UChar_t g, UChar_t b);
+   virtual void SetCollectionVisible(bool);
+   virtual void ItemChanged(REveDataItem* item);
 
-   void setHandlerFunc (std::function<void (const REveDataCollection*)> handler_func)
+   void SetHandlerFunc (std::function<void (REveDataCollection*)> handler_func)
    {
       _handler_func = handler_func;
    }
-   void setHandlerFuncIds (std::function<void (const REveDataCollection*, const Ids_t&)> handler_func)
+   void SetHandlerFuncIds (std::function<void (REveDataCollection*, const Ids_t&)> handler_func)
    {
       _handler_func_ids= handler_func;
    }
@@ -102,6 +104,8 @@ public:
          fFiltered = f; /* stamp; */
       }
    };
+   virtual void SetItemColorRGB(UChar_t r, UChar_t g, UChar_t b);
+   virtual void SetItemRnrSelf(bool);
 
    virtual Int_t WriteCoreJson(nlohmann::json &cj, Int_t rnr_offset);
    ClassDef(REveDataItem, 0);
