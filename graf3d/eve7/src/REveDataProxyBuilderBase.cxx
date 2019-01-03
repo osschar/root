@@ -179,16 +179,48 @@ REveDataProxyBuilderBase::CreateProduct( const REveViewContext* viewContext)
 }
 
 //______________________________________________________________________________
+
+namespace {
+   void applyVisAttrToChildren(REveElement* p) {
+      for (auto it = p->BeginChildren(); it != p->EndChildren(); ++it)
+      {
+         REveElement* c = *it;
+         //if (c->GetMainColor() != p->GetMainColor())
+         {
+            c->SetMainColor(p->GetMainColor());
+            printf("apply color %d to %s\n", p->GetMainColor(), c->GetElementName());
+         }
+         c->SetRnrSelf(p->GetRnrSelf());
+         applyVisAttrToChildren(c);
+      }
+   }
+}
+
 void
 REveDataProxyBuilderBase::ModelChanges(const REveDataCollection::Ids_t& iIds, Product* p)
 {
+   printf("REveDataProxyBuilderBase::ModelChanges  %s \n",  m_collection->GetElementName());
    REveElementList* elms = p->m_elements;
    assert(m_collection && static_cast<int>(m_collection->GetNItems()) <= elms->NumChildren() && "can not use default modelChanges implementation");
 
-   REveElement::List_i itElement = elms->BeginChildren();
 
-   for (REveDataCollection::Ids_t::const_iterator it = iIds.begin(); it != iIds.end(); ++it, ++itElement)
+
+   for (REveDataCollection::Ids_t::const_iterator it = iIds.begin(); it != iIds.end(); ++it)
    {
+      int itemIdx = *it;
+      REveDataItem* item = m_collection->GetDataItem(itemIdx);
+
+      printf("Edit compound for item index %d \n", itemIdx);
+      // imitate FWInteractionList::modelChanges
+      REveElement::List_i itElement = elms->BeginChildren();
+      std::advance(itElement, itemIdx);
+      REveElement* comp = *itElement;
+      // AMT temporary workaround for use of compunds
+      if (comp->GetMainColor() != item->GetMainColor()) comp->SetMainColor(item->GetMainColor());
+      comp->SetRnrSelf(item->GetRnrSelf());
+      applyVisAttrToChildren(comp);
+
+
       if (VisibilityModelChanges(*it, *itElement, p->m_viewContext))
       {
          elms->ProjectChild(*itElement);
@@ -228,6 +260,8 @@ void
 REveDataProxyBuilderBase::SetupAddElement(REveElement* el, REveElement* parent, bool color) const
 {
    SetupElement(el, color);
+   // AMT -- this temprary to get right tooltip
+   el->SetElementName(parent->GetElementName());
    parent->AddElement(el);
 }
 
