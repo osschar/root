@@ -36,7 +36,7 @@ class XYJet : public TParticle
 private:
    float m_etaSize;
    float m_phiSize;
-   
+
 public:
    float GetEtaSize() const { return m_etaSize; }
    float GetPhiSize() const { return m_phiSize; }
@@ -69,7 +69,7 @@ class TableHandle
 public:
    typedef std::vector<TableEntry> TableEntries;
    typedef std::map<std::string, TableEntries> TableSpecs;
-   
+
    TableHandle&
    column(const char *name, int precision, const char *expression)
    {
@@ -77,22 +77,22 @@ public:
       columnEntry.fName = name;
       columnEntry.fPrecision = precision;
       columnEntry.fExpression = expression;
-   
+
       m_specs[m_name].push_back(columnEntry);
       return *this;
    }
-      
+
    TableHandle &column(const char *label, int precision)
    {
       return column(label, precision, label);
    }
 
    TableHandle(std::string collectionName, TableSpecs &specs)
-      :m_name(collectionName), m_specs(specs) 
+      :m_name(collectionName), m_specs(specs)
    {
       m_specs[collectionName].clear();
    }
-   
+
 private:
    std::string  m_name;
    TableSpecs  &m_specs;
@@ -107,7 +107,7 @@ class XYJetProxyBuilder: public REX::REveDataSimpleProxyBuilder
    virtual void Build(const void* data, REX::REveElement* iItemHolder, const REX::REveViewContext* context)
    {
       const XYJet* dj = static_cast<const XYJet*>(data);
-      
+
       auto jet = new REX::REveJetCone();
       jet->SetCylinder(2*context->GetMaxR(), context->GetMaxZ());
       jet->AddEllipticCone(dj->Eta(), dj->GetPolarPhi(), dj->GetEtaSize(), dj->GetPhiSize());
@@ -122,11 +122,14 @@ class TrackProxyBuilder : public REX::REveDataSimpleProxyBuilder
    using REX::REveDataSimpleProxyBuilder::Build;
    virtual void Build(const void* data, REX::REveElement* iItemHolder, const REX::REveViewContext* context)
    {
+      printf("calling build function REveDataSimpleProxyBuilder %s\n", iItemHolder->GetElementName());
       TParticle* p = (TParticle*)data;
+      p->Print("all");
       auto track = new REX::REveTrack(p, 1, context->GetPropagator());
       track->MakeTrack();
       SetupAddElement(track, iItemHolder, false);
       iItemHolder->AddElement(track);
+      track->Print("all");
       track->SetElementName(Form("element %s", iItemHolder->GetElementName()));
    }
 };
@@ -143,18 +146,18 @@ public:
    {
       printf("TableProxBuilder::modelChanges() for %s not implemented", Collection()->GetElementName());
    }
-   
+
    using REX::REveDataProxyBuilderBase::Build;
    virtual void Build(const REX::REveDataCollection* collection, REX::REveElementList* product, const REX::REveViewContext* context)
    {
       if (!GetHaveAWindow())
          return;
 
-      // printf("====== build table element %s\n", collection->GetElementName());
+      printf("====== build table element %s\n", collection->GetElementName());
 
       auto table = new REX::REveDataTable("testTable");
       table->SetCollection(collection);
-     
+
       for (const TableEntry& spec : m_specs) {
          auto c = new REX::REveDataColumn(spec.fName.c_str());
          table->AddElement(c);
@@ -188,22 +191,23 @@ private:
    REX::REveViewContext* m_viewContext;
 
    REX::REveProjectionManager* m_mngRhoZ;
-   
+
    std::vector<REX::REveDataProxyBuilderBase*> m_builders;
-   std::vector<REX::REveDataCollection*> m_collections;
+   //   std::vector<REX::REveDataCollection*> m_collections;
+   REX::REveScene* m_collections;
 
    TableHandle::TableSpecs  m_tableFormats;
-   
+
 public:
    XYManager() {
       createScenesAndViews();
-      
+
       // table specs
       table("XYTracks").
          column("pt", 1, "Pt").
          column("eta", 3, "Eta").
          column("phi", 3, "Phi");
-      
+
       table("XYJets").
          column("eta", 1, "Eta").
          column("phi", 1, "Phi").
@@ -227,12 +231,15 @@ public:
 
    void createScenesAndViews()
    {
+      // collections
+      m_collections = REX::gEve->SpawnNewScene("Collections","Collections");
+
       // 3D
       m_scenes.push_back(REX::gEve->GetEventScene());
 
       // RhoZ
       if (1) {
-         auto rhoZEventScene = REX::gEve->SpawnNewScene("RhoZ Event Data","RhoZ");
+         auto rhoZEventScene = REX::gEve->SpawnNewScene("RhoZ Scene","RhoZ");
          m_mngRhoZ = new REX::REveProjectionManager(REX::REveProjection::kPT_RhoZ);
          m_mngRhoZ->SetImportEmpty(true);
          auto rhoZView = REX::gEve->SpawnNewViewer("RhoZ View", "");
@@ -241,11 +248,11 @@ public:
       }
 
       // Table
-      auto tableScene  = REX::gEve->SpawnNewScene("Table", "Table");
+      auto tableScene  = REX::gEve->SpawnNewScene("Tables", "Tables");
       auto tableView = REX::gEve->SpawnNewViewer("Table", "Table View");
       tableView->AddScene(tableScene);
       m_scenes.push_back(tableScene);
-      
+
    }
 
    // this should be handeled with framefor plugins
@@ -260,7 +267,7 @@ public:
          return new TrackProxyBuilder();
       }
    }
-   
+
    void addCollection(REX::REveDataCollection* collection)
    {
       // GL view types
@@ -268,7 +275,7 @@ public:
       glBuilder->SetCollection(collection);
       glBuilder->SetHaveAWindow(true);
       REX::REveElementList* product = glBuilder->CreateProduct(m_viewContext);
-      for (REX::REveScene* scene : m_scenes) {         
+      for (REX::REveScene* scene : m_scenes) {
          if (strncmp(scene->GetTitle(), "Table", 5) == 0) continue;
          if (!strncmp(scene->GetTitle(), "RhoZ", 3)) {
             m_mngRhoZ->ImportElements(product, scene);
@@ -279,40 +286,46 @@ public:
       }
       m_builders.push_back(glBuilder);
       glBuilder->Build();
-      
-      // Table view types
-      bool showTable = m_collections.empty();     
+
+      // Table view types      {
+      bool showTable = !m_collections->HasChildren();
       auto tableBuilder = new TableProxyBuilder();
       tableBuilder->SetCollection(collection);
       tableBuilder->SetHaveAWindow(showTable);
       tableBuilder->SetTableEntries(m_tableFormats[collection->GetName()]);
-      if (1 || showTable) {
-         REX::REveElementList* product = tableBuilder->CreateProduct(m_viewContext);
-         for (REX::REveScene* scene : m_scenes) {         
+
+         REX::REveElementList* tablep = tableBuilder->CreateProduct(m_viewContext);
+         for (REX::REveScene* scene : m_scenes) {
             if (strncmp(scene->GetTitle(), "Table", 5) == 0) {
-               scene->AddElement(product);
-               tableBuilder->Build(collection, product, m_viewContext );
+               scene->AddElement(tablep);
+               tableBuilder->Build(collection, tablep, m_viewContext );
             }
          }
-      }
+
       m_builders.push_back(tableBuilder);
-      m_collections.push_back(collection);
+      m_collections->AddElement(collection);
+
+      collection->SetHandlerFunc([&] (REX::REveDataCollection* collection) { this->CollectionChanged( collection ); });
+      collection->SetHandlerFuncIds([&] (REX::REveDataCollection* collection, const REX::REveDataCollection::Ids_t& ids) { this->ModelChanged( collection, ids ); });
    }
-         
+
    TableHandle table(const char *collectionName){
       TableHandle handle(collectionName, m_tableFormats);
       return handle;
    }
-   
-   
+
+
    void CollectionChanged(REX::REveDataCollection* collection) {
       printf("collection changes %s \n", collection->GetElementName());
    }
 
-   void ModelChanged(REX::REveDataCollection* collection, REX::REveDataCollection::Ids_t& ids) {
+   void ModelChanged(REX::REveDataCollection* collection, const REX::REveDataCollection::Ids_t& ids) {
       printf("Model changes in collection %s: \n", collection->GetElementName());
-      for (auto i : ids) {
-         printf("medel index %d \n", i);
+      for (auto proxy : m_builders) {
+         if (proxy->Collection() == collection) {
+         proxy->ModelChanges(ids);
+         break;
+         }
       }
    }
 };
@@ -351,7 +364,7 @@ REX::REveDataCollection* makeTrackCollection(const char* name, int N)
 
       int pdg = 11 * (r.Integer(2) > 0 ? 1 : -1);
       particle->SetPdgCode(pdg);
-      
+
 
       TString pname; pname.Form("TrackXY %2d", i);
       collection->AddItem(particle, pname.Data(), "");
@@ -366,7 +379,7 @@ REX::REveDataCollection* makeJetCollection(const char* name, int N)
    REX::REveDataCollection* collection = new REX::REveDataCollection(name);
    collection->SetItemClass(XYJet::Class());
    collection->SetMainColor(kYellow);
-   
+
 
    TRandom &r = * gRandom;
    r.SetSeed(0);
@@ -376,15 +389,15 @@ REX::REveDataCollection* makeJetCollection(const char* name, int N)
       double pt  = r.Uniform(0.5, 10);
       double eta = r.Uniform(-2.55, 2.55);
       double phi = r.Uniform(0, TMath::TwoPi());
-      
+
       double px = pt * std::cos(phi);
       double py = pt * std::sin(phi);
       double pz = pt * (1. / (std::tan(2*std::atan(std::exp(-eta)))));
-      
+
       auto jet = new XYJet(0, 0, 0, 0, 0, 0, px, py, pz, std::sqrt(px*px + py*py + pz*pz + 80*80));
       jet->SetEtaSize(r.Uniform(0.02, 0.2));
       jet->SetPhiSize(r.Uniform(0.01, 0.3));
-                           
+
       TString pname; pname.Form("JetXY %2d", i);
       collection->AddItem(jet, pname.Data(), "");
    }
@@ -402,19 +415,15 @@ void collection_proxies()
 
    auto xyManager = new XYManager();
    REX::REveElementList* collections = new REX::REveElementList("Collections");
-   REX::gEve->GetWorld()->AddElement(collections);
 
    auto trackCollection = makeTrackCollection("XYTracks", 10);
    trackCollection->SetFilterExpr("i.Pt() > 0.1 && std::abs(i.Eta()) < 1");
-   trackCollection->ApplyFilter();   
    xyManager->addCollection(trackCollection);
-   collections->AddElement(trackCollection);
 
    if (1) {
    auto jetCollection = makeJetCollection("XYJets", 4);
    xyManager->addCollection(jetCollection);
-   collections->AddElement(jetCollection);
    }
-   
+
    REX::gEve->Show();
 }
