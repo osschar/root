@@ -20,7 +20,7 @@ sap.ui.define([
             this.mgr.UseConnection(data.conn_handle);
             this.standalone = data.standalone;
             this.mgr.RegisterUpdate(this, "onManagerUpdate");
-            
+
          } else {
             this.mgr = data.mgr;
             this.elementid = data.elementid;
@@ -49,11 +49,11 @@ sap.ui.define([
          this.creator.useIndexAsIs = (JSROOT.GetUrlOption('useindx') !== null);
          this.checkScences();
       },
-      
+
       onManagerUpdate: function() {
          // called when manager was updated, need only in standalone modes to detect own element id
          if (!this.standalone || this.elementid) return;
-         
+
          var viewers = this.mgr.FindViewers();
 
          // first check number of views to create
@@ -62,11 +62,11 @@ sap.ui.define([
             if (viewers[n].fName.indexOf(this.standalone) == 0) { found = viewers[n]; break; }
          }
          if (!found) return;
-         
+
          this.elementid = found.fElementId;
          this.kind = (found.fName == "Default Viewer") ? "3D" : "2D";
          this.checkScences();
-         
+
       },
 
       // function called from GuiPanelController
@@ -91,12 +91,12 @@ sap.ui.define([
       },
 
       checkScences: function() {
-         
+
          if (!this._load_scripts || !this._render_html || !this.elementid) return;
-         
+
          if (!this.register_for_change) {
             this.register_for_change = true;
-            
+
             // only when rendering completed - register for modify events
             var element = this.mgr.GetElement(this.elementid);
 
@@ -203,17 +203,18 @@ sap.ui.define([
          this.last_highlight = geo_object;
          this.mgr.ProcessHighlight(this, geo_object, geo_object ? 0 : 100);
       },
-      
+
       /// invoked from the manager
-      
+
       onElementHighlight: function(masterid) {
          if (!this.painter_ready || !this.geo_painter) return;
 
          // masterid used as identifier, no any recursions
          this.geo_painter.HighlightMesh(null, null, masterid, null, true);
       },
-      
-      makeGLRepresentation: function(elem) {
+
+       makeGLRepresentation: function(elem) {
+           if (!elem.render_data) return null;
          var fname = elem.render_data.rnr_func;
          var obj3d = this.creator[fname](elem, elem.render_data);
          if (obj3d) {
@@ -234,7 +235,7 @@ sap.ui.define([
             return obj3d;
          }
       },
-      
+
       createExtras: function(arr, toplevel) {
          if (!arr) return;
          for (var k=0;k<arr.length;++k) {
@@ -252,12 +253,12 @@ sap.ui.define([
             this.createExtras(elem.childs);
          }
       },
-      
+
       hasExtras: function(elem) {
          if (!elem) return false;
          if (elem.render_data) return true;
          if (elem.childs)
-            for (var k=0;k<elem.childs.length;++k) 
+            for (var k=0;k<elem.childs.length;++k)
                if (this.hasExtras(elem.childs[k])) return true;
          return false;
       },
@@ -284,9 +285,9 @@ sap.ui.define([
 
       replaceElement: function(el) {
          if (!this.geo_painter) return;
-         
+
          var mesh = this.getMesh(el.fElementId);
-         
+
          var ex = this.geo_painter._extraObjects;
          for (var i=0; i < ex.arr.length; ++i) {
             if (ex.arr[i].geo_object == el.fElementId) {
@@ -313,29 +314,32 @@ sap.ui.define([
          return null;
       },
 
-      visibilityChanged: function(el, msg) {
-          console.log("visibilit element changed ", this, msg);
-          var mesh = this.getMesh(el.fElementId);
-          console.log("MESH visibility change ", mesh , el.fRnrSelf);
-          if (mesh) {
-              mesh.visible = el.fRnrSelf;
-              this.geo_painter.Render3D(-1);
-          }
+
+       visibilityChanged: function(el) {
+           if (this.geo_painter && this.geo_painter._extraObjects ) {
+               var ex = this.geo_painter._extraObjects;
+               for (var i=0; i < ex.arr.length; ++i) {
+                   if (ex.arr[i].eveId == el.fElementId) {
+                       ex.arr[i].visible = el.fRnrSelf;
+                   }
+               }
+
+               this.geo_painter.Render3D(-1);
+           }
       },
 
-      visibilityChildrenChanged: function(el, msg) {
+      visibilityChildrenChanged: function(el) {
          console.log("visibilit children changed ", this.mgr, el);
-          el.fRnrChildren = msg.fRnrChildren;
          if (el.childs) {
             for ( var i = 0; i < el.childs.length; ++i)
             {
                // console.log("visChildren", el.fElementId, "loop child ", el.childs[i] )
                 var mesh = this.getMesh(el.childs[i].fElementId);
                 if (mesh) {
-                    el.childs[i].fRnrSelf =  msg.fRnrChildren;;
-                    mesh.visible = msg.fRnrChildren;
+                    el.childs[i].fRnrSelf =  el.fRnrChildren;
+                    mesh.visible = el.fRnrChildren;
                 }
-               this.visibilityChildrenChanged(el.childs[i], msg);
+               this.visibilityChildrenChanged(el.childs[i]);
                this.geo_painter.Render3D(-1);
             }
          }
