@@ -151,8 +151,18 @@ sap.ui.define([
             }, {
                name : "Collection Color",
                member: "fMainColor",
-               srv  : "SetMainColorRGB",
+               srv  : "SetCollectionColorRGB",
                _type   : "Color"
+           }],
+           "REveDataItem" : [{
+               name : "ItemColor",
+               member: "fMainColor",
+               srv: "SetItemColorRGB",
+               _type   : "Color"
+           },{
+               name : "ItemRnrSelf",
+               member: "fRnrSelf",
+               _type   : "Bool"
            }],
            "REveTrack" : [
             {
@@ -168,21 +178,7 @@ sap.ui.define([
                _type   : "Number"
             }],
            "REveDataGeoShape" : [{
-            }],
-           "REveDataItem" : [{
-               name : "ItemColor",
-               member: "fMainColor",
-               _type   : "Color"
-           },{
-               name : "ItemRnrSelf",
-               member: "fRnrSel",
-               _type   : "Bool"
-           },{
-               name : "PassFilter",
-               member: "fFiltered",
-               _type   : "Bool"
-                             
-           }]
+            }]
          };
 
       },
@@ -302,7 +298,7 @@ sap.ui.define([
             arrw.push(cgd[i]);
          }
 
-         for (var i=0; i< arrw.length; ++i) {
+          for (var i=0; i< arrw.length; ++i) {
             var parName = arrw[i].name;
 
             if (!arrw[i].member) {
@@ -471,7 +467,6 @@ sap.ui.define([
          var idx = path.substring(base.length);
          var customData =  oContext.oModel.oData["widgetlist"][idx].data;
          //console.log("model ",  oContext.oModel);
-         //console.log("custom data ", customData);
          var controller =  sap.ui.getCore().byId("TopEveId--Summary").getController();
          var widget;
          switch (customData._type) {
@@ -525,14 +520,16 @@ sap.ui.define([
                press: function () {
 
                   var oCPPop = new ColorPalettePopover( {
-                        defaultColor: "cyan",
+                      defaultColor: "cyan",
                         colors: ['gold','darkorange', 'indianred','rgb(102,51,0)', 'cyan',// 'magenta'
                                  'blue', 'lime', 'gray','slategray','rgb(204, 198, 170)',
                                  'white', 'black','red' , 'rgb(102,154,51)', 'rgb(200, 0, 200)'],
-                        colorSelect: controller.handleColorSelect.bind(controller),
+                        colorSelect: controller.handleColorSelect.bind(controller)
                    });
 
+                   
                    oCPPop.openBy(this);
+                   oCPPop.data("myData", customData);
                  }
             });
 
@@ -555,7 +552,8 @@ sap.ui.define([
       },
 
       handleColorSelect: function(event, data) {
-         var val = event.getParameters().value;
+          var val = event.getParameters().value;
+          var myData = event.getSource().data("myData");
 
          var rgb,
              regex = /rgb\((\d+)\,\s?(\d+)\,\s?(\d+)\)/,
@@ -583,11 +581,10 @@ sap.ui.define([
             rgb = rgb ? { r: parseInt(rgb[1], 16), g: parseInt(rgb[2], 16), b: parseInt(rgb[3], 16) } : null;
          }
 
-         // var mir =  "SetMainColorRGB(" + rgb.r + ", " + rgb.g +  ", " + rgb.b + ")";
-         var mir =  "SetMainColorRGB((UChar_t)" + rgb.r + ", (UChar_t)" + rgb.g +  ", (UChar_t)" + rgb.b + ")";
-         // var mir =  "SetMainColorRGB(" + String.fromCharCode(97 + rgb.r) + ", " + String.fromCharCode(97 + rgb.g) +  ", " + String.fromCharCode(97 + rgb.b) + ")";
+
+         var mir =  myData.srv + "((UChar_t)" + rgb.r + ", (UChar_t)" + rgb.g +  ", (UChar_t)" + rgb.b + ")";
+
          var obj = { "mir": mir, "fElementId": this.editorElement.fElementId, "class": this.editorElement._typename };
-         console.log("MIR color ", obj);
          this.mgr.handle.Send(JSON.stringify(obj));
       },
 
