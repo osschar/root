@@ -29,7 +29,7 @@ void makeJets(int N_Jets, REX::REveElement* jetHolder)
       auto jet = new REX::REveJetCone(Form("Jet_%d",i ));
       jet->SetCylinder(2*kR_max, 2*kZ_d);
       jet->AddEllipticCone(r.Uniform(-3.5, 3.5), r.Uniform(0, TMath::TwoPi()),
-                           r.Uniform(0.02, 0.2), r.Uniform(0.02, 0.3));
+                           0.5, 0.7);
       jet->SetFillColor(kPink - 8);
       jet->SetLineColor(kViolet - 7);
 
@@ -44,7 +44,7 @@ void jets()
 
    REX::REveElement* jetHolder = new REX::REveElementList("Jets");
    eveMng->GetEventScene()->AddElement(jetHolder);
-   makeJets(2, jetHolder);
+   makeJets(1, jetHolder);
 
    eveMng->Show();
 }
