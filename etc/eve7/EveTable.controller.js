@@ -284,7 +284,7 @@ sap.ui.define([
          console.log("table element id ", pthis.tableEveElement.fElementId);
 
          var obj = {"mir" : mir, "fElementId" : pthis.tableEveElement.fElementId, "class" : pthis.tableEveElement._typename};
-         sap.ui.getCore().byId("TopEveId").getController().handle.Send(JSON.stringify(obj));
+         pthis.mgr.handle.Send(JSON.stringify(obj));
          console.log("MIR obj ", obj);
 
 
