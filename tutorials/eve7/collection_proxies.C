@@ -13,6 +13,7 @@
 #include "ROOT/REveDataCollectionManager.hxx"
 #include "ROOT/REveDataProxyBuilderBase.hxx"
 #include "ROOT/REveDataSimpleProxyBuilder.hxx"
+#include "ROOT/REveDataSimpleProxyBuilderTemplate.hxx"
 #include <ROOT/REveTrack.hxx>
 #include <ROOT/REveTrackPropagator.hxx>
 #include <ROOT/REveViewer.hxx>
@@ -101,35 +102,29 @@ private:
 //==============================================================================
 //============ PROXY BUILDERS  ================================================
 //==============================================================================
-class XYJetProxyBuilder: public REX::REveDataSimpleProxyBuilder
+class XYJetProxyBuilder: public REX::REveDataSimpleProxyBuilderTemplate<XYJet>
 {
-   using REX::REveDataSimpleProxyBuilder::Build;
-   virtual void Build(const void* data, REX::REveElement* iItemHolder, const REX::REveViewContext* context)
+   using REveDataSimpleProxyBuilderTemplate<XYJet>::Build;
+   virtual void Build(const XYJet& dj, REX::REveElement* iItemHolder, const REX::REveViewContext* context)
    {
-      const XYJet* dj = static_cast<const XYJet*>(data);
-
       auto jet = new REX::REveJetCone();
       jet->SetCylinder(2*context->GetMaxR(), context->GetMaxZ());
-      jet->AddEllipticCone(dj->Eta(), dj->GetPolarPhi(), dj->GetEtaSize(), dj->GetPhiSize());
+      jet->AddEllipticCone(dj.Eta(), dj.GetPolarPhi(), dj.GetEtaSize(), dj.GetPhiSize());
       SetupAddElement(jet, iItemHolder);
       jet->SetElementName(Form("element %s", iItemHolder->GetElementName()));
    }
 };
 
-
-class TrackProxyBuilder : public REX::REveDataSimpleProxyBuilder
-{
-   using REX::REveDataSimpleProxyBuilder::Build;
-   virtual void Build(const void* data, REX::REveElement* iItemHolder, const REX::REveViewContext* context)
+class TrackProxyBuilder : public REX::REveDataSimpleProxyBuilderTemplate<TParticle>
+{   
+   using REveDataSimpleProxyBuilderTemplate<TParticle>::Build;
+   virtual void Build(const TParticle& p, REX::REveElement* iItemHolder, const REX::REveViewContext* context)
    {
-      printf("calling build function REveDataSimpleProxyBuilder %s\n", iItemHolder->GetElementName());
-      TParticle* p = (TParticle*)data;
-      p->Print("all");
-      auto track = new REX::REveTrack(p, 1, context->GetPropagator());
+      const TParticle* x = &p;
+      auto track = new REX::REveTrack((TParticle*)(x), 1, context->GetPropagator());
       track->MakeTrack();
       SetupAddElement(track, iItemHolder, false);
       iItemHolder->AddElement(track);
-      track->Print("all");
       track->SetElementName(Form("element %s", iItemHolder->GetElementName()));
    }
 };
@@ -152,8 +147,6 @@ public:
    {
       if (!GetHaveAWindow())
          return;
-
-      printf("====== build table element %s\n", collection->GetElementName());
 
       auto table = new REX::REveDataTable("testTable");
       table->SetCollection(collection);
@@ -239,7 +232,7 @@ public:
 
       // RhoZ
       if (1) {
-         auto rhoZEventScene = REX::gEve->SpawnNewScene("RhoZ Scene","RhoZ");
+         auto rhoZEventScene = REX::gEve->SpawnNewScene("RhoZ Scene","Projected");
          m_mngRhoZ = new REX::REveProjectionManager(REX::REveProjection::kPT_RhoZ);
          m_mngRhoZ->SetImportEmpty(true);
          auto rhoZView = REX::gEve->SpawnNewViewer("RhoZ View", "");
@@ -277,7 +270,7 @@ public:
       REX::REveElementList* product = glBuilder->CreateProduct(m_viewContext);
       for (REX::REveScene* scene : m_scenes) {
          if (strncmp(scene->GetTitle(), "Table", 5) == 0) continue;
-         if (!strncmp(scene->GetTitle(), "RhoZ", 3)) {
+         if (!strncmp(scene->GetTitle(), "Projected", 8)) {
             m_mngRhoZ->ImportElements(product, scene);
          }
          else {
@@ -366,7 +359,7 @@ REX::REveDataCollection* makeTrackCollection(const char* name, int N)
       particle->SetPdgCode(pdg);
 
 
-      TString pname; pname.Form("TrackXY %2d", i);
+      TString pname; pname.Form("item %2d", i);
       collection->AddItem(particle, pname.Data(), "");
       collection->GetDataItem(i-1)->SetMainColorPtr(collection->GetMainColorPtr());
    }
@@ -398,7 +391,7 @@ REX::REveDataCollection* makeJetCollection(const char* name, int N)
       jet->SetEtaSize(r.Uniform(0.02, 0.2));
       jet->SetPhiSize(r.Uniform(0.01, 0.3));
 
-      TString pname; pname.Form("JetXY %2d", i);
+      TString pname; pname.Form("item %2d", i);
       collection->AddItem(jet, pname.Data(), "");
    }
 

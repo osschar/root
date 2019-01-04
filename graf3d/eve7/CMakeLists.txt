@@ -6,6 +6,7 @@ ROOT_STANDARD_LIBRARY_PACKAGE(ROOTEve
      inc/ROOT/REveDataCollectionManager.hxx
      inc/ROOT/REveDataProxyBuilderBase.hxx
      inc/ROOT/REveDataSimpleProxyBuilder.hxx
+     inc/ROOT/REveDataSimpleProxyBuilderTemplate.hxx
      inc/ROOT/REveElement.hxx
      inc/ROOT/REveGeoPolyShape.hxx
      inc/ROOT/REveGeoShapeExtract.hxx
