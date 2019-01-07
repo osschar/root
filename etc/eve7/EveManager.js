@@ -351,7 +351,7 @@
                     parent.childs = [];
 
                 parent.childs.push(em);
-                this.callSceneReceivers(scene, "elementAdded", obj);
+                this.callSceneReceivers(scene, "elementAdded", em);
             }
         }
 
