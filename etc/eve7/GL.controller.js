@@ -178,8 +178,8 @@ sap.ui.define([
 
          this.geo_painter.prepareObjectDraw(geom_obj); // and now start everything
 
-         // AMT temporary here, should be set in camera instantiation time
-         if (this.geo_painter._camera.type == "OrthographicCamera") {
+          // AMT temporary here, should be set in camera instantiation time
+          if (this.geo_painter._camera.type == "OrthographicCamera") {
             this.geo_painter._camera.left = -this.getView().$().width();
             this.geo_painter._camera.right = this.getView().$().width();
             this.geo_painter._camera.top = this.getView().$().height();
@@ -279,7 +279,8 @@ sap.ui.define([
             this.geo_painter.CheckResize();
       },
 
-      colorChanged: function(el) {
+       colorChanged: function(el) {
+           console.log("color change ", el.fElementId, el.fMainColor);
          this.replaceElement(el);
       },
 
@@ -344,7 +345,14 @@ sap.ui.define([
             }
          }
       },
-      elementAdded: function(em) {
+       elementAdded: function(el) {
+         var obj3d =  this.makeGLRepresentation(el);
+         if (obj3d) {
+            this.geo_painter.addExtra(obj3d);
+            this.geo_painter.getExtrasContainer().add(obj3d);
+         }
+           console.log("element added ", obj3d, el);
+         this.geo_painter.Render3D(-1);           
       },
       elementRemoved: function() {
       },
