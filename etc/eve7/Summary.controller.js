@@ -143,7 +143,8 @@ sap.ui.define([
             }],
             "REveDataCollection" : [{
                name : "FilterExpr",
-               _type   : "String"
+                _type   : "String",
+                quote : 1
             },{
                 name : "CollectionVisible",
                 member:"fRnrSelf",
@@ -162,6 +163,9 @@ sap.ui.define([
            },{
                name : "ItemRnrSelf",
                member: "fRnrSelf",
+               _type   : "Bool"
+           },{
+               name : "Filtered",
                _type   : "Bool"
            }],
            "REveTrack" : [
@@ -589,9 +593,14 @@ sap.ui.define([
       },
 
       sendMethodInvocationRequest: function(value, event) {
-         // console.log("on change !!!!!!", event.getSource().data("myData"));
+         console.log("on change !!!!!!", event.getSource().data("myData"));
+
+         if (event.getSource().data("myData").quote !== undefined ) {
+              value = "\"" + value + " \"";
+         }
          var mir =  event.getSource().data("myData").srv + "( " + value + " )";
-         // console.log("=====> ", mir);
+        
+         console.log("=====> ", mir);
          var obj = {"mir" : mir, "fElementId" : this.editorElement.fElementId, "class" : this.editorElement._typename};
 
          this.mgr.handle.Send(JSON.stringify(obj));
