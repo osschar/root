@@ -13,6 +13,15 @@ REveDataProxyBuilderBase::Product::Product(const REveViewContext* c) : m_viewCon
    m_elements->IncDenyDestroy();
 }
 
+//______________________________________________________________________________
+
+
+REveDataProxyBuilderBase::REveDataProxyBuilderBase(std::string type):
+   m_type(type),
+   m_collection(0),
+   m_haveWindow(false)
+{
+}
 
 REveDataProxyBuilderBase::Product::~Product()
 {
@@ -35,14 +44,6 @@ REveDataProxyBuilderBase::Product::~Product()
    m_elements->Annihilate();
 }
 
-//______________________________________________________________________________
-
-
-REveDataProxyBuilderBase::REveDataProxyBuilderBase():
-   m_collection(0),
-   m_haveWindow(false)
-{
-}
 
 //______________________________________________________________________________
 void REveDataProxyBuilderBase::SetCollection(REveDataCollection* c)
@@ -185,7 +186,7 @@ namespace {
       for (auto it = p->BeginChildren(); it != p->EndChildren(); ++it)
       {
          REveElement* c = *it;
-         //if (c->GetMainColor() != p->GetMainColor())
+         if (c->GetMainColor() != p->GetMainColor())
          {
             c->SetMainColor(p->GetMainColor());
             printf("apply color %d to %s\n", p->GetMainColor(), c->GetElementName());
@@ -203,20 +204,19 @@ REveDataProxyBuilderBase::ModelChanges(const REveDataCollection::Ids_t& iIds, Pr
    REveElementList* elms = p->m_elements;
    assert(m_collection && static_cast<int>(m_collection->GetNItems()) <= elms->NumChildren() && "can not use default modelChanges implementation");
 
-
-
    for (REveDataCollection::Ids_t::const_iterator it = iIds.begin(); it != iIds.end(); ++it)
    {
       int itemIdx = *it;
       REveDataItem* item = m_collection->GetDataItem(itemIdx);
 
-      printf("Edit compound for item index %d \n", itemIdx);
+      // printf("Edit compound for item index %d \n", itemIdx);
       // imitate FWInteractionList::modelChanges
       REveElement::List_i itElement = elms->BeginChildren();
       std::advance(itElement, itemIdx);
       REveElement* comp = *itElement;
       // AMT temporary workaround for use of compunds
-      if (comp->GetMainColor() != item->GetMainColor()) comp->SetMainColor(item->GetMainColor());
+      if (comp->GetMainColor() != item->GetMainColor())
+        comp->SetMainColor(item->GetMainColor());
       comp->SetRnrSelf(item->GetRnrSelf());
       applyVisAttrToChildren(comp);
 
@@ -224,6 +224,7 @@ REveDataProxyBuilderBase::ModelChanges(const REveDataCollection::Ids_t& iIds, Pr
       if (VisibilityModelChanges(*it, *itElement, p->m_viewContext))
       {
          elms->ProjectChild(*itElement);
+         printf("---REveDataProxyBuilderBase project child\n ");
       }
    }
 }

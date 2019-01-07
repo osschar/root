@@ -7,7 +7,7 @@
 using namespace ROOT::Experimental;
 namespace REX = ROOT::Experimental;
 
-REveDataSimpleProxyBuilder::REveDataSimpleProxyBuilder()
+REveDataSimpleProxyBuilder::REveDataSimpleProxyBuilder(std::string type) : REveDataProxyBuilderBase(type)
 {
 }
 

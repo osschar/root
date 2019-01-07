@@ -28,7 +28,9 @@ public:
       return m_collection;
    }
 
-   REveDataProxyBuilderBase();
+   // ---------- constructor/destructor  ---------------------
+   
+   REveDataProxyBuilderBase(std::string type);
    virtual ~REveDataProxyBuilderBase() {}
 
    void SetCollection(REveDataCollection*);
@@ -51,6 +53,7 @@ public:
    bool GetHaveAWindow() const { return m_haveWindow; }
    void SetHaveAWindow(bool);
 
+   std::string Type() const { return m_type; }
 protected:
   // Override this if visibility changes can cause (re)-creation of proxies.
    // Returns true if new proxies were created.
@@ -70,6 +73,8 @@ protected:
    std::vector<Product*> m_products;
 
 private:
+   std::string           m_type;
+   
    const REveDataCollection*   m_collection;
 
    float                 m_layer;
@@ -77,6 +82,7 @@ private:
    bool                  m_haveWindow;
    bool                  m_modelsChanged;
 
+   
    ClassDef(REveDataProxyBuilderBase, 0);
 
 };
