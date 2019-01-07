@@ -86,7 +86,7 @@ void REveDataCollection::ApplyFilter()
    {
       bool res = fFilterFoo(ii.fDataPtr);
 
-      printf("Item:%s -- filter result = %d\n", ii.fItemPtr->GetElementName(), res);
+      // printf("Item:%s -- filter result = %d\n", ii.fItemPtr->GetElementName(), res);
 
       ii.fItemPtr->SetFiltered( ! res );
 
@@ -94,6 +94,7 @@ void REveDataCollection::ApplyFilter()
       ii.fItemPtr->SetRnrSelf( res );
       ids.push_back(idx++);
    }
+   StampObjProps();
    if ( _handler_func_ids) _handler_func_ids( this , ids);
 }
 
@@ -203,8 +204,6 @@ void REveDataItem::SetItemColorRGB(UChar_t r, UChar_t g, UChar_t b)
    c->ItemChanged(this);
 }
 
-
-
 void REveDataItem::SetItemRnrSelf(bool iRnrSelf)
 {
    REveElement::SetRnrSelf(iRnrSelf);
@@ -212,6 +211,13 @@ void REveDataItem::SetItemRnrSelf(bool iRnrSelf)
    c->ItemChanged(this);
 }
 
+void REveDataItem::SetFiltered(bool f)
+{
+  if (f != fFiltered) {
+         fFiltered = f;
+         StampObjProps();
+  }
+}
 
 //==============================================================================
 // REveDataTable
