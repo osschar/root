@@ -290,12 +290,14 @@ sap.ui.define([
 
       },
 
-      replaceElement: function(el) {
+       replaceElement: function(el) {
+           console.log("REPLACE TABLE !!! ");
          this.setupTable( this.tableEveElement);
       },
 
 
-      elementAdded : function() {
+      elementAdded : function(el) {
+           this.setEveData();
       },
       elementRemoved: function() {
       },
