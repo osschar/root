@@ -98,12 +98,7 @@ public:
    virtual ~REveDataItem() {}
 
    Bool_t GetFiltered() const { return fFiltered; }
-   void SetFiltered(Bool_t f)
-   {
-      if (f != fFiltered) {
-         fFiltered = f; /* stamp; */
-      }
-   };
+   void SetFiltered(Bool_t f);
    virtual void SetItemColorRGB(UChar_t r, UChar_t g, UChar_t b);
    virtual void SetItemRnrSelf(bool);
 
