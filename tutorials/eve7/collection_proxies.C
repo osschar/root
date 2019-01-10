@@ -25,6 +25,7 @@
 #include "TRandom.h"
 #include "TGeoTube.h"
 Color_t trackColor = kGreen + 2;
+Color_t jetColor = kYellow;
 
 namespace REX = ROOT::Experimental;
 
@@ -133,13 +134,16 @@ class TableProxyBuilder : public REX::REveDataProxyBuilderBase
 {
 private:
    TableHandle::TableEntries m_specs;
+   REX::REveDataTable* m_table;
+   
 public:
+   TableProxyBuilder() : REX::REveDataProxyBuilderBase("Table"), m_table(0) {}
    virtual bool WillHandleInteraction() const { return true; }
 
    using REX::REveDataProxyBuilderBase::ModelChanges;
-   virtual void ModelChanges(const REX::REveDataCollection::Ids_t&)
+   virtual void ModelChanges(const REX::REveDataCollection::Ids_t&, REX::REveDataProxyBuilderBase::Product* p)
    {
-      printf("TableProxBuilder::modelChanges() for %s not implemented", Collection()->GetElementName());
+      m_table->StampObjProps();
    }
 
    using REX::REveDataProxyBuilderBase::Build;
@@ -160,12 +164,12 @@ public:
       }
 
       product->AddElement(table);
+      m_table = table;
    }
 
    void SetTableEntries(TableHandle::TableEntries& iSpecs)
    {
        for (TableEntry& spec : iSpecs) {
-          // spec.Print();
           m_specs.push_back(spec);
        }
 
@@ -313,11 +317,10 @@ public:
    }
 
    void ModelChanged(REX::REveDataCollection* collection, const REX::REveDataCollection::Ids_t& ids) {
-      printf("Model changes in collection %s: \n", collection->GetElementName());
       for (auto proxy : m_builders) {
          if (proxy->Collection() == collection) {
-         proxy->ModelChanges(ids);
-         break;
+            // printf("XXXXX Model changes check proxy %s: \n", proxy->Type().c_str());
+            proxy->ModelChanges(ids);
          }
       }
    }
@@ -371,7 +374,7 @@ REX::REveDataCollection* makeJetCollection(const char* name, int N)
 {
    REX::REveDataCollection* collection = new REX::REveDataCollection(name);
    collection->SetItemClass(XYJet::Class());
-   collection->SetMainColor(kYellow);
+   collection->SetMainColorPtr(&jetColor);
 
 
    TRandom &r = * gRandom;
@@ -393,6 +396,7 @@ REX::REveDataCollection* makeJetCollection(const char* name, int N)
 
       TString pname; pname.Form("item %2d", i);
       collection->AddItem(jet, pname.Data(), "");
+      collection->GetDataItem(i-1)->SetMainColorPtr(collection->GetMainColorPtr());
    }
 
    return collection;
@@ -407,7 +411,6 @@ void collection_proxies()
    REX::REveManager::Create();
 
    auto xyManager = new XYManager();
-   REX::REveElementList* collections = new REX::REveElementList("Collections");
 
    auto trackCollection = makeTrackCollection("XYTracks", 10);
    trackCollection->SetFilterExpr("i.Pt() > 0.1 && std::abs(i.Eta()) < 1");
