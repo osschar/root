@@ -21,8 +21,9 @@
    /// Holder of all EVE-related functions and classes
    JSROOT.EVE = {};
 
-   function EveManager() {
-      this.map = {}; // use object, not array
+   function EveManager()
+   {
+      this.map    = {}; // use object, not array
       this.childs = [];
       this.last_json = null;
       this.scene_changes = null;
@@ -266,17 +267,20 @@
       var removedIds = msg.header["removedElements"];
 
       if (scene.$receivers)
-         for (var i=0; i<scene.$receivers.length; i++) {
-            var controller =  scene.$receivers[i].obj;
+      {
+         for (var i = 0; i < scene.$receivers.length; i++)
+         {
+            var controller = scene.$receivers[i].obj;
             controller.beginChanges();
-            for (var r=0; r != removedIds.length; ++r)
-
-
-                controller.elementRemoved(removedIds[r]);
+            for (var r = 0; r != removedIds.length; ++r)
+            {
+               controller.elementRemoved(removedIds[r]);
+            }
          }
-
+      }
       // wait for binary if needed
-      if (msg.header.fTotalBinarySize) {
+      if (msg.header.fTotalBinarySize)
+      {
           this.last_json = [1];
           for (var i = 0; i < arr.length; ++i)
               this.last_json.push(arr[i]);
@@ -299,61 +303,65 @@
     }
 
 
-    EveManager.prototype.PostProcessSceneChanges = function() {
-        if (!this.scene_changes) return;
+   EveManager.prototype.PostProcessSceneChanges = function()
+   {
+      if (!this.scene_changes) return;
 
-        var arr = this.scene_changes.arr;
-        var header = this.scene_changes.header;
-        var scene = this.GetElement(header.fSceneId);
-        var nModified = header["numRepresentationChanged"];
+      var arr = this.scene_changes.arr;
+      var header = this.scene_changes.header;
+      var scene = this.GetElement(header.fSceneId);
+      var nModified = header["numRepresentationChanged"];
 
-        this.scene_changes = null;
+      this.scene_changes = null;
 
+      for (var n=0; n<arr.length; ++n)
+      {
+         var em = arr[n];
 
-        for (var n=0; n<arr.length; ++n) {
-            var em = arr[n];
+         // update existing
+         if (n < nModified )
+         {
+            var obj = this.map[em.fElementId];
 
-            // update existing
-            if (n < nModified ) {
-                var obj = this.map[em.fElementId];
-
-                if (em.changeBit & this.EChangeBits.kCBVisibility) {
-                    if (obj.fRnrSelf != em.fRnrSelf) {
-                        obj.fRnrSelf = em.fRnrSelf;
-                        this.callSceneReceivers(scene, "visibilityChanged", obj);
-                    }
-                    if (obj.fRnrChildren != em.fRnrChildren) {
-                        obj.fRnrChildren = em.fRnrSelfChildren;
-                        this.callSceneReceivers(scene, "visibilityChildrenChanged", obj);
-                    }
-                }
-
-                if (em.changeBit & this.EChangeBits.kCBColorSelection) {
-                    delete em.render_data;
-                    JSROOT.extend(obj, em);
-                    this.callSceneReceivers(scene, "colorChanged", obj);
-                }
-
-                if (em.changeBit & this.EChangeBits.kCBObjProps) {
-                   delete obj.render_data;
-                    jQuery.extend(obj, em);
-                    this.callSceneReceivers(scene, "replaceElement", obj);
-                }
-
-                // rename updateGED to checkGED???
-                this.InvokeReceivers("elem_update", null, 0, em.fElementId);
+            if (em.changeBit & this.EChangeBits.kCBVisibility)
+            {
+               if (obj.fRnrSelf != em.fRnrSelf) {
+                  obj.fRnrSelf = em.fRnrSelf;
+                  this.callSceneReceivers(scene, "visibilityChanged", obj);
+               }
+               if (obj.fRnrChildren != em.fRnrChildren) {
+                  obj.fRnrChildren = em.fRnrChildren;
+                  this.callSceneReceivers(scene, "visibilityChildrenChanged", obj);
+               }
             }
-            else {
-                // create new
-                this.map[em.fElementId] = em;
-                var parent = this.map[em.fMotherId];
-                if (!parent.childs)
-                    parent.childs = [];
 
-                parent.childs.push(em);
-                this.callSceneReceivers(scene, "elementAdded", em);
+            if (em.changeBit & this.EChangeBits.kCBColorSelection) {
+               delete em.render_data;
+               JSROOT.extend(obj, em);
+               this.callSceneReceivers(scene, "colorChanged", obj);
             }
-        }
+
+            if (em.changeBit & this.EChangeBits.kCBObjProps) {
+               delete obj.render_data;
+               jQuery.extend(obj, em);
+               this.callSceneReceivers(scene, "replaceElement", obj);
+            }
+
+            // rename updateGED to checkGED???
+            this.InvokeReceivers("elem_update", null, 0, em.fElementId);
+         }
+         else
+         {
+            // create new
+            this.map[em.fElementId] = em;
+            var parent = this.map[em.fMotherId];
+            if (!parent.childs)
+               parent.childs = [];
+
+            parent.childs.push(em);
+            this.callSceneReceivers(scene, "elementAdded", em);
+         }
+      }
 
       if (scene.$receivers) {
          for (var i=0; i != scene.$receivers.length; i++) {

@@ -44,7 +44,6 @@
       mesh.geo_name = hit.fName;
       mesh.geo_object = hit.fMasterId || hit.fElementId;
 
-      mesh.visible = hit.fRnrSelf;
       mesh.material.sizeAttenuation = false;
       mesh.material.size = hit.fMarkerSize;
       return mesh;
@@ -100,7 +99,6 @@
       line.object = track;
       line.geo_name = track.fName;
       line.geo_object = track.fMasterId || track.fElementId;
-      line.visible = track.fRnrSelf;
       line.hightlightWidthScale = 2;
 
       return line;
@@ -148,7 +146,6 @@
       mesh.object = jet_ro.object = jet;
       mesh.geo_name = jet_ro.geo_name = jet.fName;
       mesh.geo_object = jet_ro.geo_object = jet.fMasterId || jet.fElementId;
-      jet_ro.visible = jet.fRnrSelf;
       
       // redirect highlight to the mesh
       jet_ro.geo_highlight = line1.geo_highlight = line2.geo_highlight = mesh;
@@ -207,8 +204,6 @@
       // redirect highlight to the line1
       jet_ro.geo_highlight = line1.geo_highlight = line2.geo_highlight = mesh;
       
-      jet_ro.visible = jet.fRnrSelf;
-
       return jet_ro;
    }
    
