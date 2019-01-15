@@ -206,7 +206,8 @@
          return this.DestroyElements(arr);
    }
 
-   EveManager.prototype.Update = function(arr) {
+   EveManager.prototype.Update = function(arr)
+   {
       this.last_json = null;
       // console.log("JSON", arr[0]);
 
@@ -217,13 +218,15 @@
       if (arr[0].fTotalBinarySize)
          this.last_json = arr;
 
-      for (var n=1; n<arr.length;++n) {
+      for (var n = 1; n < arr.length; ++n)
+      {
          var elem = arr[n];
 
          var obj = this.map[elem.fElementId];
 
-         if (!obj) {
-            // element was not exists up to now
+         if ( ! obj)
+         {
+            // element did not exist up to now
             var parent = null;
             if (elem.fMotherId !== 0) {
                parent = this.map[elem.fMotherId];
@@ -241,7 +244,6 @@
             parent.childs.push(elem);
 
             obj = this.map[elem.fElementId] = elem;
-
          }
 
          this.MarkModified(elem.fElementId);

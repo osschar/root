@@ -49,6 +49,7 @@ sap.ui.define([
          this.id2obj_map = {};
          this.scene      = new THREE.Scene();
          this.camera     = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
+         this.rot_center = new THREE.Vector3(0,0,0);
 
          // this.controls = new THREE.OrbitControls( this.camera );
          //var controls = new THREE.FirstPersonControls( camera );
@@ -57,8 +58,8 @@ sap.ui.define([
          this.renderer.setPixelRatio( window.devicePixelRatio );
          this.renderer.setSize( window.innerWidth, window.innerHeight );
 
-         this.scene.fog = new THREE.FogExp2( 0xaaaaaa, 0.05 );
-         this.renderer.setClearColor( this.scene.fog.color, 1 );
+         // this.scene.fog = new THREE.FogExp2( 0xaaaaaa, 0.05 );
+         this.renderer.setClearColor( 0xffffff, 1 );
 
          this.dom_registered = false;
          //document.body.appendChild( this.renderer.domElement );
@@ -89,9 +90,6 @@ sap.ui.define([
          var plane = new THREE.GridHelper(20, 20, 0x80d080, 0x8080d0);
          this.scene.add(plane);
 
-         this.camera.position.set(-6, 6, -6);
-         this.camera.lookAt(plane);
-
          //this.controls.update();
          //this.render();
       },
@@ -111,6 +109,23 @@ sap.ui.define([
             this.controls.addEventListener( 'change', this.onThreeChange.bind(this) );
 
             this.dom_registered = true;
+
+            // Setup camera
+            var sbbox = new THREE.Box3();
+            sbbox.setFromObject( this.scene );
+
+            //var center = boundingBox.getCenter();
+            this.controls.target = this.rot_center;
+
+            var maxV = new THREE.Vector3; maxV.subVectors(sbbox.max, this.rot_center);
+            var minV = new THREE.Vector3; minV.subVectors(sbbox.min, this.rot_center);
+
+            var posV = new THREE.Vector3; posV = maxV.multiplyScalar(2);
+
+            this.camera.position.set( posV.x, posV.y, posV.z );
+            this.camera.lookAt(this.rot_center);
+
+            console.log("scene bbox ", sbbox, ", camera_pos ", posV, ", look_at ", this.rot_center);
          }
 
          //console.log(this.controls);
@@ -128,6 +143,8 @@ sap.ui.define([
       {
          // console.log("THREE change ", etypetarget, event);
 
+         // XXXX update controller target to rot_center?
+
          this.render();
       },
 
@@ -140,7 +157,8 @@ sap.ui.define([
          this.checkScences();
       },
 
-      onManagerUpdate: function() {
+      onManagerUpdate: function()
+      {
          // called when manager was updated, need only in standalone modes to detect own element id
          if (!this.standalone || this.elementid) return;
 
@@ -160,7 +178,8 @@ sap.ui.define([
       },
 
       // function called from GuiPanelController
-      onExit: function() {
+      onExit: function()
+      {
          if (this.mgr) this.mgr.Unregister(this);
       },
 
@@ -172,7 +191,8 @@ sap.ui.define([
          // this.checkScences();
       },
 
-      onAfterRendering: function() {
+      onAfterRendering: function()
+      {
 
          this._render_html = true;
 
@@ -182,18 +202,20 @@ sap.ui.define([
          this.checkScences();
       },
 
-      checkScences: function() {
-
+      checkScences: function()
+      {
          if (!this._load_scripts || !this._render_html || !this.elementid) return;
 
-         if (!this.register_for_change) {
-            this.register_for_change = true;
+         if (!this.registered_for_change)
+         {
+            this.registered_for_change = true;
 
             // only when rendering completed - register for modify events
             var element = this.mgr.GetElement(this.elementid);
 
             // loop over scene and add dependency
-            for (var k=0;k<element.childs.length;++k) {
+            for (var k=0;k<element.childs.length;++k)
+            {
                var scene = element.childs[k];
                this.mgr.Register(scene.fSceneId, this, "onElementChanged");
             }
@@ -267,7 +289,7 @@ sap.ui.define([
             var scene = this.mgr.GetElement(scene_info.fSceneId);
 
             if (scene && scene.childs)
-               this.create3DObjects(scene.childs);
+               this.create3DObjects(scene.childs, true);
          }
 
          // if geometry detected in the scenes, it will be used to display
