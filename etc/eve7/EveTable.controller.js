@@ -36,7 +36,7 @@ sap.ui.define([
             var scene = element.childs[k];
             console.log("FOUND scene", scene.fSceneId);
 
-            this.mgr.Register(scene.fSceneId, this, "onElementChanged");
+            this.mgr.RegisterSceneReceiver(scene.fSceneId, this);
             
             this.setEveData();
          }
@@ -122,7 +122,7 @@ sap.ui.define([
       
       onLoadScripts: function() {
          this._load_scripts = true;
-         this.checkScences();
+         this.checkScenes();
       },
       acm:function()
       {
@@ -133,7 +133,7 @@ sap.ui.define([
          if (this.mgr) this.mgr.Unregister(this);
       },
 
-      onElementChanged: function(id, element) {
+      onSceneChanged: function(element, id) {
          console.log("!!!CHANGED", id);
 
          this.setEveData();
@@ -157,10 +157,10 @@ sap.ui.define([
          // only when rendering completed - register for modify events
          var element = this.mgr.GetElement(this.elementid);
 
-         this.checkScences();
+         this.checkScenes();
       },
 
-      checkScences: function() {
+      checkScenes: function() {
       },
 
       toggleTableEdit: function() {
