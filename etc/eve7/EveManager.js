@@ -84,18 +84,31 @@
       this.handle.Send(JSON.stringify(obj));
    }
 
-   /** Configure dependency for given element id - invoke function when element changed */
-   EveManager.prototype.Register = function(id, receiver, func_name) {
+   /** Configure receiver for scene-respective events. Following event used:
+    * onSceneChanged */
+   EveManager.prototype.RegisterSceneReceiver = function(id, receiver, func_name) {
 
       var elem = this.GetElement(id);
-
+      
       if (!elem) return;
 
       if (!elem.$receivers) elem.$receivers = [];
 
-      elem.$receivers.push({ obj: receiver, func: func_name });
+      if (elem.$receivers.indexOf(receiver)<0)
+         elem.$receivers.push(receiver);
    }
 
+   /** Invoke function on all receiver of scene events - when such function exists */
+   EveManager.prototype.callSceneReceivers = function (scene, fname, arg) {
+      if (scene.$receivers) {
+          for (var i=0; i < scene.$receivers.length; i++) {
+              var receiver = scene.$receivers[i];
+              if (typeof receiver[fname] == "function")
+                 receiver[fname](arg);
+          }
+      }
+  }
+  
    /** returns master id for given element id
     * master id used for highlighting element in all dependent views */
    EveManager.prototype.GetMasterId = function(elemid) {
@@ -185,13 +198,10 @@
    }
 
    EveManager.prototype.ProcessModified = function(sceneid) {
-      var elem = this.map[sceneid];
-      if (!elem || !elem.$modified || !elem.$receivers) return;
-
-      for (var k=0;k<elem.$receivers.length;++k) {
-         var f = elem.$receivers[k];
-         f.obj[f.func](sceneid, elem);
-      }
+      var elem = this.GetElement(sceneid);
+      if (!elem || !elem.$modified) return;
+      
+      this.callSceneReceivers(elem, "onSceneChanged", sceneid);
 
       delete elem.$modified;
    }
@@ -262,24 +272,18 @@
       this.last_json = null;
       this.scene_changes = msg;
 
-      var scene = this.map[msg.header.fSceneId];
+      var scene = this.GetElement(msg.header.fSceneId);
 
       // notify scenes for beginning of changes and
       // notify for element removal
       var removedIds = msg.header["removedElements"];
 
-      if (scene.$receivers)
-      {
-         for (var i = 0; i < scene.$receivers.length; i++)
-         {
-            var controller = scene.$receivers[i].obj;
-            controller.beginChanges();
-            for (var r = 0; r != removedIds.length; ++r)
-            {
-               controller.elementRemoved(removedIds[r]);
-            }
-         }
-      }
+      // do we need this?
+      this.callSceneReceivers(scene, "beginChanges");
+      
+      for (var r = 0; r < removedIds.length; ++r)
+         this.callSceneReceivers(scene, "elementRemoved", removedIds[r]);
+
       // wait for binary if needed
       if (msg.header.fTotalBinarySize)
       {
@@ -293,16 +297,6 @@
    }
 
    //______________________________________________________________________________
-
-
-    EveManager.prototype.callSceneReceivers = function (scene, fname, el) {
-        if (scene.$receivers) {
-            for (var i=0; i != scene.$receivers.length; i++) {
-                var receiver = scene.$receivers[i].obj;
-                receiver[fname](el);
-            }
-        }
-    }
 
 
    EveManager.prototype.PostProcessSceneChanges = function()
@@ -365,12 +359,7 @@
          }
       }
 
-      if (scene.$receivers) {
-         for (var i=0; i != scene.$receivers.length; i++) {
-            var ctrl =  scene.$receivers[i].obj;
-            if (ctrl) ctrl.endChanges();
-         }
-      }
+      this.callSceneReceivers(scene, "endChanges");
 
       var treeRebuild = header.removedElements.length || (arr.length != nModified );
 
@@ -394,7 +383,7 @@
       if (!ids) return;
 
       for (var n=0;n<ids.length;++n) {
-         var element = this.map[ids[n]];
+         var element = this.GetElement(ids[n]);
          if (!element) {
             console.log("try to delete non-existing element with id", ids[n]);
             continue;
