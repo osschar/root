@@ -297,8 +297,7 @@ sap.ui.define([
 
       /// function called by GeoPainter, when mesh is highlighted
       /// forward message to the EveManager to redistribute event to all other drawings
-      HighlightMesh: function(mesh, color, geo_object) {
-         
+      HighlightMesh: function(mesh, color, geo_object, geo_index) {
          if (this.last_highlight === geo_object) return;
          this.last_highlight = geo_object;
          this.mgr.ProcessHighlight(this, geo_object, geo_object ? 0 : 100);
