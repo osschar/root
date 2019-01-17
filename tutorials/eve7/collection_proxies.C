@@ -112,7 +112,7 @@ class XYJetProxyBuilder: public REX::REveDataSimpleProxyBuilderTemplate<XYJet>
       jet->SetCylinder(2*context->GetMaxR(), context->GetMaxZ());
       jet->AddEllipticCone(dj.Eta(), dj.GetPolarPhi(), dj.GetEtaSize(), dj.GetPhiSize());
       SetupAddElement(jet, iItemHolder);
-      jet->SetElementName(Form("element %s", iItemHolder->GetElementName()));
+      jet->SetName(Form("element %s", iItemHolder->GetName().c_str()));
    }
 };
 
@@ -126,7 +126,7 @@ class TrackProxyBuilder : public REX::REveDataSimpleProxyBuilderTemplate<TPartic
       track->MakeTrack();
       SetupAddElement(track, iItemHolder, false);
       iItemHolder->AddElement(track);
-      track->SetElementName(Form("element %s", iItemHolder->GetElementName()));
+      track->SetName(Form("element %s", iItemHolder->GetCName()));
    }
 };
 
@@ -147,7 +147,7 @@ public:
    }
 
    using REX::REveDataProxyBuilderBase::Build;
-   virtual void Build(const REX::REveDataCollection* collection, REX::REveElementList* product, const REX::REveViewContext* context)
+   virtual void Build(const REX::REveDataCollection* collection, REX::REveElement* product, const REX::REveViewContext* context)
    {
       if (!GetHaveAWindow())
          return;
@@ -271,10 +271,10 @@ public:
       auto glBuilder = makeGLBuilderForType(collection->GetItemClass());
       glBuilder->SetCollection(collection);
       glBuilder->SetHaveAWindow(true);
-      REX::REveElementList* product = glBuilder->CreateProduct(m_viewContext);
+      REX::REveElement* product = glBuilder->CreateProduct(m_viewContext);
       for (REX::REveScene* scene : m_scenes) {
-         if (strncmp(scene->GetTitle(), "Table", 5) == 0) continue;
-         if (!strncmp(scene->GetTitle(), "Projected", 8)) {
+         if (strncmp(scene->GetCTitle(), "Table", 5) == 0) continue;
+         if (!strncmp(scene->GetCTitle(), "Projected", 8)) {
             m_mngRhoZ->ImportElements(product, scene);
          }
          else {
@@ -291,9 +291,9 @@ public:
       tableBuilder->SetHaveAWindow(showTable);
       tableBuilder->SetTableEntries(m_tableFormats[collection->GetName()]);
 
-         REX::REveElementList* tablep = tableBuilder->CreateProduct(m_viewContext);
+         REX::REveElement* tablep = tableBuilder->CreateProduct(m_viewContext);
          for (REX::REveScene* scene : m_scenes) {
-            if (strncmp(scene->GetTitle(), "Table", 5) == 0) {
+            if (strncmp(scene->GetCTitle(), "Table", 5) == 0) {
                scene->AddElement(tablep);
                tableBuilder->Build(collection, tablep, m_viewContext );
             }
@@ -313,7 +313,7 @@ public:
 
 
    void CollectionChanged(REX::REveDataCollection* collection) {
-      printf("collection changes %s \n", collection->GetElementName());
+      printf("collection changes %s \n", collection->GetCName());
    }
 
    void ModelChanged(REX::REveDataCollection* collection, const REX::REveDataCollection::Ids_t& ids) {

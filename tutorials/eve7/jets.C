@@ -42,7 +42,7 @@ void jets()
 {
    auto eveMng = REX::REveManager::Create();
 
-   REX::REveElement* jetHolder = new REX::REveElementList("Jets");
+   REX::REveElement* jetHolder = new REX::REveElement("Jets");
    eveMng->GetEventScene()->AddElement(jetHolder);
    makeJets(1, jetHolder);
 
