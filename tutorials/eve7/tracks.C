@@ -48,7 +48,7 @@ void tracks()
 {
    auto eveMng = REX::REveManager::Create();
 
-   REX::REveElement* trackHolder = new REX::REveElementList("Tracks");
+   REX::REveElement* trackHolder = new REX::REveElement("Tracks");
    eveMng->GetEventScene()->AddElement(trackHolder);
    makeTracks(10, trackHolder);
 

@@ -189,6 +189,9 @@ void REveStraightLineSet::BuildRenderData()
       fRenderData->PushV(m->fV[0], m->fV[1], m->fV[2]);
       fRenderData->PushI(m->fLineId);
    }
+
+   REveElement::BuildRenderData();
+   
    printf("REveStraightLineSet::BuildRenderData size= %d\n", fRenderData->GetBinarySize());
 }
 
