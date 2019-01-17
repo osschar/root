@@ -28,12 +28,13 @@ class REveDataItem;
 
 //==============================================================================
 
-class REveDataCollection : public REveElementList {
+class REveDataCollection : public REveElement
+{
 public:
    typedef std::vector<int> Ids_t;
-private:
 
-   std::function<void (REveDataCollection*)> _handler_func;
+private:
+   std::function<void (REveDataCollection*)>               _handler_func;
    std::function<void (REveDataCollection*, const Ids_t&)> _handler_func_ids;
 
 public:
@@ -41,7 +42,8 @@ public:
 
    TClass *fItemClass{nullptr}; // so far only really need class name
 
-   struct ItemInfo_t {
+   struct ItemInfo_t
+   {
       void *fDataPtr{nullptr};
       REveDataItem *fItemPtr{nullptr};
 
@@ -53,14 +55,14 @@ public:
    TString fFilterExpr;
    std::function<bool(void *)> fFilterFoo = [](void *) { return true; };
 
-   REveDataCollection(const char *n = "REveDataCollection", const char *t = "");
+   REveDataCollection(const std::string& n = "REveDataCollection", const std::string& t = "");
    virtual ~REveDataCollection() {}
 
    TClass *GetItemClass() const { return fItemClass; }
    void SetItemClass(TClass *cls) { fItemClass = cls; }
 
    void ReserveItems(Int_t items_size) { fItems.reserve(items_size); }
-   void AddItem(void *data_ptr, const char *n, const char *t);
+   void AddItem(void *data_ptr, const std::string& n, const std::string& t);
 
    void SetFilterExpr(const TString &filter);
    void ApplyFilter();
@@ -89,32 +91,35 @@ public:
 
 //==============================================================================
 
-class REveDataItem : public REveElementList {
+class REveDataItem : public REveElement
+{
 protected:
    Bool_t fFiltered{false};
 
 public:
-   REveDataItem(const char *n = "REveDataItem", const char *t = "");
+   REveDataItem(const std::string& n = "REveDataItem", const std::string& t = "");
    virtual ~REveDataItem() {}
 
    Bool_t GetFiltered() const { return fFiltered; }
-   void SetFiltered(Bool_t f);
+   void   SetFiltered(Bool_t f);
+
    virtual void SetItemColorRGB(UChar_t r, UChar_t g, UChar_t b);
    virtual void SetItemRnrSelf(bool);
 
-   virtual Int_t WriteCoreJson(nlohmann::json &cj, Int_t rnr_offset);
+   Int_t WriteCoreJson(nlohmann::json &cj, Int_t rnr_offset); // override;
+
    ClassDef(REveDataItem, 0);
 };
 
 //==============================================================================
 
-class REveDataTable : public REveElementList // XXXX
+class REveDataTable : public REveElement
 {
 protected:
    const REveDataCollection *fCollection{nullptr};
 
 public:
-   REveDataTable(const char *n = "REveDataTable", const char *t = "");
+   REveDataTable(const std::string& n = "REveDataTable", const std::string& t = "");
    virtual ~REveDataTable() {}
 
    void SetCollection(const REveDataCollection *col) { fCollection = col; }
@@ -123,14 +128,14 @@ public:
    void PrintTable();
    virtual Int_t WriteCoreJson(nlohmann::json &cj, Int_t rnr_offset);
 
-   void AddNewColumn(const char *expr, const char *title, int prec = 2);
+   void AddNewColumn(const std::string& expr, const std::string& title, int prec = 2);
 
    ClassDef(REveDataTable, 0);
 };
 
 //==============================================================================
 
-class REveDataColumn : public REveElementList // XXXX
+class REveDataColumn : public REveElement
 {
 public:
    enum FieldType_e { FT_Double = 0, FT_Bool, FT_String };
@@ -149,10 +154,10 @@ public:
    std::function<std::string(void *)> fStringFoo;
 
 public:
-   REveDataColumn(const char *n = "REveDataColumn", const char *t = "");
+   REveDataColumn(const std::string& n = "REveDataColumn", const std::string& t = "");
    virtual ~REveDataColumn() {}
 
-   void SetExpressionAndType(const TString &expr, FieldType_e type);
+   void SetExpressionAndType(const std::string &expr, FieldType_e type);
    void SetPrecision(Int_t prec);
 
    std::string EvalExpr(void *iptr);

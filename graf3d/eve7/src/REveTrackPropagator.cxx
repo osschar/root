@@ -210,9 +210,9 @@ Double_t             REveTrackPropagator::fgEditorMaxZ  = 4000;
 ////////////////////////////////////////////////////////////////////////////////
 /// Default constructor.
 
-REveTrackPropagator::REveTrackPropagator(const char* n, const char* t,
+REveTrackPropagator::REveTrackPropagator(const std::string& n, const std::string& t,
                                          REveMagField *field, Bool_t own_field) :
-   REveElementList(n, t),
+   REveElement(n, t),
    REveRefBackPtr(),
 
    fStepper(kHelix),
@@ -280,7 +280,7 @@ void REveTrackPropagator::CheckReferenceCount(const REveException& eh)
 {
    if (fRefCount <= 0)
    {
-      REveElementList::CheckReferenceCount(eh);
+      REveElement::CheckReferenceCount(eh);
    }
 }
 
@@ -299,7 +299,7 @@ void REveTrackPropagator::ElementChanged(Bool_t update_scenes, Bool_t redraw)
       track->StampObjProps();
       ++i;
    }
-   REveElementList::ElementChanged(update_scenes, redraw);
+   REveElement::ElementChanged(update_scenes, redraw);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -38,8 +38,8 @@ calculated by multiplying the transformation matrices of all parents.
 ////////////////////////////////////////////////////////////////////////////////
 /// Constructor.
 
-REveScene::REveScene(const char* n, const char* t) :
-   REveElementList(n, t)
+REveScene::REveScene(const std::string& n, const std::string& t) :
+   REveElement(n, t)
 {
    fScene = this;
 }
@@ -258,7 +258,7 @@ void REveScene::StreamRepresentationChanges()
 
       if (bits & kCBObjProps)
       {
-         printf("total element change %s \n", el->GetElementName());
+         printf("total element change %s \n", el->GetCName());
 
          Int_t rd_size = el->WriteCoreJson(jobj, fTotalBinarySize);
          if (rd_size) {
@@ -275,7 +275,7 @@ void REveScene::StreamRepresentationChanges()
 
    for (auto el : fAddedElements) {
       nlohmann::json jobj = {};
-      printf("scene representation change new element change %s \n", el->GetElementName());
+      printf("scene representation change new element change %s \n", el->GetCName());
       Int_t rd_size = el->WriteCoreJson(jobj, fTotalBinarySize);
       jarr.push_back(jobj);
       if (rd_size) {
@@ -305,7 +305,7 @@ void REveScene::StreamRepresentationChanges()
    nlohmann::json msg = { {"header", jhdr}, {"arr", jarr}};
    fOutputJson = msg.dump();
 
-   printf("[%s] Stream representation changes %s ...\n", GetElementName(), fOutputJson.substr(0,30).c_str() );
+   printf("[%s] Stream representation changes %s ...\n", GetCName(), fOutputJson.substr(0,30).c_str() );
 }
 
 void
@@ -324,7 +324,7 @@ REveScene::SendChangesToSubscribers()
 Bool_t
 REveScene::IsChanged() const
 {
-   printf("REveScene::IsChanged %s %d\n", GetElementName(), fAddedElements.empty());
+   printf("REveScene::IsChanged %s %d\n", GetCName(), fAddedElements.empty());
    return ! (fChangedElements.empty() && fAddedElements.empty() && fRemovedElements.empty());
 }
 
@@ -457,8 +457,8 @@ List of Scenes providing common operations on REveScene collections.
 ////////////////////////////////////////////////////////////////////////////////
 /// Constructor.
 
-REveSceneList::REveSceneList(const char* n, const char* t) :
-   REveElementList(n, t)
+REveSceneList::REveSceneList(const std::string& n, const std::string& t) :
+   REveElement(n, t)
 {
    SetChildClass(REveScene::Class());
 }

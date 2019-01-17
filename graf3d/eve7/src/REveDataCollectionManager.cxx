@@ -5,20 +5,14 @@
 using namespace ROOT::Experimental;
 namespace REX = ROOT::Experimental;
 
-REveDataCollectionManager::REveDataCollectionManager(const char* n, const char* t) :
-   REveElementList(n, t)
+REveDataCollectionManager::REveDataCollectionManager(const std::string& n, const std::string& t) :
+   REveElement(n, t)
 {
 }
 
-//______________________________________________________________________________
+////////////////////////////////////////////////////////////////
+/// constructors and destructor
 
-//______________________________________________________________________________
-
-//______________________________________________________________________________
-
-
-// constructors and destructor
-//
 REveDataInteractionList::REveDataInteractionList(const REveDataCollection* item)
    : m_collection(item)
 {}
@@ -70,7 +64,7 @@ REveDataInteractionList::Added(REveElement* el, unsigned int idx)
    */
    auto bi = m_collection->BeginChildren();
    std::advance(bi, idx);
-   std::string name = (*bi)->GetElementName();
+   std::string name = (*bi)->GetName();
 
    REveCompound* c = new REveCompound(name.c_str(), name.c_str());
    c->EnableListElements(m_collection->GetRnrSelf());

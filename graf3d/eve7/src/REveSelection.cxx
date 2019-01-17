@@ -28,8 +28,8 @@ selection type (select/highlight).
 ////////////////////////////////////////////////////////////////////////////////
 /// Constructor.
 
-REveSelection::REveSelection(const char* n, const char* t) :
-   REveElementList(n, t),
+REveSelection::REveSelection(const std::string& n, const std::string& t) :
+   REveElement(n, t),
    fPickToSelect  (kPS_Projectable),
    fActive        (kTRUE),
    fIsMaster      (kTRUE)
@@ -101,7 +101,7 @@ Bool_t REveSelection::AcceptElement(REveElement* el)
 
 void REveSelection::AddElement(REveElement* el)
 {
-   REveElementList::AddElement(el);
+   REveElement::AddElement(el);
 
    SelMap_i i = fImpliedSelected.insert(std::make_pair(el, Set_t())).first;
    if (fActive)
@@ -117,7 +117,7 @@ void REveSelection::AddElement(REveElement* el)
 
 void REveSelection::RemoveElement(REveElement* el)
 {
-   REveElementList::RemoveElement(el);
+   REveElement::RemoveElement(el);
    SelectionRemoved(el);
 }
 
@@ -148,7 +148,7 @@ void REveSelection::RemoveElementLocal(REveElement* el)
 
 void REveSelection::RemoveElements()
 {
-   REveElementList::RemoveElements();
+   REveElement::RemoveElements();
    SelectionCleared();
 }
 

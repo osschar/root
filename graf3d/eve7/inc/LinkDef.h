@@ -105,12 +105,10 @@
 #pragma link C++ class ROOT::Experimental::REvePointSelectorConsumer+;
 #pragma link C++ class ROOT::Experimental::REvePointSelector+;
 
-// REveElement
 #pragma link C++ class ROOT::Experimental::REveRenderData+;
+
+// REveElement
 #pragma link C++ class ROOT::Experimental::REveElement+;
-#pragma link C++ class ROOT::Experimental::REveElementObjectPtr+;
-#pragma link C++ class ROOT::Experimental::REveElementList+;
-#pragma link C++ class ROOT::Experimental::REveElementListProjected+;
 
 #pragma link C++ class std::list<ROOT::Experimental::REveElement*>;
 #pragma link C++ class std::list<ROOT::Experimental::REveElement*>::iterator;

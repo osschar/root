@@ -30,8 +30,8 @@ Color_t  REveDataCollection::fgDefaultColor  = kBlue;
 // REveDataCollection
 //==============================================================================
 
-REveDataCollection::REveDataCollection(const char* n, const char* t) :
-   REveElementList(n, t)
+REveDataCollection::REveDataCollection(const std::string& n, const std::string& t) :
+   REveElement(n, t)
 {
    fChildClass = REveDataItem::Class();
 
@@ -43,7 +43,7 @@ REveDataCollection::REveDataCollection(const char* n, const char* t) :
    _handler_func_ids = 0;
 }
 
-void REveDataCollection::AddItem(void *data_ptr, const char *n, const char *t)
+void REveDataCollection::AddItem(void *data_ptr, const std::string& n, const std::string& t)
 {
    auto el = new REveDataItem(n, t);
    AddElement(el);
@@ -183,8 +183,8 @@ void REveDataCollection::ItemChanged(REveDataItem* iItem)
 // REveDataItem
 //==============================================================================
 
-REveDataItem::REveDataItem(const char* n, const char* t) :
-   REveElementList(n, t)
+REveDataItem::REveDataItem(const std::string& n, const std::string& t) :
+   REveElement(n, t)
 {
    SetMainColorPtr(new Color_t(REveDataCollection::fgDefaultColor));
 }
@@ -223,8 +223,8 @@ void REveDataItem::SetFiltered(bool f)
 // REveDataTable
 //==============================================================================
 
-REveDataTable::REveDataTable(const char* n, const char* t) :
-   REveElementList(n, t)
+REveDataTable::REveDataTable(const std::string& n, const std::string& t) :
+   REveElement(n, t)
 {
    fChildClass = REveDataColumn::Class();
 }
@@ -238,7 +238,7 @@ void REveDataTable::PrintTable()
       void         *data = fCollection->GetDataPtr(i);
       REveDataItem *item = fCollection->GetDataItem(i);
 
-      printf("| %-20s |", item->GetElementName());
+      printf("| %-20s |", item->GetCName());
 
       for (auto & chld : fChildren)
       {
@@ -264,7 +264,7 @@ Int_t REveDataTable::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
       for (auto & chld : fChildren)
       {
          auto clmn = dynamic_cast<REveDataColumn*>(chld);
-         row[chld->GetElementName()] = clmn->EvalExpr(data);
+         row[chld->GetCName()] = clmn->EvalExpr(data);
          // printf(" %10s |", clmn->EvalExpr(data).c_str());
 
       }
@@ -275,7 +275,7 @@ Int_t REveDataTable::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
    return ret;
 }
 
-void REveDataTable::AddNewColumn(const char* expr, const char* title, int prec)
+void REveDataTable::AddNewColumn(const std::string& expr, const std::string& title, int prec)
 {
    auto c = new REX::REveDataColumn(title);
    AddElement(c);
@@ -290,12 +290,12 @@ void REveDataTable::AddNewColumn(const char* expr, const char* title, int prec)
 // REveDataColumn
 //==============================================================================
 
-REveDataColumn::REveDataColumn(const char* n, const char* t) :
-   REveElementList(n, t)
+REveDataColumn::REveDataColumn(const std::string& n, const std::string& t) :
+   REveElement(n, t)
 {
 }
 
-void REveDataColumn::SetExpressionAndType(const TString& expr, FieldType_e type)
+void REveDataColumn::SetExpressionAndType(const std::string& expr, FieldType_e type)
 {
    auto table = dynamic_cast<REveDataTable*>(fMother);
    auto coll = table->GetCollection();
@@ -304,8 +304,8 @@ void REveDataColumn::SetExpressionAndType(const TString& expr, FieldType_e type)
    fExpression = expr;
    fType       = type;
 
-   const char *rtyp{nullptr};
-   const void *fooptr{nullptr};
+   const char *rtyp   = nullptr;
+   const void *fooptr = nullptr;
 
    switch (fType)
    {

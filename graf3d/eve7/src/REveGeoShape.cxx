@@ -269,7 +269,7 @@ void REveGeoShape::WriteExtract(const char* name)
 REveGeoShapeExtract *REveGeoShape::DumpShapeTree(REveGeoShape* gsre,
                                                  REveGeoShapeExtract* parent)
 {
-   REveGeoShapeExtract* she = new REveGeoShapeExtract(gsre->GetName(), gsre->GetTitle());
+   REveGeoShapeExtract* she = new REveGeoShapeExtract(gsre->GetCName(), gsre->GetCTitle());
    she->SetTrans(gsre->RefMainTrans().Array());
    {
       Int_t   ci = gsre->GetFillColor();

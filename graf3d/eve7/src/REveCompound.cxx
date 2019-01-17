@@ -22,10 +22,19 @@ Description of REveCompound
 ////////////////////////////////////////////////////////////////////////////////
 /// Constructor.
 
-REveCompound::REveCompound(const char* n, const char* t, Bool_t doColor, Bool_t doTransparency) :
-   REveElementList (n, t, doColor, doTransparency),
-   fCompoundOpen   (0)
+REveCompound::REveCompound(const std::string& n, const std::string& t,
+                           Bool_t doColor, Bool_t doTransparency) :
+   REveElement   (n, t),
+   fCompoundOpen (0)
 {
+   if (doColor) {
+      fCanEditMainColor = kTRUE;
+      SetMainColorPtr(&fColor);
+   }
+   if (doTransparency)
+   {
+      fCanEditMainTransparency = kTRUE;
+   }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -94,7 +103,7 @@ void REveCompound::SetMainTransparency(Char_t t)
 
 void REveCompound::AddElement(REveElement* el)
 {
-   REveElementList::AddElement(el);
+   REveElement::AddElement(el);
    if (IsCompoundOpen() && el->GetCompound() == 0)
       el->SetCompound(this);
 }
@@ -107,7 +116,7 @@ void REveCompound::RemoveElementLocal(REveElement* el)
    if (el->GetCompound() == this)
       el->SetCompound(0);
 
-   REveElementList::RemoveElementLocal(el);
+   REveElement::RemoveElementLocal(el);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -121,7 +130,7 @@ void REveCompound::RemoveElementsLocal()
          (*i)->SetCompound(0);
    }
 
-   REveElementList::RemoveElementsLocal();
+   REveElement::RemoveElementsLocal();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -146,7 +155,7 @@ void REveCompound::FillImpliedSelectedSet(Set_t& impSelSet)
       }
    }
 
-   REveElementList::FillImpliedSelectedSet(impSelSet);
+   REveElement::FillImpliedSelectedSet(impSelSet);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

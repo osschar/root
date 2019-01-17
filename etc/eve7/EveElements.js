@@ -124,7 +124,7 @@
       for (var i = 1; i < N - 1; ++i)
          idcs.push( 0, i, i + 1 );
       geo_body.setIndex( idcs );
-      geo_body.computeVertexNormals();
+      // geo_body.computeVertexNormals();
       
       var geo_rim = new THREE.BufferGeometry();
       geo_rim.addAttribute('position', pos_ba);
@@ -142,9 +142,9 @@
       var mcol = JSROOT.Painter.root_colors[jet.fMainColor];
       var lcol = JSROOT.Painter.root_colors[jet.fLineColor];
       
-      var mesh = new THREE.Mesh(geo_body, new THREE.MeshPhongMaterial({ depthWrite: false, color: mcol, transparent: true, opacity: 0.5, side: THREE.DoubleSide }));
-      var line1 = new THREE.LineLoop(geo_rim,  new THREE.LineBasicMaterial({ linewidth: 2,   color: lcol, transparent: true, opacity: 0.5 })) 
-      var line2 = new THREE.LineSegments(geo_rays, new THREE.LineBasicMaterial({ linewidth: 0.5, color: lcol, transparent: true, opacity: 0.5 }));
+      var mesh  = new THREE.Mesh(geo_body, new THREE.MeshPhongMaterial({ depthWrite: false, color: mcol, transparent: true, opacity: 0.5, side: THREE.DoubleSide, flatShading: true }));
+      var line1 = new THREE.LineLoop(geo_rim,  new THREE.LineBasicMaterial({ linewidth: 2,   color: lcol, transparent: true, opacity: 0.8 })) 
+      var line2 = new THREE.LineSegments(geo_rays, new THREE.LineBasicMaterial({ linewidth: 0.5, color: lcol, transparent: true, opacity: 0.8 }));
       
       jet_ro.add( mesh  );
       jet_ro.add( line1 );

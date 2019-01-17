@@ -37,7 +37,7 @@ namespace REX = ROOT::Experimental;
 /// Constructor.
 
 REveProjectionManager::REveProjectionManager(REveProjection::EPType_e type):
-   REveElementList("REveProjectionManager",""),
+   REveElement("REveProjectionManager",""),
    TAttBBox(),
    fProjection  (nullptr),
    fCurrentDepth(0),
@@ -166,7 +166,7 @@ Bool_t REveProjectionManager::ShouldImport(REveElement* el)
    if (fImportEmpty)
       return kTRUE;
 
-   if (el->IsA() != REveElementList::Class() && el->IsA()->InheritsFrom(REveProjectable::Class()))
+   if (el->IsA()->InheritsFrom(REveProjectable::Class()))
       return kTRUE;
    for (List_i i=el->BeginChildren(); i!=el->EndChildren(); ++i)
       if (ShouldImport(*i))
@@ -220,10 +220,10 @@ REveElement* REveProjectionManager::ImportElementsRecurse(REveElement* el,
       }
       else
       {
-         new_el = new REveElementList;
+         new_el = new REveElement;
       }
-      new_el->SetElementName (Form("%s [P]", el->GetElementName()));
-      new_el->SetElementTitle(Form("Projected replica.\n%s", el->GetElementTitle()));
+      new_el->SetName (Form("%s [P]", el->GetCName()));
+      new_el->SetTitle(Form("Projected replica.\n%s", el->GetCTitle()));
       new_el->SetRnrSelf     (el->GetRnrSelf());
       new_el->SetRnrChildren (el->GetRnrChildren());
       new_el->SetPickable    (el->IsPickable());

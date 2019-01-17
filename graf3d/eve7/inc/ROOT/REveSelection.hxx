@@ -19,7 +19,8 @@
 namespace ROOT {
 namespace Experimental {
 
-class REveSelection : public REveElementList {
+class REveSelection : public REveElement
+{
 public:
    enum EPickToSelect   // How to convert picking events to top selected element:
    { kPS_Ignore,        // ignore picking
@@ -54,7 +55,7 @@ protected:
    void RecheckImpliedSet(SelMap_i smi);
 
 public:
-   REveSelection(const char *n = "REveSelection", const char *t = "");
+   REveSelection(const std::string& n = "REveSelection", const std::string& t = "");
    virtual ~REveSelection() {}
 
    void SetHighlightMode();

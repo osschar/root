@@ -19,7 +19,9 @@
 namespace ROOT {
 namespace Experimental {
 
-class REveProjectionManager : public REveElementList, public TAttBBox {
+class REveProjectionManager : public REveElement,
+                              public TAttBBox
+{
 private:
    REveProjectionManager(const REveProjectionManager &);            // Not implemented
    REveProjectionManager &operator=(const REveProjectionManager &); // Not implemented

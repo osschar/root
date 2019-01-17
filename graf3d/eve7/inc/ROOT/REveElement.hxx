@@ -16,8 +16,6 @@
 #include <ROOT/REveVector.hxx>
 #include <ROOT/REveProjectionBases.hxx>
 
-#include "TNamed.h"
-#include "TRef.h"
 #include <memory>
 
 class TGeoMatrix;
@@ -61,9 +59,9 @@ class REveCompound;
 class REveTrans;
 class REveRenderData;
 
-/******************************************************************************/
+//==============================================================================
 // REveElement
-/******************************************************************************/
+//==============================================================================
 
 class REveElement
 {
@@ -95,8 +93,11 @@ protected:
    void assign_scene_recursively(REveScene* s);
 
 protected:
+   std::string      fName;                 //  Element name
+   std::string      fTitle;                //  Element title / tooltip
    List_t           fParents;              //  List of parents.
    List_t           fChildren;             //  List of children.
+   TClass          *fChildClass{nullptr};  // Class of acceptable children, others are rejected.
    REveCompound    *fCompound{nullptr};    //  Compound this object belongs to.
    REveElement     *fVizModel{nullptr};    //! Element used as model from VizDB.
    TString          fVizTag;               //  Tag used to query VizDB for model element.
@@ -116,7 +117,6 @@ protected:
    Color_t         *fMainColorPtr{nullptr}; //  Pointer to main-color variable.
    std::unique_ptr<REveTrans> fMainTrans;   //  Pointer to main transformation matrix.
 
-   TRef             fSource;               //  External object that is represented by this element.
    void            *fUserData{nullptr};    //! Externally assigned and controlled user data.
    std::unique_ptr<REveRenderData> fRenderData;//! Vertex / normal / triangle index information for rendering.
 
@@ -124,11 +124,10 @@ protected:
    virtual void RemoveElementsInternal();
    virtual void AnnihilateRecursively();
 
-   static const char* ToString(Bool_t b);
+   static const std::string& ToString(Bool_t b);
 
 public:
-   REveElement();
-   REveElement(Color_t& main_color);
+   REveElement(const std::string& name="", const std::string& title="");
    REveElement(const REveElement& e);
    virtual ~REveElement();
 
@@ -138,12 +137,16 @@ public:
    virtual REveElement* CloneElementRecurse(Int_t level=0) const;
    virtual void         CloneChildrenRecurse(REveElement* dest, Int_t level=0) const;
 
-   virtual const char* GetElementName()  const;
-   virtual const char* GetElementTitle() const;
-   virtual TString     GetHighlightTooltip() { return TString(GetElementTitle()); }
-   virtual void SetElementName (const char* name);
-   virtual void SetElementTitle(const char* title);
-   virtual void SetElementNameTitle(const char* name, const char* title);
+   std::string GetName()   const { return fName;  }
+   const char* GetCName()  const { return fName.c_str();  }
+   std::string GetTitle()  const { return fTitle; }
+   const char* GetCTitle() const { return fTitle.c_str();  }
+
+   virtual std::string GetHighlightTooltip() const { return fTitle; }
+
+   void SetName (const std::string& name);
+   void SetTitle(const std::string& title);
+   void SetNameTitle(const std::string& name, const std::string& title);
    virtual void NameTitleChanged();
 
    const TString& GetVizTag() const             { return fVizTag; }
@@ -173,8 +176,7 @@ public:
    virtual void RemoveParent(REveElement* el);
    virtual void CheckReferenceCount(const REveException& eh="REveElement::CheckReferenceCount ");
    virtual void CollectSceneParents(List_t& scenes);
-   virtual void CollectSceneParentsFromChildren(List_t& scenes,
-                                                REveElement* parent);
+   virtual void CollectSceneParentsFromChildren(List_t& scenes, REveElement* parent);
 
    List_i  BeginParents()        { return  fParents.begin();  }
    List_i  EndParents()          { return  fParents.end();    }
@@ -182,6 +184,9 @@ public:
    List_ci EndParents()    const { return  fParents.end();    }
    Int_t   NumParents()    const { return  fParents.size();   }
    Bool_t  HasParents()    const { return !fParents.empty();  }
+
+   TClass* GetChildClass() const { return fChildClass; }
+   void    SetChildClass(TClass* c) { fChildClass = c; }
 
    const List_t& RefChildren() const { return  fChildren;     }
    List_i  BeginChildren()       { return  fChildren.begin(); }
@@ -214,17 +219,9 @@ public:
    void   IncParentIgnoreCnt();
    void   DecParentIgnoreCnt();
 
-   virtual TObject* GetObject      (const REveException& eh) const;
-   virtual TObject* GetEditorObject(const REveException& eh) const { return GetObject(eh); }
-   virtual TObject* GetRenderObject(const REveException& eh) const { return GetObject(eh); }
-
    // --------------------------------
 
    virtual void ExportToCINT(char *var_name); // *MENU*
-
-   void    DumpSourceObject() const;                       // *MENU*
-   void    PrintSourceObject() const;                      // *MENU*
-   void    ExportSourceObjectToCINT(char* var_name) const; // *MENU*
 
    virtual Bool_t AcceptElement(REveElement* el);
 
@@ -291,10 +288,6 @@ public:
 
    virtual Int_t WriteCoreJson(nlohmann::json &cj, Int_t rnr_offset);
    virtual void  BuildRenderData();
-
-   TRef&    GetSource()                 { return fSource; }
-   TObject* GetSourceObject()     const { return fSource.GetObject(); }
-   void     SetSourceObject(TObject *o) { fSource = o; }
 
    void* GetUserData() const { return fUserData; }
    void  SetUserData(void* ud) { fUserData = ud; }
@@ -405,120 +398,15 @@ public:
 
    // Menu entries for VizDB communication (here so they are last in the menu).
 
-   void VizDB_Apply(const char* tag);           // *MENU*
+   void VizDB_Apply(const std::string& tag);    // *MENU*
    void VizDB_Reapply();                        // *MENU*
    void VizDB_UpdateModel(Bool_t update=kTRUE); // *MENU*
-   void VizDB_Insert(const char* tag, Bool_t replace=kTRUE, Bool_t update=kTRUE); // *MENU*
+   void VizDB_Insert(const std::string& tag, Bool_t replace=kTRUE, Bool_t update=kTRUE); // *MENU*
 
    ClassDef(REveElement, 0); // Base class for REveUtil visualization elements, providing hierarchy management, rendering control and list-tree item management.
 };
 
-
-/******************************************************************************/
-// REveElementObjectPtr
-// FIXME: Not used, can be removed?
-/******************************************************************************/
-
-class REveElementObjectPtr : public REveElement,
-                             public TObject
-{
-   REveElementObjectPtr& operator=(const REveElementObjectPtr&); // Not implemented
-
-protected:
-   TObject* fObject{nullptr};     // External object holding the visual data.
-   Bool_t   fOwnObject{kFALSE};  // Is object owned / should be deleted on destruction.
-
-public:
-   REveElementObjectPtr(TObject* obj, Bool_t own=kTRUE);
-   REveElementObjectPtr(TObject* obj, Color_t& mainColor, Bool_t own=kTRUE);
-   REveElementObjectPtr(const REveElementObjectPtr& e);
-   virtual ~REveElementObjectPtr();
-
-   virtual REveElementObjectPtr* CloneElement() const;
-
-   virtual TObject* GetObject(const REveException& eh="REveElementObjectPtr::GetObject ") const;
-   virtual void     ExportToCINT(char* var_name);
-
-   Bool_t GetOwnObject() const   { return fOwnObject; }
-   void   SetOwnObject(Bool_t o) { fOwnObject = o; }
-
-   ClassDef(REveElementObjectPtr, 0); // REveElement with external TObject as a holder of visualization data.
-};
-
-
-/******************************************************************************/
-// REveElementList
-/******************************************************************************/
-
-class REveElementList : public REveElement,
-                        public TNamed,
-                        public REveProjectable
-{
-private:
-   REveElementList& operator=(const REveElementList&); // Not implemented
-
-protected:
-   Color_t   fColor{0};              // Color of the object.
-   TClass   *fChildClass{nullptr};   // Class of acceptable children, others are rejected.
-
-public:
-   REveElementList(const char *n = "REveElementList", const char *t = "", Bool_t doColor = kFALSE,
-                   Bool_t doTransparency = kFALSE);
-   REveElementList(const REveElementList &e);
-   virtual ~REveElementList() {}
-
-   virtual TObject* GetObject(const REveException& /*eh*/="REveElementList::GetObject ") const
-   { const TObject* obj = this; return const_cast<TObject*>(obj); }
-
-   virtual REveElementList* CloneElement() const;
-
-   virtual const char* GetElementName()  const { return GetName();  }
-   virtual const char* GetElementTitle() const { return GetTitle(); }
-
-   virtual void SetElementName (const char* name)
-   { TNamed::SetName(name); NameTitleChanged(); }
-
-   virtual void SetElementTitle(const char* title)
-   { TNamed::SetTitle(title); NameTitleChanged(); }
-
-   virtual void SetElementNameTitle(const char* name, const char* title)
-   { TNamed::SetNameTitle(name, title); NameTitleChanged(); }
-
-   TClass* GetChildClass() const { return fChildClass; }
-   void    SetChildClass(TClass* c) { fChildClass = c; }
-
-   // Element
-   Bool_t  AcceptElement(REveElement* el); // override;
-
-   // Projectable
-   TClass* ProjectedClass(const REveProjection* p) const; // override;
-
-   ClassDef(REveElementList, 0); // List of REveElement objects with a possibility to limit the class of accepted elements.
-};
-
-
-/******************************************************************************/
-// REveElementListProjected
-/******************************************************************************/
-
-class REveElementListProjected : public REveElementList,
-                                 public REveProjected
-{
-private:
-   REveElementListProjected(const REveElementListProjected&);            // Not implemented
-   REveElementListProjected& operator=(const REveElementListProjected&); // Not implemented
-
-public:
-   REveElementListProjected();
-   virtual ~REveElementListProjected() {}
-
-   virtual void UpdateProjection();
-   virtual REveElement* GetProjectedAsElement() { return this; }
-
-   ClassDef(REveElementListProjected, 0); // Projected REveElementList.
-};
-
 } // namespace Experimental
-} // namespace Experimental
+} // namespace ROOT
 
 #endif

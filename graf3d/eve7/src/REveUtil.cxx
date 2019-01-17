@@ -478,8 +478,8 @@ void REveRefBackPtr::DecRefCount(REveElement* re)
          fBackRefs.erase(i);
       REveRefCnt::DecRefCount();
    } else {
-      Warning(eh, "render element '%s' not found in back-refs.",
-                  re->GetObject(eh)->GetName());
+      Warning(eh, "element '%s' not found in back-refs.",
+                  re->GetCName());
    }
 }
 

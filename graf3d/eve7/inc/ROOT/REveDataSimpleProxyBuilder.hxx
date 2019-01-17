@@ -7,17 +7,17 @@ namespace ROOT {
 namespace Experimental {
 
 class REveDataCollection;
-class REveElementList;
+class REveElement;
 
-class REveDataSimpleProxyBuilder : public REveDataProxyBuilderBase {
-
+class REveDataSimpleProxyBuilder : public REveDataProxyBuilderBase
+{
 public:
    REveDataSimpleProxyBuilder(std::string type);
    virtual ~REveDataSimpleProxyBuilder();
 
 protected:
    using REveDataProxyBuilderBase::Build;
-   virtual void Build(const REveDataCollection* iCollection, REveElementList* product, const REveViewContext*);
+   virtual void Build(const REveDataCollection* iCollection, REveElement* product, const REveViewContext*);
 
    //called once for each collection in collection, the void* points to the
    // object properly offset in memory

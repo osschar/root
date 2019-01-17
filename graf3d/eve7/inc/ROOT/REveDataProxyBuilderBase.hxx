@@ -10,12 +10,13 @@ namespace Experimental {
 class REveDataInteractionList;
 class REveViewContext;
 
-class REveDataProxyBuilderBase  {
+class REveDataProxyBuilderBase
+{
 public:
    struct Product
    {
       const REveViewContext*  m_viewContext;
-      REveElementList*        m_elements;
+      REveElement*        m_elements;
 
       Product(const REveViewContext* c);
       virtual ~Product();
@@ -23,10 +24,8 @@ public:
 
    // ---------- const member functions ---------------------
 
-   const REveViewContext& Context() const;
-   const REveDataCollection* Collection() const {
-      return m_collection;
-   }
+   const REveViewContext&    Context()    const;
+   const REveDataCollection* Collection() const { return m_collection;  }
 
    // ---------- constructor/destructor  ---------------------
    
@@ -39,9 +38,9 @@ public:
    virtual void CollectionBeingDestroyed(const REveDataCollection*);
 
    void Build();
-   // virtual void Build(REveElementList* product);
+   // virtual void Build(REveElement* product);
 
-   REveElementList* CreateProduct(const REveViewContext*);
+   REveElement* CreateProduct(const REveViewContext*);
    //  void removePerViewProduct(const REveViewContext* vc);
 
    void ModelChanges(const REveDataCollection::Ids_t&);
@@ -54,18 +53,18 @@ public:
    void SetHaveAWindow(bool);
 
    std::string Type() const { return m_type; }
+
 protected:
-  // Override this if visibility changes can cause (re)-creation of proxies.
+   // Override this if visibility changes can cause (re)-creation of proxies.
    // Returns true if new proxies were created.
    virtual bool VisibilityModelChanges(int idx, REveElement*, const REveViewContext*);
 
-   virtual void Build(const REveDataCollection* iItem, REveElementList* product, const REveViewContext*);
+   virtual void Build(const REveDataCollection* iItem, REveElement* product, const REveViewContext*);
 
    virtual void ModelChanges(const REveDataCollection::Ids_t&, Product*);
 
   // utility
    REveCompound* CreateCompound(bool set_color=true, bool propagate_color_to_all_children=false) const;
-
    virtual void Clean();
    virtual void CleanLocal();
 

@@ -44,8 +44,8 @@ public:
    REveSecondarySelectable();
    virtual ~REveSecondarySelectable() {}
 
-   Bool_t GetAlwaysSecSelect() const { return fAlwaysSecSelect; }
-   void SetAlwaysSecSelect(Bool_t f) { fAlwaysSecSelect = f; }
+   Bool_t GetAlwaysSecSelect()   const { return fAlwaysSecSelect; }
+   void   SetAlwaysSecSelect(Bool_t f) { fAlwaysSecSelect = f; }
 
    const SelectionSet_t &RefSelectedSet() const { return fSelectedSet; }
    const SelectionSet_t &RefHighlightedSet() const { return fHighlightedSet; }

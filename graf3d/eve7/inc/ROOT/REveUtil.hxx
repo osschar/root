@@ -34,7 +34,8 @@ class REveElement;
 // REveUtil
 /******************************************************************************/
 
-class REveUtil {
+class REveUtil
+{
 private:
    static TObjArray *fgDefaultColors;
 
@@ -87,7 +88,8 @@ inline Bool_t REveUtil::IsU1IntervalOverlappingByMeanDelta(Float_t meanM, Float_
 bool operator==(const TString &t, const std::string &s);
 bool operator==(const std::string &s, const TString &t);
 
-class REveException : public std::exception, public TString {
+class REveException : public std::exception, public TString
+{
 public:
    REveException() {}
    REveException(const TString &s) : TString(s) {}
@@ -109,7 +111,8 @@ REveException operator+(const REveException &s1, const char *s2);
 // Exception-safe global variable holders
 /******************************************************************************/
 
-class REveGeoManagerHolder {
+class REveGeoManagerHolder
+{
 private:
    TGeoManager *fManager{nullptr};  ///<!  hold manager
    Int_t fNSegments{0};             ///<!  previous settings for num segments
@@ -123,7 +126,8 @@ public:
 // REveRefCnt base-class (interface)
 /******************************************************************************/
 
-class REveRefCnt {
+class REveRefCnt
+{
 protected:
    Int_t fRefCount;
 
@@ -150,7 +154,8 @@ public:
 // REveRefBackPtr reference-count with back pointers
 /******************************************************************************/
 
-class REveRefBackPtr : public REveRefCnt {
+class REveRefBackPtr : public REveRefCnt
+{
 protected:
    typedef std::map<REveElement *, Int_t> RefMap_t;
    typedef RefMap_t::iterator RefMap_i;

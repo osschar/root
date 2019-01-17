@@ -39,16 +39,19 @@ namespace REX = ROOT::Experimental;
 \ingroup REve
 Base class for REveUtil visualization elements, providing hierarchy
 management, rendering control and list-tree item management.
+
+Class of acceptable children can be limited by setting the
+fChildClass member.
 */
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Default constructor.
 
-REveElement::REveElement() :
+REveElement::REveElement(const std::string& name, const std::string& title) :
+   fName                (name),
+   fTitle               (title),
    fParents             (),
    fChildren            (),
-   fCompound            (0),
-   fVizModel            (0),
    fVizTag              (),
    fNumChildren         (0),
    fParentIgnoreCnt     (0),
@@ -62,40 +65,6 @@ REveElement::REveElement() :
    fMainTransparency    (0),
    fMainColorPtr        (0),
    fMainTrans           (),
-   fSource              (),
-   fPickable            (kFALSE),
-   fSelected            (kFALSE),
-   fHighlighted         (kFALSE),
-   fImpliedSelected     (0),
-   fImpliedHighlighted  (0),
-   fCSCBits             (0),
-   fChangeBits          (0),
-   fDestructing         (kNone)
-{
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Constructor.
-
-REveElement::REveElement(Color_t &main_color) :
-   fParents             (),
-   fChildren            (),
-   fCompound            (nullptr),
-   fVizModel            (nullptr),
-   fVizTag              (),
-   fNumChildren         (0),
-   fParentIgnoreCnt     (0),
-   fDenyDestroy         (0),
-   fDestroyOnZeroRefCnt (kTRUE),
-   fRnrSelf             (kTRUE),
-   fRnrChildren         (kTRUE),
-   fCanEditMainColor    (kFALSE),
-   fCanEditMainTransparency(kFALSE),
-   fCanEditMainTrans    (kFALSE),
-   fMainTransparency    (0),
-   fMainColorPtr        (&main_color),
-   fMainTrans           (),
-   fSource              (),
    fPickable            (kFALSE),
    fSelected            (kFALSE),
    fHighlighted         (kFALSE),
@@ -114,15 +83,18 @@ REveElement::REveElement(Color_t &main_color) :
 ///   REveElement* CloneElementRecurse(Int_t level)
 ///   void         CloneChildrenRecurse(REveElement* dest, Int_t level)
 /// ~~~
-/// 'TRef fSource' is copied but 'void* UserData' is NOT.
+/// 'void* UserData' is NOT copied.
 /// If the element is projectable, its projections are NOT copied.
 ///
 /// Not implemented for most sub-classes, let us know.
 /// Note that sub-classes of REveProjected are NOT and will NOT be copyable.
 
 REveElement::REveElement(const REveElement& e) :
+   fName                (e.fName),
+   fTitle               (e.fTitle),
    fParents             (),
    fChildren            (),
+   fChildClass          (e.fChildClass),
    fCompound            (nullptr),
    fVizModel            (nullptr),
    fVizTag              (e.fVizTag),
@@ -138,7 +110,6 @@ REveElement::REveElement(const REveElement& e) :
    fMainTransparency    (e.fMainTransparency),
    fMainColorPtr        (nullptr),
    fMainTrans           (),
-   fSource              (e.fSource),
    fPickable            (e.fPickable),
    fSelected            (kFALSE),
    fHighlighted         (kFALSE),
@@ -265,80 +236,34 @@ void REveElement::CloneChildrenRecurse(REveElement* dest, Int_t level) const
 //==============================================================================
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Virtual function for retrieving name of the element.
-/// Here we attempt to cast the assigned object into TNamed and call
-/// GetName() there.
+/// Set name of an element.
 
-const char* REveElement::GetElementName() const
+void REveElement::SetName(const std::string& name)
 {
-   static const REveException eh("REveElement::GetElementName ");
-
-   TNamed* named = dynamic_cast<TNamed*>(GetObject(eh));
-   return named ? named->GetName() : "<no-name>";
+   fName = name;
+   NameTitleChanged();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Virtual function for retrieving title of the render-element.
-/// Here we attempt to cast the assigned object into TNamed and call
-/// GetTitle() there.
+/// Set title of an element.
 
-const char*  REveElement::GetElementTitle() const
+void REveElement::SetTitle(const std::string& title)
 {
-   static const REveException eh("REveElement::GetElementTitle ");
-
-   TNamed* named = dynamic_cast<TNamed*>(GetObject(eh));
-   return named ? named->GetTitle() : "<no-title>";
+   fTitle = title;
+   NameTitleChanged();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Virtual function for setting of name of an element.
-/// Here we attempt to cast the assigned object into TNamed and call
-/// SetName() there.
-/// If you override this call NameTitleChanged() from there.
-
-void REveElement::SetElementName(const char* name)
-{
-   static const REveException eh("REveElement::SetElementName ");
-
-   TNamed* named = dynamic_cast<TNamed*>(GetObject(eh));
-   if (named) {
-      named->SetName(name);
-      NameTitleChanged();
-   }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Virtual function for setting of title of an element.
-/// Here we attempt to cast the assigned object into TNamed and call
-/// SetTitle() there.
-/// If you override this call NameTitleChanged() from there.
-
-void REveElement::SetElementTitle(const char* title)
-{
-   static const REveException eh("REveElement::SetElementTitle ");
-
-   TNamed* named = dynamic_cast<TNamed*>(GetObject(eh));
-   if (named) {
-      named->SetTitle(title);
-      NameTitleChanged();
-   }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Virtual function for setting of name and title of render element.
+/// Set name and title of an element.
 /// Here we attempt to cast the assigned object into TNamed and call
 /// SetNameTitle() there.
 /// If you override this call NameTitleChanged() from there.
 
-void REveElement::SetElementNameTitle(const char* name, const char* title)
+void REveElement::SetNameTitle(const std::string& name, const std::string& title)
 {
-   static const REveException eh("REveElement::SetElementNameTitle ");
-
-   TNamed* named = dynamic_cast<TNamed*>(GetObject(eh));
-   if (named) {
-      named->SetNameTitle(name, title);
-      NameTitleChanged();
-   }
+   fName  = name;
+   fTitle = title;
+   NameTitleChanged();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -348,7 +273,7 @@ void REveElement::SetElementNameTitle(const char* name, const char* title)
 
 void REveElement::NameTitleChanged()
 {
-   // Nothing to do - list-tree-items take this info directly.
+   // Should send out some message. Need a new stamp type?
 }
 
 //******************************************************************************
@@ -503,7 +428,7 @@ void REveElement::SaveVizParams(std::ostream& out, const TString& tag, const TSt
    static const REveException eh("REveElement::GetObject ");
 
    TString t = "   ";
-   TString cls(GetObject(eh)->ClassName());
+   TString cls(IsA()->GetName());
 
    out << "\n";
 
@@ -529,8 +454,8 @@ void REveElement::WriteVizParams(std::ostream& out, const TString& var)
 {
    TString t = "   " + var + "->";
 
-   out << t << "SetElementName(\""  << GetElementName()  << "\");\n";
-   out << t << "SetElementTitle(\"" << GetElementTitle() << "\");\n";
+   out << t << "SetElementName(\""  << fName  << "\");\n";
+   out << t << "SetElementTitle(\"" << fTitle << "\");\n";
    out << t << "SetEditMainColor("  << fCanEditMainColor << ");\n";
    out << t << "SetEditMainTransparency(" << fCanEditMainTransparency << ");\n";
    out << t << "SetMainTransparency("     << fMainTransparency << ");\n";
@@ -539,7 +464,7 @@ void REveElement::WriteVizParams(std::ostream& out, const TString& var)
 ////////////////////////////////////////////////////////////////////////////////
 /// Set visual parameters for this object for given tag.
 
-void REveElement::VizDB_Apply(const char* tag)
+void REveElement::VizDB_Apply(const std::string& tag)
 {
    if (ApplyVizTag(tag))
    {
@@ -590,11 +515,11 @@ void REveElement::VizDB_UpdateModel(Bool_t update)
 /// If replace is true an existing element with the same tag will be replaced.
 /// If update is true, existing client of tag will be updated.
 
-void REveElement::VizDB_Insert(const char* tag, Bool_t replace, Bool_t update)
+void REveElement::VizDB_Insert(const std::string& tag, Bool_t replace, Bool_t update)
 {
    static const REveException eh("REveElement::GetObject ");
 
-   TClass* cls = GetObject(eh)->IsA();
+   TClass* cls     = IsA();
    REveElement* el = reinterpret_cast<REveElement*>(cls->New());
    if (el == 0) {
       Error("VizDB_Insert", "Creation of replica failed.");
@@ -683,7 +608,7 @@ void REveElement::CheckReferenceCount(const REveException& eh)
       if (REX::gEve && REX::gEve->GetUseOrphanage())
       {
          if (gDebug > 0)
-            Info(eh, "moving to orphanage '%s' on zero reference count.", GetElementName());
+            Info(eh, "moving to orphanage '%s' on zero reference count.", GetCName());
 
          PreDeleteElement();
          REX::gEve->GetOrphanage()->AddElement(this);
@@ -691,7 +616,7 @@ void REveElement::CheckReferenceCount(const REveException& eh)
       else
       {
          if (gDebug > 0)
-            Info(eh, "auto-destructing '%s' on zero reference count.", GetElementName());
+            Info(eh, "auto-destructing '%s' on zero reference count.", GetCName());
 
          PreDeleteElement();
          delete this;
@@ -732,22 +657,6 @@ void REveElement::CollectSceneParentsFromChildren(List_t&      scenes,
    }
 }
 
-
-////////////////////////////////////////////////////////////////////////////////
-/// Get a TObject associated with this render-element.
-/// Most cases uses double-inheritance from REveElement and TObject
-/// so we just do a dynamic cast here.
-/// If some REveElement descendant implements a different scheme,
-/// this virtual method should be overriden accordingly.
-
-TObject* REveElement::GetObject(const REveException& eh) const
-{
-   const TObject* obj = dynamic_cast<const TObject*>(this);
-   if (obj == 0)
-      throw eh + "not a TObject.";
-   return const_cast<TObject*>(obj);
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 /// Export render-element to CINT with variable name var_name.
 
@@ -756,103 +665,6 @@ void REveElement::ExportToCINT(char* var_name)
    const char* cname = IsA()->GetName();
    gROOT->ProcessLine(TString::Format("%s* %s = (%s*)0x%lx;", cname, var_name, cname, (ULong_t)this));
 }
-
-////////////////////////////////////////////////////////////////////////////////
-/// Call Dump() on source object.
-/// Throws an exception if it is not set.
-
-void REveElement::DumpSourceObject() const
-{
-   static const REveException eh("REveElement::DumpSourceObject ");
-
-   TObject *so = GetSourceObject();
-   if (!so)
-      throw eh + "source-object not set.";
-
-   so->Dump();
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Call Print() on source object.
-/// Throws an exception if it is not set.
-
-void REveElement::PrintSourceObject() const
-{
-   static const REveException eh("REveElement::PrintSourceObject ");
-
-   TObject *so = GetSourceObject();
-   if (!so)
-      throw eh + "source-object not set.";
-
-   so->Print();
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Export source object to CINT with given name for the variable.
-/// Throws an exception if it is not set.
-
-void REveElement::ExportSourceObjectToCINT(char* var_name) const
-{
-   static const REveException eh("REveElement::ExportSourceObjectToCINT ");
-
-   TObject *so = GetSourceObject();
-   if (!so)
-      throw eh + "source-object not set.";
-
-   const char* cname = so->IsA()->GetName();
-   gROOT->ProcessLine(TString::Format("%s* %s = (%s*)0x%lx;", cname, var_name, cname, (ULong_t)so));
-}
-
-/*
-////////////////////////////////////////////////////////////////////////////////
-/// Paint self and/or children into currently active pad.
-
-void REveElement::PadPaint(Option_t* option)
-{
-   static const REveException eh("REveElement::PadPaint ");
-
-   TObject* obj = 0;
-   if (GetRnrSelf() && (obj = GetRenderObject(eh)))
-      obj->Paint(option);
-
-
-   if (GetRnrChildren()) {
-      for (List_i i=BeginChildren(); i!=EndChildren(); ++i) {
-         (*i)->PadPaint(option);
-      }
-   }
-}
-*/
-
- /*
-////////////////////////////////////////////////////////////////////////////////
-/// Paint object -- a generic implementation for EVE elements.
-/// This supports direct rendering using a dedicated GL class.
-/// Override TObject::Paint() in sub-classes if different behaviour
-/// is required.
-
-void REveElement::PaintStandard(TObject* id)
-{
-   static const REveException eh("REveElement::PaintStandard ");
-
-   TBuffer3D buff(TBuffer3DTypes::kGeneric);
-
-   // Section kCore
-   buff.fID           = id;
-   buff.fColor        = GetMainColor();
-   buff.fTransparency = GetMainTransparency();
-   if (HasMainTrans())  RefMainTrans().SetBuffer3D(buff);
-
-   buff.SetSectionsValid(TBuffer3D::kCore);
-
-   Int_t reqSections = gPad->GetViewer3D()->AddObject(buff);
-   if (reqSections != TBuffer3D::kNone)
-   {
-      Warning(eh, "IsA='%s'. Viewer3D requires more sections (%d). Only direct-rendering supported.",
-              id->ClassName(), reqSections);
-   }
-}
- */
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Set render state of this element, i.e. if it will be published
@@ -1111,12 +923,16 @@ void REveElement::SetTransMatrix(const TGeoMatrix& mat)
 ////////////////////////////////////////////////////////////////////////////////
 /// Check if el can be added to this element.
 ///
-/// In the base-class version we only make sure the new child is not
-/// equal to this.
+/// Here we make sure the new child is not equal to this and, if fChildClass
+/// is set, that it is inherited from it.
 
 Bool_t REveElement::AcceptElement(REveElement* el)
 {
-   return el != this;
+   if (el == this)
+      return kFALSE;
+   if (fChildClass && ! el->IsA()->InheritsFrom(fChildClass))
+      return kFALSE;
+   return kTRUE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1129,8 +945,7 @@ void REveElement::AddElement(REveElement* el)
    assert(el != 0);
 
    if ( ! AcceptElement(el))
-      throw eh + Form("parent '%s' rejects '%s'.",
-                      GetElementName(), el->GetElementName());
+      throw eh + Form("parent '%s' rejects '%s'.", GetCName(), el->GetCName());
 
    if (el->fElementId == 0 && fElementId != 0)
    {
@@ -1303,7 +1118,7 @@ REveElement* REveElement::FindChild(const TString&  name, const TClass* cls)
 {
    for (List_i i=fChildren.begin(); i!=fChildren.end(); ++i)
    {
-      if (name.CompareTo((*i)->GetElementName()) == 0)
+      if (name.CompareTo((*i)->GetCName()) == 0)
       {
          if (!cls || (cls && (*i)->IsA()->InheritsFrom(cls)))
             return *i;
@@ -1322,7 +1137,7 @@ REveElement* REveElement::FindChild(TPRegexp& regexp, const TClass* cls)
 {
    for (List_i i=fChildren.begin(); i!=fChildren.end(); ++i)
    {
-      if (regexp.MatchB((*i)->GetElementName()))
+      if (regexp.MatchB((*i)->GetName()))
       {
          if (!cls || (cls && (*i)->IsA()->InheritsFrom(cls)))
             return *i;
@@ -1343,7 +1158,7 @@ Int_t REveElement::FindChildren(List_t& matches,
    Int_t count = 0;
    for (List_i i=fChildren.begin(); i!=fChildren.end(); ++i)
    {
-      if (name.CompareTo((*i)->GetElementName()) == 0)
+      if (name.CompareTo((*i)->GetCName()) == 0)
       {
          if (!cls || (cls && (*i)->IsA()->InheritsFrom(cls)))
          {
@@ -1367,7 +1182,7 @@ Int_t REveElement::FindChildren(List_t& matches,
    Int_t count = 0;
    for (List_i i=fChildren.begin(); i!=fChildren.end(); ++i)
    {
-      if (regexp.MatchB((*i)->GetElementName()))
+      if (regexp.MatchB((*i)->GetCName()))
       {
          if (!cls || (cls && (*i)->IsA()->InheritsFrom(cls)))
          {
@@ -1469,7 +1284,7 @@ void REveElement::Annihilate()
    if (fParents.size() > 1)
    {
       Warning(eh, "More than one parent for '%s': %d. Refusing to delete.",
-              GetElementName(), (Int_t) fParents.size());
+              GetCName(), (Int_t) fParents.size());
       return;
    }
 
@@ -1519,7 +1334,7 @@ void REveElement::Destroy()
 
    if (fDenyDestroy > 0)
       throw eh + TString::Format("element '%s' (%s*) 0x%lx is protected against destruction.",
-                                 GetElementName(), IsA()->GetName(), (ULong_t)this);
+                                 GetCName(), IsA()->GetName(), (ULong_t)this);
 
    PreDeleteElement();
    delete this;
@@ -1566,7 +1381,7 @@ void REveElement::DestroyElements()
       else
       {
          if (gDebug > 0)
-            Info(eh, "element '%s' is protected agains destruction, removing locally.", c->GetElementName());
+            Info(eh, "element '%s' is protected agains destruction, removing locally.", c->GetCName());
          RemoveElement(c);
       }
    }
@@ -1814,7 +1629,6 @@ void REveElement::FillImpliedSelectedSet(Set_t& impSelSet)
 ////////////////////////////////////////////////////////////////////////////////
 /// Get selection level, needed for rendering selection and
 /// highlight feedback.
-/// This should go to TAtt3D.
 
 UChar_t REveElement::GetSelectedLevel() const
 {
@@ -1852,7 +1666,7 @@ void REveElement::AddStamp(UChar_t bits)
 {
   if (fDestructing == kNone && fScene && fScene->IsAcceptingChanges())
    {
-      printf("%s AddStamp %d + (%d) -> %d \n", GetElementName(), fChangeBits, bits, fChangeBits|bits);
+      printf("%s AddStamp %d + (%d) -> %d \n", GetCName(), fChangeBits, bits, fChangeBits|bits);
       fChangeBits |= bits;
       fScene->SceneElementChanged(this);
    }
@@ -1874,103 +1688,22 @@ void REveElement::BuildRenderData()
 /// Convert Bool_t to string - kTRUE or kFALSE.
 /// Needed in WriteVizParams().
 
-const char* REveElement::ToString(Bool_t b)
+const std::string& REveElement::ToString(Bool_t b)
 {
-   return b ? "kTRUE" : "kFALSE";
-}
+   static const std::string true_str ("kTRUE");
+   static const std::string false_str("kFALSE");
 
-/** \class REveElementObjectPtr
-\ingroup REve
-REveElement with external TObject as a holder of visualization data.
-*/
-
-////////////////////////////////////////////////////////////////////////////////
-/// Constructor.
-
-REveElementObjectPtr::REveElementObjectPtr(TObject* obj, Bool_t own) :
-   REveElement (),
-   TObject     (),
-   fObject     (obj),
-   fOwnObject  (own)
-{
+   return b ? true_str : false_str;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Constructor.
-
-REveElementObjectPtr::REveElementObjectPtr(TObject* obj, Color_t& mainColor, Bool_t own) :
-   REveElement (mainColor),
-   TObject     (),
-   fObject     (obj),
-   fOwnObject  (own)
-{
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Copy constructor.
-/// If object pointed to is owned it is cloned.
-/// It is assumed that the main-color has its origin in the TObject pointed to so
-/// it is fixed here accordingly.
-
-REveElementObjectPtr::REveElementObjectPtr(const REveElementObjectPtr& e) :
-   REveElement (e),
-   TObject     (e),
-   fObject     (0),
-   fOwnObject  (e.fOwnObject)
-{
-   if (fOwnObject && e.fObject)
-   {
-      fObject = e.fObject->Clone();
-      SetMainColorPtr((Color_t*)((const char*) fObject + ((const char*) e.GetMainColorPtr() - (const char*) e.fObject)));
-   }
-   else
-   {
-      SetMainColorPtr(e.GetMainColorPtr());
-   }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Clone the element via copy constructor.
-/// Virtual from REveElement.
-
-REveElementObjectPtr* REveElementObjectPtr::CloneElement() const
-{
-   return new REveElementObjectPtr(*this);
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Return external object.
-/// Virtual from REveElement.
-
-TObject* REveElementObjectPtr::GetObject(const REveException& eh) const
-{
-   if (fObject == 0)
-      throw eh + "fObject not set.";
-   return fObject;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Export external object to CINT with variable name var_name.
-/// Virtual from REveElement.
-
-void REveElementObjectPtr::ExportToCINT(char* var_name)
-{
-   static const REveException eh("REveElementObjectPtr::ExportToCINT ");
-
-   TObject* obj = GetObject(eh);
-   const char* cname = obj->IsA()->GetName();
-   gROOT->ProcessLine(Form("%s* %s = (%s*)0x%lx;", cname, var_name, cname, (ULong_t)obj));
-}
-
-//==============================================================================
-// Write core json. If rnr_offset negative, render data will not be written
-//==============================================================================
+/// Write core json. If rnr_offset negative, render data will not be written
 
 Int_t REveElement::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
 {
    j["_typename"]  = IsA()->GetName();
-   j["fName"]      = GetElementName();
-   j["fTitle"]     = GetElementTitle();
+   j["fName"]      = fName;
+   j["fTitle"]     = fTitle;
    j["fElementId"] = GetElementId();
    j["fMotherId"]  = get_mother_id();
    j["fSceneId"]   = get_scene_id();
@@ -2007,106 +1740,4 @@ Int_t REveElement::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
    else {
       return 0;
    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Destructor.
-
-REveElementObjectPtr::~REveElementObjectPtr()
-{
-   if (fOwnObject)
-      delete fObject;
-}
-
-/** \class  REveElementList
-\ingroup REve
-A list of EveElements.
-
-Class of acceptable children can be limited by setting the
-fChildClass member.
-
-!!! should have two ctors (like in REveElement), one with Color_t&
-and set fDoColor automatically, based on which ctor is called.
-*/
-
-////////////////////////////////////////////////////////////////////////////////
-/// Constructor.
-
-REveElementList::REveElementList(const char* n, const char* t, Bool_t doColor, Bool_t doTransparency) :
-   REveElement(),
-   TNamed(n, t),
-   REveProjectable(),
-   fColor(0),
-   fChildClass(nullptr)
-{
-   if (doColor) {
-      fCanEditMainColor = kTRUE;
-      SetMainColorPtr(&fColor);
-   }
-   if (doTransparency)
-   {
-      fCanEditMainTransparency = kTRUE;
-   }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Copy constructor.
-
-REveElementList::REveElementList(const REveElementList& e) :
-   REveElement (e),
-   TNamed      (e),
-   REveProjectable(),
-   fColor      (e.fColor),
-   fChildClass (e.fChildClass)
-{
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Clone the element via copy constructor.
-/// Virtual from REveElement.
-
-REveElementList* REveElementList::CloneElement() const
-{
-   return new REveElementList(*this);
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Check if REveElement el is inherited from fChildClass.
-/// Virtual from REveElement.
-
-Bool_t REveElementList::AcceptElement(REveElement* el)
-{
-   if (fChildClass && ! el->IsA()->InheritsFrom(fChildClass))
-      return kFALSE;
-   return kTRUE;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Virtual from REveProjectable, returns REveCompoundProjected class.
-
-TClass* REveElementList::ProjectedClass(const REveProjection*) const
-{
-   return REveElementListProjected::Class();
-}
-
-/** \class REveElementListProjected
-\ingroup REve
-A projected element list -- required for proper propagation
-of render state to projected views.
-*/
-
-////////////////////////////////////////////////////////////////////////////////
-/// Constructor.
-
-REveElementListProjected::REveElementListProjected() :
-   REveElementList("REveElementListProjected")
-{
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// This is abstract method from base-class REveProjected.
-/// No implementation.
-
-void REveElementListProjected::UpdateProjection()
-{
 }

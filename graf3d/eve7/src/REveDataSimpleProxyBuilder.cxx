@@ -37,7 +37,7 @@ REveDataSimpleProxyBuilder::Clean()
 // AMT: looks like collection parameter is not necessary, maybe for callbacks
 void
 REveDataSimpleProxyBuilder::Build(const REveDataCollection* collection,
-                            REveElementList* product, const REveViewContext* vc)
+                                  REveElement* product, const REveViewContext* vc)
 {
    size_t size = collection->GetNItems();
    REveElement::List_i pIdx = product->BeginChildren();
@@ -55,7 +55,7 @@ REveDataSimpleProxyBuilder::Build(const REveDataCollection* collection,
          itemHolder = CreateCompound(true, true);
          itemHolder->SetMainColorPtr(collection->GetMainColorPtr());
          SetupAddElement(itemHolder, product, true);
-         itemHolder->SetElementName(Form("compound %d", index));
+         itemHolder->SetName(Form("compound %d", index));
 
       }
       auto di = Collection()->GetDataItem(index);

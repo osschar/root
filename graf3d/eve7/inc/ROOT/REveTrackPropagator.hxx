@@ -29,7 +29,8 @@ class REvePointSet;
 // REveMagField
 //==============================================================================
 
-class REveMagField {
+class REveMagField
+{
 protected:
    Bool_t fFieldConstant{kFALSE};
 
@@ -66,7 +67,8 @@ public:
 // REveMagFieldConst
 //==============================================================================
 
-class REveMagFieldConst : public REveMagField {
+class REveMagFieldConst : public REveMagField
+{
 protected:
    REveVectorD fB;
 
@@ -85,7 +87,8 @@ public:
 // REveMagFieldDuo
 //==============================================================================
 
-class REveMagFieldDuo : public REveMagField {
+class REveMagFieldDuo : public REveMagField
+{
 protected:
    REveVectorD fBIn;
    REveVectorD fBOut;
@@ -117,7 +120,9 @@ public:
 // REveTrackPropagator
 //==============================================================================
 
-class REveTrackPropagator : public REveElementList, public REveRefBackPtr {
+class REveTrackPropagator : public REveElement,
+                            public REveRefBackPtr
+{
 public:
    enum EStepper_e { kHelix, kRungeKutta };
 
@@ -239,7 +244,7 @@ protected:
                                    REveVectorD &out);
 
 public:
-   REveTrackPropagator(const char *n = "REveTrackPropagator", const char *t = "", REveMagField *field = 0,
+   REveTrackPropagator(const std::string& n = "REveTrackPropagator", const std::string& t = "", REveMagField *field = 0,
                        Bool_t own_field = kTRUE);
    virtual ~REveTrackPropagator();
 

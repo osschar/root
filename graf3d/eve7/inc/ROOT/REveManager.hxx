@@ -126,7 +126,7 @@ protected:
    REveSelection            *fSelection;
    REveSelection            *fHighlight;
 
-   REveElementList          *fOrphanage;
+   REveElement              *fOrphanage;
    Bool_t                    fUseOrphanage;
 
    std::shared_ptr<ROOT::Experimental::RWebWindow>  fWebWindow;
@@ -143,7 +143,7 @@ public:
    REveSelection*     GetSelection() const { return fSelection; }
    REveSelection*     GetHighlight() const { return fHighlight; }
 
-   REveElementList*   GetOrphanage()    const { return fOrphanage;    }
+   REveElement*       GetOrphanage()    const { return fOrphanage;    }
    Bool_t             GetUseOrphanage() const { return fUseOrphanage; }
    void               SetUseOrphanage(Bool_t o) { fUseOrphanage = o;  }
    void               ClearOrphanage();

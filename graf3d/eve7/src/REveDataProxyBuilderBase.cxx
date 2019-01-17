@@ -9,7 +9,7 @@ namespace REX = ROOT::Experimental;
 
 REveDataProxyBuilderBase::Product::Product(const REveViewContext* c) : m_viewContext(c), m_elements(0)
 {
-   m_elements = new REveElementList("ProxyProduct");
+   m_elements = new REveElement("ProxyProduct");
    m_elements->IncDenyDestroy();
 }
 
@@ -75,7 +75,7 @@ void REveDataProxyBuilderBase::Build()
          for (Product_it i = m_products.begin(); i != m_products.end(); ++i)
          {
              //printf("build() %s \n", m_collection->name().c_str());
-            REveElementList* elms = (*i)->m_elements;
+            REveElement* elms = (*i)->m_elements;
             size_t oldSize = elms->NumChildren();
 
             Build(m_collection, elms, (*i)->m_viewContext);
@@ -141,7 +141,7 @@ void REveDataProxyBuilderBase::Build()
       }
       catch (const std::runtime_error& iException)
       {
-         std::cout << "Caught exception in build function for item " << m_collection->GetElementName() << ":\n"
+         std::cout << "Caught exception in build function for item " << m_collection->GetCName() << ":\n"
                               << iException.what() << std::endl;
          exit(1);
       }
@@ -150,16 +150,16 @@ void REveDataProxyBuilderBase::Build()
 
 //______________________________________________________________________________
 void
-REveDataProxyBuilderBase::Build(const REveDataCollection*, REveElementList*, const REveViewContext*)
+REveDataProxyBuilderBase::Build(const REveDataCollection*, REveElement*, const REveViewContext*)
 {
-   assert("virtual build(const REveEventItem*, REveElementList*, const REveViewContext*) not implemented by inherited class");
+   assert("virtual build(const REveEventItem*, REveElement*, const REveViewContext*) not implemented by inherited class");
 }
 
 
 //______________________________________________________________________________
 
 
-REveElementList*
+REveElement*
 REveDataProxyBuilderBase::CreateProduct( const REveViewContext* viewContext)
 {
    if ( m_products.empty() == false)
@@ -174,7 +174,7 @@ REveDataProxyBuilderBase::CreateProduct( const REveViewContext* viewContext)
    if (m_collection)
    {
       // debug info in eve browser
-      product->m_elements->SetElementName(Form("product %s", m_collection->GetElementName()));
+      product->m_elements->SetName(Form("product %s", m_collection->GetCName()));
    }
    return product->m_elements;
 }
@@ -189,7 +189,7 @@ namespace {
          if (c->GetMainColor() != p->GetMainColor())
          {
             c->SetMainColor(p->GetMainColor());
-            printf("apply color %d to %s\n", p->GetMainColor(), c->GetElementName());
+            printf("apply color %d to %s\n", p->GetMainColor(), c->GetCName());
          }
          c->SetRnrSelf(p->GetRnrSelf());
          applyVisAttrToChildren(c);
@@ -200,8 +200,8 @@ namespace {
 void
 REveDataProxyBuilderBase::ModelChanges(const REveDataCollection::Ids_t& iIds, Product* p)
 {
-   printf("REveDataProxyBuilderBase::ModelChanges  %s \n",  m_collection->GetElementName());
-   REveElementList* elms = p->m_elements;
+   printf("REveDataProxyBuilderBase::ModelChanges  %s \n",  m_collection->GetCName());
+   REveElement* elms = p->m_elements;
    assert(m_collection && static_cast<int>(m_collection->GetNItems()) <= elms->NumChildren() && "can not use default modelChanges implementation");
 
    for (REveDataCollection::Ids_t::const_iterator it = iIds.begin(); it != iIds.end(); ++it)
@@ -262,7 +262,7 @@ REveDataProxyBuilderBase::SetupAddElement(REveElement* el, REveElement* parent, 
 {
    SetupElement(el, color);
    // AMT -- this temprary to get right tooltip
-   el->SetElementName(parent->GetElementName());
+   el->SetName(parent->GetName());
    parent->AddElement(el);
 }
 

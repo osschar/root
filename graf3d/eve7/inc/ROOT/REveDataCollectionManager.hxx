@@ -9,9 +9,9 @@ namespace Experimental {
 
 class REveTrackPropagator;
 
-class REveDataCollectionManager : public REveElementList {
+class REveDataCollectionManager : public REveElement {
 public:
-   REveDataCollectionManager(const char *n = "REveDataCollection", const char *t = "");
+   REveDataCollectionManager(const std::string& n = "REveDataCollection", const std::string& t = "");
    virtual ~REveDataCollectionManager() {}
 
    // AMT

@@ -112,7 +112,7 @@ REveManager::REveManager() : // (Bool_t map_window, Option_t* opt) :
    fHighlight->IncDenyDestroy();
    AssignElementId(fHighlight);
 
-   fOrphanage = new REveElementList("Global Orphanage");
+   fOrphanage = new REveElement("Global Orphanage");
    fOrphanage->IncDenyDestroy();
    AssignElementId(fOrphanage);
 
@@ -787,7 +787,7 @@ void REveManager::HttpServerCallback(unsigned connid, const std::string &arg)
 
          scene->AddSubscriber(std::make_unique<REveClient>(connid, fWebWindow));
          printf("\nEVEMNG ............. streaming scene %s [%s]\n",
-                scene->GetElementTitle() ,scene->GetElementName());
+                scene->GetCTitle(), scene->GetCName());
 
          // This prepares core and render data buffers.
          scene->StreamElements();
@@ -913,7 +913,7 @@ void REveManager::BroadcastElementsOf(REveElement::List_t& els)
       assert (scene != 0);
 
       printf("\nEVEMNG ............. streaming scene %s [%s]\n",
-             scene->GetElementTitle(), scene->GetElementName());
+             scene->GetCTitle(), scene->GetCName());
 
       // This prepares core and render data buffers.
       scene->StreamElements();
