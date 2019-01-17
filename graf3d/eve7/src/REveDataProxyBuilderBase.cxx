@@ -9,7 +9,7 @@ namespace REX = ROOT::Experimental;
 
 REveDataProxyBuilderBase::Product::Product(const REveViewContext* c) : m_viewContext(c), m_elements(0)
 {
-   m_elements = new REveElement("ProxyProduct");
+   m_elements = new REveCompound("ProxyProduct", "", false);
    m_elements->IncDenyDestroy();
 }
 
