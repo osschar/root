@@ -28,6 +28,7 @@
       this.creator = new JSROOT.EVE.EveElements();
       this.creator.useIndexAsIs = (JSROOT.GetUrlOption('useindx') !== null);
       this.id2obj_map = {};
+      this.first_time = true;
       
       // register ourself for scene events
       this.mgr.RegisterSceneReceiver(scene.fSceneId, this);
@@ -72,16 +73,18 @@
       }
    }
    
-   EveScene.prototype.create3DObjects = function(res3d, all_ancestor_children_visible, elem0)
+   EveScene.prototype.create3DObjects = function(all_ancestor_children_visible, prnt, res3d)
    {
-      if (elem0 === undefined)          
-         elem0 = this.mgr.GetElement(this.id);
+      if (prnt === undefined) {          
+         prnt = this.mgr.GetElement(this.id);
+         res3d = [];
+      }
 
-      if (!elem0 || !elem0.childs) return;
+      if (!prnt || !prnt.childs) return res3d;
       
-      for (var k = 0; k < elem0.childs.length; ++k)
+      for (var k = 0; k < prnt.childs.length; ++k)
       {
-         var elem = elem0.childs[k];
+         var elem = prnt.childs[k];
          if (elem.render_data)
          {
             var fname = elem.render_data.rnr_func, obj3d = null;
@@ -108,8 +111,10 @@
             }
          }
 
-         this.create3DObjects(res3d, elem.fRnrChildren && all_ancestor_children_visible, elem);
+         this.create3DObjects(elem.fRnrChildren && all_ancestor_children_visible, elem, res3d);
       }
+      
+      return res3d;
    } 
    
    /** method insert all objects into three.js container */
@@ -117,8 +122,8 @@
    {
       if (!this.viewer) return;
       
-      var res3d = [];
-      this.create3DObjects(res3d, true);
+      var res3d = this.create3DObjects(true);
+      if (!res3d.length && this.first_time) return;
       
       var cont = this.viewer.getThreejsContainer("scene" + this.id);
       while (cont.children.length > 0)
@@ -128,6 +133,7 @@
          cont.add(res3d[k]);
       
       this.viewer.render();
+      this.first_time = false;
    }
    
    EveScene.prototype.getObj3D = function(elementId)

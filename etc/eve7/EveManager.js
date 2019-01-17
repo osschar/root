@@ -147,7 +147,7 @@
 
    /** Invoke specified receiver functions on all registered receivers */
 
-   EveManager.prototype.InvokeReceivers = function(kind, sender, timeout, receiver_arg) {
+   EveManager.prototype.InvokeReceivers = function(kind, sender, timeout, receiver_arg, receiver_arg2) {
       var tname = kind + "_timer";
       if (this[tname]) {
          clearTimeout(this[tname]);
@@ -155,12 +155,12 @@
       }
 
       if (timeout) {
-         this[tname] = setTimeout(this.InvokeReceivers.bind(this, kind, sender, 0, receiver_arg), timeout);
+         this[tname] = setTimeout(this.InvokeReceivers.bind(this, kind, sender, 0, receiver_arg, receiver_arg2), timeout);
       } else {
          for (var n=0; n<this.hrecv.length; ++n) {
             var el = this.hrecv[n];
             if ((el.obj !== sender) && el[kind])
-               el.obj[el[kind]](receiver_arg);
+               el.obj[el[kind]](receiver_arg, receiver_arg2);
          }
       }
    }
@@ -170,8 +170,8 @@
     * One specifies element id and on/off state.
     * If timeout configured, actual execution will be postponed on given time interval */
 
-   EveManager.prototype.ProcessHighlight = function(sender, masterid, timeout) {
-      this.InvokeReceivers("highlight", sender, timeout, masterid);
+   EveManager.prototype.ProcessHighlight = function(sender, masterid, masterindex, timeout) {
+      this.InvokeReceivers("highlight", sender, timeout, masterid, masterindex);
    }
 
    /** Invoke Update on all dependent views.

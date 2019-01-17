@@ -300,12 +300,12 @@ sap.ui.define([
       HighlightMesh: function(mesh, color, geo_object, geo_index) {
          if (this.last_highlight === geo_object) return;
          this.last_highlight = geo_object;
-         this.mgr.ProcessHighlight(this, geo_object, geo_object ? 0 : 100);
+         this.mgr.ProcessHighlight(this, geo_object, geo_index, geo_object ? 0 : 100);
       },
 
       /// invoked from the manager
 
-      onElementHighlight: function(masterid)
+      onElementHighlight: function(masterid, masterindex)
       {
          if (direct_threejs) {
             console.log("onElementHighlight not implemented");
@@ -315,7 +315,7 @@ sap.ui.define([
          if (!this.painter_ready || !this.geo_painter) return;
 
          // // masterid used as identifier, no any recursions
-         this.geo_painter.HighlightMesh(null, null, masterid, null, true);
+         this.geo_painter.HighlightMesh(null, null, masterid, masterindex, null, true);
       },
 
       onResize: function(event) {

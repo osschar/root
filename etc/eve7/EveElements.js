@@ -40,10 +40,10 @@
 
       // for the points index in intersect is just point index and can be used as is
       // this is only for demonstration, can be used later
-      // mesh.geo_extract_index = function(intersect) {
-      //   return intersect && intersect.index!==undefined ? intersect.index : undefined; 
-      // }
-      // mesh.geo_create_highlight = JSROOT.Painter.PointsHighlight;
+      mesh.geo_extract_index = function(intersect) {
+         return intersect && intersect.index!==undefined ? intersect.index : undefined; 
+      }
+      mesh.geo_create_highlight = JSROOT.Painter.PointsHighlight;
       
       mesh.highlightScale = 2;
       

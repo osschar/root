@@ -348,15 +348,15 @@ sap.ui.define([
 
          var masterid = this.mgr.GetMasterId(ttt.id);
 
-         this.mgr.ProcessHighlight(this, masterid);
+         this.mgr.ProcessHighlight(this, masterid, undefined);
       },
 
       onMouseLeave: function(oEvent) {
          // actual call will be performed 100ms later and can be overwritten
-         this.mgr.ProcessHighlight(this, 0, 100);
+         this.mgr.ProcessHighlight(this, 0, undefined, 100);
       },
 
-      onTreeElementHighlight: function(masterid) {
+      onTreeElementHighlight: function(masterid, masterindex) {
          var items = this.getView().byId("tree").getItems();
          for (var n = 0; n<items.length;++n) {
             var item = items[n],
