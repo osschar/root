@@ -212,6 +212,14 @@
 #pragma link C++ class ROOT::Experimental::REveJetCone+;
 #pragma link C++ class ROOT::Experimental::REveJetConeProjected+;
 
+// REveLineSet
+#pragma link C++ class ROOT::Experimental::REveStraightLineSet+;
+#pragma link C++ class ROOT::Experimental::REveStraightLineSetProjected+;
+
+// REveChunkManager
+#pragma link C++ class ROOT::Experimental::REveChunkManager+;
+#pragma link C++ class ROOT::Experimental::REveChunkManager::iterator;
+
 // Geometry viewer
 #pragma link C++ class ROOT::Experimental::REveGeomNode+;
 #pragma link C++ class ROOT::Experimental::REveGeomVisisble+;

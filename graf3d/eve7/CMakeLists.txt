@@ -1,5 +1,6 @@
 ROOT_STANDARD_LIBRARY_PACKAGE(ROOTEve
   HEADERS
+     inc/ROOT/REveChunkManager.hxx
      inc/ROOT/REveClient.hxx
      inc/ROOT/REveCompound.hxx
      inc/ROOT/REveDataClasses.hxx
@@ -29,6 +30,7 @@ ROOT_STANDARD_LIBRARY_PACKAGE(ROOTEve
      inc/ROOT/REveSecondarySelectable.hxx
      inc/ROOT/REveSelection.hxx
      inc/ROOT/REveShape.hxx
+     inc/ROOT/REveStraightLineSet.hxx
      inc/ROOT/REveTrack.hxx
      inc/ROOT/REveTrackProjected.hxx
      inc/ROOT/REveTrackPropagator.hxx
@@ -50,6 +52,7 @@ ROOT_STANDARD_LIBRARY_PACKAGE(ROOTEve
      glu/sweep.c
      glu/tess.c
      glu/tessmono.c
+     src/REveChunkManager.cxx
      src/REveCompound.cxx
      src/REveDataClasses.cxx
      src/REveDataCollectionManager.cxx
@@ -77,6 +80,7 @@ ROOT_STANDARD_LIBRARY_PACKAGE(ROOTEve
      src/REveSecondarySelectable.cxx
      src/REveSelection.cxx
      src/REveShape.cxx
+     src/REveStraightLineSet.cxx
      src/REveTrack.cxx
      src/REveTrackProjected.cxx
      src/REveTrackPropagator.cxx
