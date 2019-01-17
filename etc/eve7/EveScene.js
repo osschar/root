@@ -160,28 +160,8 @@
 
          this.update3DObjectsVisibility(elem.childs, elem.fRnrChildren && all_ancestor_children_visible);
       }
-   }
-   
-   EveScene.prototype.visibilityChildrenChanged = function(el)
-   {
-      console.log("visibility children changed ", this.mgr, el);
+   }   
 
-      if (el.childs)
-      {
-         // XXXX Overkill, but I don't have obj3d for all elements.
-         // Also, can do this traversal once for the whole update package,
-         // needs to be managed from EveManager.js.
-         // Or marked here and then recomputed before rendering (probably better).
-
-         var scene = this.mgr.GetElement(el.fSceneId);
-
-         this.update3DObjectsVisibility(scene.childs, true);
-
-         if (this.viewer)
-            this.viewer.render();
-      }
-   }
-   
    EveScene.prototype.colorChanged = function(el)
    {
       console.log("color change ", el.fElementId, el.fMainColor);
@@ -194,12 +174,14 @@
       if (!this.viewer) return;
       
       var obj3d = this.getObj3D(el.fElementId);
+      var all_ancestor_children_visible = obj3d.all_ancestor_children_visible;
       
       var container = this.viewer.getThreejsContainer("scene" + this.id);
 
       container.remove(obj3d);
 
       obj3d = this.makeGLRepresentation(el);
+      obj3d.all_ancestor_children_visible = obj3d;
 
       container.add(obj3d);
       
@@ -213,6 +195,10 @@
       
       var obj3d =  this.makeGLRepresentation(el);
       if (!obj3d) return;
+
+      // AMT this is an overkill, temporary solution      
+      var scene = this.mgr.GetElement(el.fSceneId);
+      this.update3DObjectsVisibility(scene.childs, true);
       
       var container = this.viewer.getThreejsContainer("scene" + this.id);
 
@@ -235,6 +221,25 @@
          this.viewer.render();
    }
 
+   EveScene.prototype.visibilityChildrenChanged = function(el)
+   {
+      console.log("visibility children changed ", this.mgr, el);
+
+      if (el.childs)
+      {
+         // XXXX Overkill, but I don't have obj3d for all elements.
+         // Also, can do this traversal once for the whole update package,
+         // needs to be managed from EveManager.js.
+         // Or marked here and then recomputed before rendering (probably better).
+
+         var scene = this.mgr.GetElement(el.fSceneId);
+
+         this.update3DObjectsVisibility(scene.childs, true);
+
+         if (this.viewer)
+            this.viewer.render();
+      }
+   }
    
    EveScene.prototype.elementRemoved = function() {
    }
