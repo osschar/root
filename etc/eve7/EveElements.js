@@ -38,6 +38,9 @@
       
       var mesh = pnts.CreatePoints(JSROOT.Painter.root_colors[hit.fMarkerColor]);
 
+      /// use points control to toggle highlight and selection
+      // mesh.get_ctrl = function() { return new JSROOT.Painter.PointsControl(this); }
+
       mesh.highlightScale = 2;
       
       mesh.object = hit;
