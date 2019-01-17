@@ -437,17 +437,15 @@
       geom.addAttribute( 'position', new THREE.BufferAttribute( buf, 3 )  );
       var line = new THREE.LineSegments(geom, lineMaterial);
       obj3d.add(line);
-
-
+      
       var msize = el.fMarkerPlexSize;
-      var msize = 13;
-      var pnts = new JSROOT.Painter.PointsCreator(msize, true, 1);
+      // var msize = 13;
+      var pnts = new JSROOT.Painter.PointsCreator(msize, true, 5);
 
       var startIdx =el.fLinePlexSize * 6;
       var endIdx = startIdx + msize * 3;
-      for (var i = startIdx; i < endIdx; i++) {
+      for (var i = startIdx; i < endIdx; i+=3) {
          pnts.AddPoint(rnr_data.vtxBuff[i], rnr_data.vtxBuff[i+1], rnr_data.vtxBuff[i+2] );
-         i += 3;
       }
       var marker_mesh = pnts.CreatePoints(mainColor);
 
