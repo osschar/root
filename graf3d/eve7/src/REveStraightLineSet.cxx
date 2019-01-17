@@ -21,9 +21,8 @@ using namespace ROOT::Experimental;
 ////////////////////////////////////////////////////////////////////////////////
 /// Constructor.
 
-REveStraightLineSet::REveStraightLineSet(const char* n, const char* t):
-   REveElement (),
-   TNamed      (n, t),
+REveStraightLineSet::REveStraightLineSet(const std::string& n, const std::string& t):
+   REveElement (n, t),
 
    fLinePlex      (sizeof(Line_t), 4),
    fMarkerPlex    (sizeof(Marker_t), 8),

@@ -13,7 +13,6 @@
 #define ROOT_REveStraightLineSet
 
 #include "TNamed.h"
-#include "TAtt3D.h"
 #include "TAttMarker.h"
 #include "TAttLine.h"
 #include "TAttBBox.h"
@@ -33,8 +32,6 @@ namespace Experimental {
 //------------------------------------------------------------------------------
 class REveStraightLineSet : public REveElement,
                             public REveProjectable,
-                            public TNamed,
-                            public TAtt3D,
                             public TAttLine,
                             public TAttMarker,
                             public TAttBBox
@@ -49,10 +46,9 @@ public:
       Int_t          fId;
       Float_t        fV1[3];
       Float_t        fV2[3];
-      TRef           fRef;
 
       Line_t(Float_t x1, Float_t y1, Float_t z1,
-             Float_t x2, Float_t y2, Float_t z2) : fId(-1), fRef()
+             Float_t x2, Float_t y2, Float_t z2) : fId(-1)
       {
          fV1[0] = x1, fV1[1] = y1, fV1[2] = z1;
          fV2[0] = x2, fV2[1] = y2, fV2[2] = z2;
@@ -63,9 +59,8 @@ public:
    {
       Float_t      fV[3];
       Int_t        fLineId;
-      TRef         fRef;
 
-      Marker_t(Float_t x, Float_t y, Float_t z, Int_t line_id) : fLineId(line_id), fRef()
+      Marker_t(Float_t x, Float_t y, Float_t z, Int_t line_id) : fLineId(line_id)
       {
          fV[0] = x, fV[1] = y, fV[2] = z;
       }
@@ -86,7 +81,7 @@ protected:
    Line_t*           fLastLine; //!
 
 public:
-   REveStraightLineSet(const char* n="StraightLineSet", const char* t="");
+   REveStraightLineSet(const std::string& n="StraightLineSet", const std::string& t="");
    virtual ~REveStraightLineSet() {}
 
    virtual void SetLineColor(Color_t col) { SetMainColor(col); }
@@ -117,14 +112,17 @@ public:
    virtual TClass* ProjectedClass(const REveProjection* p) const; // override;
 
    Int_t WriteCoreJson(nlohmann::json &j, Int_t rnr_offset); // override;
-   void BuildRenderData(); // override;
-   virtual void ComputeBBox(); // override;
+   void  BuildRenderData(); // override;
+
+   void ComputeBBox(); // override;
 
    ClassDef(REveStraightLineSet, 0); // Set of straight lines with optional markers along the lines.
 };
 
 
-/******************************************************************************/
+//==============================================================================
+// REveStraightLineSetProjected
+//==============================================================================
 
 class REveStraightLineSetProjected : public REveStraightLineSet,
                                      public REveProjected
