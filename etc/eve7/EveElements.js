@@ -416,7 +416,24 @@
 
       return psp_ro;
    }
-   
+
+
+   EveElements.prototype.makeStraightLineSet = function(el, rnr_data)
+   {
+      var buf = new Float32Array(el.fLinePlexSize * 6);
+      for (var i = 0; i < el.fLinePlexSize * 6; ++i)
+      {
+         buf[i] = rnr_data.vtxBuff[i];
+      }
+      console.log("buff", buf);
+      var lineMaterial = new THREE.LineBasicMaterial({ color: el.fMainColor, linewidth: 2 });
+      
+      var geom = new THREE.BufferGeometry();
+      geom.addAttribute( 'position', new THREE.BufferAttribute( buf, 3 )  );
+      var line = new THREE.LineSegments(geom, lineMaterial);
+      console.log("line ", line);
+      return line;
+   }
 
    JSROOT.EVE.EveElements = EveElements;
 
