@@ -38,13 +38,6 @@
       
       var mesh = pnts.CreatePoints(JSROOT.Painter.root_colors[hit.fMarkerColor]);
 
-      // for the points index in intersect is just point index and can be used as is
-      // this is only for demonstration, can be used later
-      mesh.geo_extract_index = function(intersect) {
-         return intersect && intersect.index!==undefined ? intersect.index : undefined; 
-      }
-      mesh.geo_create_highlight = JSROOT.Painter.PointsHighlight;
-      
       mesh.highlightScale = 2;
       
       mesh.object = hit;
@@ -124,7 +117,7 @@
       for (var i = 1; i < N - 1; ++i)
          idcs.push( 0, i, i + 1 );
       geo_body.setIndex( idcs );
-      // geo_body.computeVertexNormals();
+      geo_body.computeVertexNormals();
       
       var geo_rim = new THREE.BufferGeometry();
       geo_rim.addAttribute('position', pos_ba);
@@ -142,9 +135,9 @@
       var mcol = JSROOT.Painter.root_colors[jet.fMainColor];
       var lcol = JSROOT.Painter.root_colors[jet.fLineColor];
       
-      var mesh  = new THREE.Mesh(geo_body, new THREE.MeshPhongMaterial({ depthWrite: false, color: mcol, transparent: true, opacity: 0.5, side: THREE.DoubleSide, flatShading: true }));
-      var line1 = new THREE.LineLoop(geo_rim,  new THREE.LineBasicMaterial({ linewidth: 2,   color: lcol, transparent: true, opacity: 0.8 })) 
-      var line2 = new THREE.LineSegments(geo_rays, new THREE.LineBasicMaterial({ linewidth: 0.5, color: lcol, transparent: true, opacity: 0.8 }));
+      var mesh = new THREE.Mesh(geo_body, new THREE.MeshPhongMaterial({ depthWrite: false, color: mcol, transparent: true, opacity: 0.5, side: THREE.DoubleSide }));
+      var line1 = new THREE.LineLoop(geo_rim,  new THREE.LineBasicMaterial({ linewidth: 2,   color: lcol, transparent: true, opacity: 0.5 })) 
+      var line2 = new THREE.LineSegments(geo_rays, new THREE.LineBasicMaterial({ linewidth: 0.5, color: lcol, transparent: true, opacity: 0.5 }));
       
       jet_ro.add( mesh  );
       jet_ro.add( line1 );
@@ -424,22 +417,40 @@
       return psp_ro;
    }
 
-
    EveElements.prototype.makeStraightLineSet = function(el, rnr_data)
    {
+      var obj3d = new THREE.Object3D();
+
+      var mainColor = JSROOT.Painter.root_colors[el.fMainColor];
+      
       var buf = new Float32Array(el.fLinePlexSize * 6);
       for (var i = 0; i < el.fLinePlexSize * 6; ++i)
       {
          buf[i] = rnr_data.vtxBuff[i];
       }
-      console.log("buff", buf);
-      var lineMaterial = new THREE.LineBasicMaterial({ color: el.fMainColor, linewidth: 2 });
+      var lineMaterial = new THREE.LineBasicMaterial({ color: mainColor, linewidth: 2 });
       
       var geom = new THREE.BufferGeometry();
       geom.addAttribute( 'position', new THREE.BufferAttribute( buf, 3 )  );
       var line = new THREE.LineSegments(geom, lineMaterial);
-      console.log("line ", line);
-      return line;
+      obj3d.add(line);
+
+
+      var msize = el.fMarkerPlexSize;
+      var msize = 13;
+      var pnts = new JSROOT.Painter.PointsCreator(msize, true, 1);
+
+      var startIdx =el.fLinePlexSize * 6;
+      var endIdx = startIdx + msize * 3;
+      for (var i = startIdx; i < endIdx; i++) {
+         pnts.AddPoint(rnr_data.vtxBuff[i], rnr_data.vtxBuff[i+1], rnr_data.vtxBuff[i+2] );
+         i += 3;
+      }
+      var marker_mesh = pnts.CreatePoints(mainColor);
+
+      obj3d.add(marker_mesh);
+
+      return obj3d;
    }
 
    JSROOT.EVE.EveElements = EveElements;
