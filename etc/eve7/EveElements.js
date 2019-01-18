@@ -77,6 +77,8 @@
       /// use points control to toggle highlight and selection
       // mesh.get_ctrl = function() { return new JSROOT.Painter.PointsControl(this); }
 
+      mesh.get_ctrl = function() { return new EveElemControl(this); }
+      
       mesh.highlightScale = 2;
       
       mesh.object = hit;
@@ -148,7 +150,7 @@
    EveElements.prototype.makeJet = function(jet, rnrData)
    {
       // console.log("make jet ", jet);
-      var jet_ro = new THREE.Object3D();
+      // var jet_ro = new THREE.Object3D();
       var pos_ba = new THREE.BufferAttribute( rnrData.vtxBuff, 3 );
       var N      = rnrData.vtxBuff.length / 3;
       
@@ -180,18 +182,17 @@
       var line1 = new THREE.LineLoop(geo_rim,  new THREE.LineBasicMaterial({ linewidth: 2,   color: lcol, transparent: true, opacity: 0.5 })) 
       var line2 = new THREE.LineSegments(geo_rays, new THREE.LineBasicMaterial({ linewidth: 0.5, color: lcol, transparent: true, opacity: 0.5 }));
       
-      jet_ro.add( mesh  );
-      jet_ro.add( line1 );
-      jet_ro.add( line2 );
+      // jet_ro.add( mesh  );
+      mesh.add( line1 );
+      mesh.add( line2 );
 
-      mesh.object = jet_ro.object = jet;
-      mesh.geo_name = jet_ro.geo_name = jet.fName;
-      mesh.geo_object = jet_ro.geo_object = jet.fMasterId || jet.fElementId;
+      mesh.object = jet;
+      mesh.geo_name = jet.fName;
+      mesh.geo_object = jet.fMasterId || jet.fElementId;
       
-      // redirect highlight to the mesh
-      jet_ro.geo_highlight = line1.geo_highlight = line2.geo_highlight = mesh;
+      mesh.get_ctrl = function() { return new EveElemControl(this); }
 
-      return jet_ro;
+      return mesh;
    }
 
    EveElements.prototype.makeJetProjected = function(jet, rnrData)
@@ -201,7 +202,6 @@
 
       // console.log("makeJetProjected ", jet);
 
-      var jet_ro = new THREE.Object3D();
       var pos_ba = new THREE.BufferAttribute( rnrData.vtxBuff, 3 );
       var N      = rnrData.vtxBuff.length / 3;
 
@@ -234,18 +234,17 @@
       var line1 = new THREE.Line(geo_rim,  new THREE.LineBasicMaterial({ linewidth: 2, color: lcol, transparent: true, opacity: 0.5 }));
       var line2 = new THREE.LineSegments(geo_rays, new THREE.LineBasicMaterial({ linewidth: 1, color: lcol, transparent: true, opacity: 0.5 }));
       
-      jet_ro.add( mesh  );
-      jet_ro.add( line1 );
-      jet_ro.add( line2 );
+      // jet_ro.add( mesh  );
+      mesh.add( line1 );
+      mesh.add( line2 );
 
-      mesh.object = jet_ro.object = jet;
-      mesh.geo_name = jet_ro.geo_name = jet.fName;
-      mesh.geo_object = jet_ro.geo_object = jet.fMasterId || jet.fElementId;
+      mesh.object = jet;
+      mesh.geo_name = jet.fName;
+      mesh.geo_object = jet.fMasterId || jet.fElementId;
       
-      // redirect highlight to the line1
-      jet_ro.geo_highlight = line1.geo_highlight = line2.geo_highlight = mesh;
+      mesh.get_ctrl = function() { return new EveElemControl(this); }
       
-      return jet_ro;
+      return mesh;
    }
    
    EveElements.prototype.makeEveGeometry = function(rnr_data, force)

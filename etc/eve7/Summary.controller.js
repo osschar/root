@@ -191,8 +191,10 @@ sap.ui.define([
          this.mgr = mgr;
          
          this.mgr.RegisterUpdate(this, "UpdateMgr");
-         this.mgr.RegisterHighlight(this, "onTreeElementHighlight");
          this.mgr.RegisterElementUpdate(this, "updateGED");
+         
+         // process scene-specific events
+         this.mgr.addSceneHandler(this);
       },
       
       UpdateMgr : function(mgr) {
@@ -330,6 +332,36 @@ sap.ui.define([
 
          this.getView().getModel("ged").setData({"widgetlist":modelw});
       },
+      
+      setElementSelected: function(mstrid, col, indx) {
+         var items = this.getView().byId("tree").getItems();
+         for (var n = 0; n<items.length;++n) {
+            var item = items[n],
+                ctxt = item.getBindingContext("treeModel"),
+                path = ctxt.getPath(),
+                ttt = item.getBindingContext("treeModel").getProperty(path);
+
+            var setcol = (col && mstrid && (mstrid == ttt.masterid)) ? "lightblue" : "";
+
+            if (mstrid == ttt.masterid) ttt.sel_color = setcol;
+            
+            item.$().css("background-color", ttt.sel_color);
+         }
+      },
+      
+      setElementHighlighted: function(mstrid, col, indx) {
+         var items = this.getView().byId("tree").getItems();
+         for (var n = 0; n<items.length;++n) {
+            var item = items[n],
+                ctxt = item.getBindingContext("treeModel"),
+                path = ctxt.getPath(),
+                ttt = item.getBindingContext("treeModel").getProperty(path);
+
+            var setcol = (col && mstrid && (mstrid == ttt.masterid)) ? "yellow" : "";
+
+            item.$().css("background-color", setcol || ttt.set_color);
+         }
+      },
 
       onMouseEnter: function(oEvent) {
          var items = this.getView().byId("tree").getItems(), item = null;
@@ -347,29 +379,32 @@ sap.ui.define([
          var ttt = item.getBindingContext("treeModel").getProperty(path);
 
          var masterid = this.mgr.GetMasterId(ttt.id);
-
-         this.mgr.ProcessHighlight(this, masterid, undefined);
+         
+         this.mgr.invokeInOtherScenes(this, "setElementHighlighted", masterid, "cyan");
       },
 
       onMouseLeave: function(oEvent) {
          // actual call will be performed 100ms later and can be overwritten
-         this.mgr.ProcessHighlight(this, 0, undefined, 100);
+         
+         var items = this.getView().byId("tree").getItems(), item = null;
+         for (var n = 0; n < items.length; ++n)
+            if (items[n].getId() == oEvent.target.id) { 
+               item = items[n]; break; 
+            }
+
+         // var item = this.getView().byId(oEvent.target.id).getControl();
+
+         if (!item) return;
+
+         var path = item.getBindingContext("treeModel").getPath();
+
+         var ttt = item.getBindingContext("treeModel").getProperty(path);
+
+         var masterid = this.mgr.GetMasterId(ttt.id);
+         
+         this.mgr.invokeInOtherScenes(this, "setElementHighlighted", masterid, null);
       },
 
-      onTreeElementHighlight: function(masterid, masterindex) {
-         var items = this.getView().byId("tree").getItems();
-         for (var n = 0; n<items.length;++n) {
-            var item = items[n],
-                ctxt = item.getBindingContext("treeModel"),
-                path = ctxt.getPath(),
-                ttt = item.getBindingContext("treeModel").getProperty(path);
-
-            var col = masterid && (masterid == ttt.masterid) ? "yellow" : "";
-
-            item.$().css("background-color", col);
-         }
-      },
-      
       getGed: function() {
          if (this.ged) {
             if (!this.ged.visible) {

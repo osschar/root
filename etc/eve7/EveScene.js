@@ -15,8 +15,6 @@
 
    "use strict";
    
-   console.log("loading EveScene.js");
-
    /// constructor, handle for REveScene class
    
    function EveScene(mgr,scene,viewer)
@@ -67,9 +65,8 @@
          //AMT: reference needed in MIR callback
          obj3d.eveId = elem.fElementId;
          obj3d.mstrId = elem.fMasterId;
-
-         if (elem.render_data.matrix)
-         {
+         
+         if (elem.render_data.matrix) {
             obj3d.matrixAutoUpdate = false;
             obj3d.matrix.fromArray( elem.render_data.matrix );
             obj3d.updateMatrixWorld(true);
@@ -253,12 +250,14 @@
    
    /** interactive handler */
    EveScene.prototype.processElementHighlighted = function(obj3d, col, indx) {
+      // console.log("processElementHigh", obj3d.mstrId, obj3d.eveId, col, indx);
       this.mgr.invokeInOtherScenes(this, "setElementHighlighted", obj3d.mstrId, col, indx);
    }
    
    /** function called by changes from server or by changes from other scenes */
    EveScene.prototype.setElementSelected = function(mstrid, col, indx) {
       var obj3d = this.getObj3D( mstrid, true );
+      if (!obj3d) obj3d = this.getObj3D( mstrid );
       if (obj3d && obj3d.get_ctrl)
          if (obj3d.get_ctrl().setSelected(col, indx, true))
             if (this.viewer) 

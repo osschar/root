@@ -40,8 +40,6 @@ sap.ui.define([
          this.geo_painter = null;
          // this.painter_ready = false;
 
-         this.mgr.RegisterHighlight(this, "onElementHighlight");
-
          JSROOT.AssertPrerequisites("geom;user:evedir/EveElements.js;evedir/EveScene.js", this.onLoadScripts.bind(this));
 
       },
@@ -297,29 +295,7 @@ sap.ui.define([
          this.redrawScenes();
       },
 
-      /// function called by GeoPainter, when mesh is highlighted
-      /// forward message to the EveManager to redistribute event to all other drawings
-      HighlightMesh: function(mesh, color, geo_object, geo_index) {
-         if (this.last_highlight === geo_object) return;
-         this.last_highlight = geo_object;
-         this.mgr.ProcessHighlight(this, geo_object, geo_index, geo_object ? 0 : 100);
-      },
-
       /// invoked from the manager
-
-      onElementHighlight: function(masterid, masterindex)
-      {
-         if (direct_threejs) {
-            console.log("onElementHighlight not implemented");
-            return;
-         } 
-         
-         if (!this.painter_ready || !this.geo_painter) return;
-
-         // // masterid used as identifier, no any recursions
-         this.geo_painter.HighlightMesh(null, null, masterid, masterindex, null, true);
-      },
-
       onResize: function(event) {
          // use timeout
          // console.log("resize painter")
