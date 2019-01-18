@@ -332,33 +332,34 @@
          if (n < nModified )
          {
             var obj = this.map[em.fElementId];
-
+            var tag = "changeBit";
             if (em.changeBit & this.EChangeBits.kCBVisibility)
             {
                if (obj.fRnrSelf != em.fRnrSelf) {
                   obj.fRnrSelf = em.fRnrSelf;
-                  this.callSceneReceivers(scene, "visibilityChanged", obj);
+                  tag = "visibilityChanged";
                }
                if (obj.fRnrChildren != em.fRnrChildren) {
                   obj.fRnrChildren = em.fRnrChildren;
-                  this.callSceneReceivers(scene, "visibilityChildrenChanged", obj);
+                  tag = "visibilityChildrenChanged";
                }
             }
 
             if (em.changeBit & this.EChangeBits.kCBColorSelection) {
                delete em.render_data;
                JSROOT.extend(obj, em);
-               this.callSceneReceivers(scene, "colorChanged", obj);
+               tag = "colorChanged";
             }
 
             if (em.changeBit & this.EChangeBits.kCBObjProps) {
                delete obj.render_data;
                jQuery.extend(obj, em);
-               this.callSceneReceivers(scene, "replaceElement", obj);
+               tag = "replaceElement";
             }
 
             // rename updateGED to checkGED???
-            this.InvokeReceivers("elem_update", null, 0, em.fElementId);
+            em.tag = tag;
+            this.callSceneReceivers(scene, "sceneElementChange", em);
          }
          else
          {
@@ -369,15 +370,15 @@
                parent.childs = [];
 
             parent.childs.push(em);
-            this.callSceneReceivers(scene, "elementAdded", em);
+            em.tag = "elementAdded";
+            this.callSceneReceivers(scene, "sceneElementChange", em);
          }
+         this.InvokeReceivers("elem_update", null, 0, em.fElementId);
       }
 
-      this.callSceneReceivers(scene, "endChanges");
 
       var treeRebuild = header.removedElements.length || (arr.length != nModified );
-
-      if (treeRebuild) this.ProcessUpdate(300);
+      this.callSceneReceivers(scene, "endChanges", treeRebuild);
    },
 
    EveManager.prototype.DeleteChildsOf = function(elem) {

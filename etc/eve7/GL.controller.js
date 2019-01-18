@@ -226,7 +226,6 @@ sap.ui.define([
          for (var k=0;k<element.childs.length;++k)
          {
             var scene = element.childs[k];
-            this.mgr.RegisterSceneReceiver(scene.fSceneId, this);
             
             var handler = new JSROOT.EVE.EveScene(this.mgr, scene, this);
 
