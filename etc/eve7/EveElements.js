@@ -22,8 +22,44 @@
 
    "use strict";
 
-   var GL = { POINTS: 0, LINES: 1, LINE_LOOP: 2, LINE_STRIP: 3, TRIANGLES: 4 };
+   
+   function EveElemControl(mesh) {
+      // JSROOT.Painter.GeoDrawingControl.call(this);
+      this.mesh = mesh;
+   }
 
+   EveElemControl.prototype = Object.create(JSROOT.Painter.GeoDrawingControl.prototype);
+   
+   EveElemControl.prototype.invokeSceneMethod = function(fname, arg1, arg2) {
+      if (!this.mesh || !this.mesh.scene) return;
+      var s = this.mesh.scene;
+      if (typeof s[fname] == "function") s[fname](this.mesh, arg1, arg2);
+   }
+
+   EveElemControl.prototype.setHighlight = function(col, indx, non_recursive) {
+      // special hook here
+      JSROOT.Painter.GeoDrawingControl.prototype.setHighlight.call(this, col || this.mesh.select_col, indx);
+      if (!non_recursive) this.invokeSceneMethod("processElementHighlighted", col, indx);
+      return true;
+   }
+
+   EveElemControl.prototype.setSelected = function(col, indx, non_recursive) {
+      var m = this.mesh;
+      if (!non_recursive && (m.select_col == col) && (m.select_indx == indx)) { col = null; indx = undefined; }
+      m.select_col = col;
+      m.select_indx = indx;
+      // special hook here
+      JSROOT.Painter.GeoDrawingControl.prototype.setHighlight.call(this, col, indx);
+      if (!non_recursive) this.invokeSceneMethod("processElementSelected", col, indx);
+      return true;
+   }
+
+   ////////////////////////////////////////////////
+   
+   
+   var GL = { POINTS: 0, LINES: 1, LINE_LOOP: 2, LINE_STRIP: 3, TRIANGLES: 4 };
+   
+   
    function EveElements()
    {
    }
@@ -103,6 +139,8 @@
       line.geo_name = track.fName;
       line.geo_object = track.fMasterId || track.fElementId;
       line.hightlightWidthScale = 2;
+      
+      line.get_ctrl = function() { return new EveElemControl(this); }
 
       return line;
    }
@@ -422,9 +460,12 @@
    
    ////////////////////////////////////////////////////////////////////////////////////////////
    
+   
    function StraightLineSetControl(mesh) {
-      this.mesh = mesh;
+      EveElemControl.call(this, mesh);
    }
+   
+   StraightLineSetControl.prototype = Object.create(EveElemControl.prototype);
    
    StraightLineSetControl.prototype.cleanup = function() {
       if (!this.mesh) return;
@@ -440,22 +481,25 @@
 
    StraightLineSetControl.prototype.isSelected = function() { return !!this.mesh.select_col; }
 
-   StraightLineSetControl.prototype.setSelected = function(col, indx) {
+   StraightLineSetControl.prototype.setSelected = function(col, indx, non_recurive) {
       var m = this.mesh;
-      if ((m.select_col == col) && (m.select_indx == indx)) {
-         col = null; indx = undefined;
-      }
+      if (!non_recurive && (m.select_col == col) && (m.select_indx == indx)) { col = null; indx = undefined; }
       m.select_col = col;
       m.select_indx = indx;
+      if (!non_recurive) this.invokeSceneMethod("processElementSelected", col, indx);
+     
       this.createSpecial("select", col, indx);
       return true;
    }
 
-   StraightLineSetControl.prototype.setHighlight = function(col, indx) {
-      var m = this.mesh;
-      m.h_index = indx;
+   StraightLineSetControl.prototype.setHighlight = function(col, indx, non_recursive) {
+      this.mesh.h_index = indx;
       this.createSpecial("highlight", col, indx);
+      if (!non_recursive) this.invokeSceneMethod("processElementHighlighted", col, indx);
+      return true;
    }
+   
+   StraightLineSetControl.prototype.getHighlightIndex = function() { return this.mesh.h_index; }
 
    StraightLineSetControl.prototype.createSpecial = function(prefix, color, index) {
       var m = this.mesh, ll = prefix + "_l_special", mm = prefix + "_m_special";
@@ -519,7 +563,7 @@
       var buf = new Float32Array(el.fLinePlexSize * 6);
       for (var i = 0; i < el.fLinePlexSize * 6; ++i)
          buf[i] = rnr_data.vtxBuff[i];
-      var lineMaterial = new THREE.LineBasicMaterial({ color: mainColor, linewidth: 2 });
+      var lineMaterial = new THREE.LineBasicMaterial({ color: mainColor, linewidth: 1 });
       
       var geom = new THREE.BufferGeometry();
       geom.addAttribute( 'position', new THREE.BufferAttribute( buf, 3 ) );
@@ -527,6 +571,7 @@
       obj3d.add(line);
       
       line.get_ctrl = function() { return new StraightLineSetControl(this.parent, true); }
+      
       line.geo_object = el.fElementId;
       line.geo_name = el.fName || "linesset";
       

@@ -227,8 +227,11 @@ sap.ui.define([
          {
             var scene = element.childs[k];
             this.mgr.RegisterSceneReceiver(scene.fSceneId, this);
+            
+            var handler = new JSROOT.EVE.EveScene(this.mgr, scene, this);
 
-            this.created_scenes.push(new JSROOT.EVE.EveScene(this.mgr, scene, this));
+            this.created_scenes.push(handler);
+            this.mgr.addSceneHandler(handler);
          }
          
       },
@@ -287,7 +290,7 @@ sap.ui.define([
          }
          
          this.painter_ready = true;
-         this.geo_painter._highlight_handlers = [ this ]; // register ourself for highlight handling
+         // this.geo_painter._highlight_handlers = [ this ]; // register ourself for highlight handling
          this.last_highlight = null;
          
          // create only when geo painter is ready
