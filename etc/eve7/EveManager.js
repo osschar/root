@@ -68,7 +68,7 @@
       if (typeof msg != "string") {
          // console.log('ArrayBuffer size ',
          // msg.byteLength, 'offset', offset);
-         this.UpdateBinary(msg, offset);
+         this.ImportSceneBinary(msg, offset);
 
          return;
       }
@@ -83,11 +83,11 @@
 
       } else if (resp && resp[0] && resp[0].content == "REveScene::StreamElements") {
 
-         this.Update(resp);
+         this.ImportSceneJson(resp);
 
       } else if (resp && resp.header && resp.header.content == "ElementsRepresentaionChanges") {
 
-         this.SceneChanged(resp);
+         this.ImportSceneChangeJson(resp);
 
       }
    }
@@ -217,7 +217,7 @@
          return this.DestroyElements(arr);
    }
 
-   EveManager.prototype.Update = function(arr)
+   EveManager.prototype.ImportSceneJson = function(arr)
    {
       this.last_json = null;
       // console.log("JSON", arr[0]);
@@ -268,7 +268,7 @@
       this.ProcessUpdate(300);
    }
 
-   EveManager.prototype.SceneChanged = function(msg) {
+   EveManager.prototype.ImportSceneChangeJson = function(msg) {
       var arr = msg.arr;
       this.last_json = null;
       this.scene_changes = msg;
@@ -412,7 +412,7 @@
       }
    }
 
-   EveManager.prototype.UpdateBinary = function(rawdata, offset) {
+   EveManager.prototype.ImportSceneBinary = function(rawdata, offset) {
 
       if (!this.last_json || !rawdata || !rawdata.byteLength) return;
 
