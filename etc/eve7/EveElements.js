@@ -419,6 +419,94 @@
 
       return psp_ro;
    }
+   
+   ////////////////////////////////////////////////////////////////////////////////////////////
+   
+   function StraightLineSetControl(mesh) {
+      this.mesh = mesh;
+   }
+   
+   StraightLineSetControl.prototype.cleanup = function() {
+      if (!this.mesh) return;
+      this.createSpecial("select");
+      this.createSpecial("highlight");
+      delete this.mesh;
+   }
+
+   StraightLineSetControl.prototype.extractIndex = function(intersect) {
+      if (!intersect || intersect.index===undefined) return undefined;
+      return intersect.index;
+   }
+
+   StraightLineSetControl.prototype.isSelected = function() { return !!this.mesh.select_col; }
+
+   StraightLineSetControl.prototype.setSelected = function(col, indx) {
+      var m = this.mesh;
+      if ((m.select_col == col) && (m.select_indx == indx)) {
+         col = null; indx = undefined;
+      }
+      m.select_col = col;
+      m.select_indx = indx;
+      this.createSpecial("select", col, indx);
+      return true;
+   }
+
+   StraightLineSetControl.prototype.setHighlight = function(col, indx) {
+      var m = this.mesh;
+      m.h_index = indx;
+      this.createSpecial("highlight", col, indx);
+   }
+
+   StraightLineSetControl.prototype.createSpecial = function(prefix, color, index) {
+      var m = this.mesh, ll = prefix + "_l_special", mm = prefix + "_m_special";
+      if (m[ll]) {
+         m.remove(m[ll]);
+         JSROOT.Painter.DisposeThreejsObject(m[ll]);
+         delete m[ll];
+      }
+      if (m[mm]) {
+         m.remove(m[mm]);
+         JSROOT.Painter.DisposeThreejsObject(m[mm]);
+         delete m[mm];
+      }
+      
+      if (!color) 
+         return;
+
+      var geom = new THREE.BufferGeometry();
+      geom.addAttribute( 'position', m.children[0].geometry.getAttribute("position") );
+      geom.setDrawRange(index, 2);
+      var lineMaterial = new THREE.LineBasicMaterial({ color: color, linewidth: 4 });
+      var line = new THREE.LineSegments(geom, lineMaterial);
+      m.add(line);
+      line.jsroot_special = true; // special object, exclude from intersections
+      m[ll] = line;
+      var el = m.eve_el;
+
+      if ((index % 2 == 0) && (index < el.fLinePlexSize*2)) {
+         var lineid = m.eve_indx[index/2], mindx = [];
+         
+         for (var k = 0; k < el.fMarkerPlexSize; ++k ) {
+            if (m.eve_indx[ k + el.fLinePlexSize] == lineid) mindx.push(k);
+         }
+         
+         if (mindx.length > 0) {
+            var pnts = new JSROOT.Painter.PointsCreator(mindx.length, true, 5);
+
+            var arr = m.children[1].geometry.getAttribute("position").array;
+            
+            for (var i = 0; i < mindx.length; ++i) {
+               var p = mindx[i]*3;
+               pnts.AddPoint(arr[p], arr[p+1], arr[p+2] );
+            }
+            var mark = pnts.CreatePoints(color);
+            m.add(mark);
+            mark.jsroot_special = true; // special object, exclude from intersections
+            m[mm] = mark;
+         }
+      }
+      
+   }
 
    EveElements.prototype.makeStraightLineSet = function(el, rnr_data)
    {
@@ -426,21 +514,24 @@
 
       var mainColor = JSROOT.Painter.root_colors[el.fMainColor];
       
+      mainColor = "lightgreen";
+      
       var buf = new Float32Array(el.fLinePlexSize * 6);
       for (var i = 0; i < el.fLinePlexSize * 6; ++i)
-      {
          buf[i] = rnr_data.vtxBuff[i];
-      }
       var lineMaterial = new THREE.LineBasicMaterial({ color: mainColor, linewidth: 2 });
       
       var geom = new THREE.BufferGeometry();
-      geom.addAttribute( 'position', new THREE.BufferAttribute( buf, 3 )  );
+      geom.addAttribute( 'position', new THREE.BufferAttribute( buf, 3 ) );
       var line = new THREE.LineSegments(geom, lineMaterial);
       obj3d.add(line);
       
+      line.get_ctrl = function() { return new StraightLineSetControl(this.parent, true); }
+      line.geo_object = el.fElementId;
+      line.geo_name = el.fName || "linesset";
+      
       var msize = el.fMarkerPlexSize;
-      // var msize = 13;
-      var pnts = new JSROOT.Painter.PointsCreator(msize, true, 5);
+      var pnts = new JSROOT.Painter.PointsCreator(msize, true, 3);
 
       var startIdx =el.fLinePlexSize * 6;
       var endIdx = startIdx + msize * 3;
@@ -450,7 +541,10 @@
       var marker_mesh = pnts.CreatePoints(mainColor);
 
       obj3d.add(marker_mesh);
-
+      
+      obj3d.eve_el = el;
+      obj3d.eve_indx = rnr_data.idxBuff;
+      
       return obj3d;
    }
 
