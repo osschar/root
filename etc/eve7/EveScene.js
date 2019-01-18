@@ -33,7 +33,7 @@
       this.first_time = true;
       
       // register ourself for scene events
-      this.mgr.RegisterSceneReceiver(scene.fSceneId, this);
+       this.mgr.RegisterSceneReceiver(scene.fSceneId, this);
    }
    
    EveScene.prototype.hasRenderData = function(elem)
@@ -170,6 +170,8 @@
       }
    }   
 
+
+   
    EveScene.prototype.colorChanged = function(el)
    {
       console.log("color change ", el.fElementId, el.fMainColor);
@@ -193,6 +195,7 @@
 
       container.add(obj3d);
       
+
       this.id2obj_map[el.fElementId] = obj3d;
       if (el.fMasterId) this.mid2obj_map[el.fMasterId] = obj3d;
       
@@ -213,8 +216,6 @@
 
       container.add(obj3d);
       console.log("element added ", el);
-      
-      this.viewer.render();
    }
    
    EveScene.prototype.visibilityChanged = function(el)
@@ -225,9 +226,6 @@
       {
          obj3d.visible = obj3d.all_ancestor_children_visible && el.fRnrSelf;
       }
-
-      if (this.viewer)
-         this.viewer.render();
    }
 
    EveScene.prototype.visibilityChildrenChanged = function(el)
@@ -244,9 +242,6 @@
          var scene = this.mgr.GetElement(el.fSceneId);
 
          this.update3DObjectsVisibility(scene.childs, true);
-
-         if (this.viewer)
-            this.viewer.render();
       }
    }
    
@@ -285,15 +280,24 @@
    }
    
    EveScene.prototype.endChanges = function() {
+      if (this.viewer)
+         this.viewer.render();
    }
    
    EveScene.prototype.onSceneChanged = function(id)
    {
-      console.log("scene changed", id);
+      console.log("EveScene.prototype.onSceneChanged scene changed ... AMT should this be called", id);
          
       this.redrawScene();
    }
 
+   EveScene.prototype.sceneElementChange = function(msg)
+   {
+      var el = this.mgr.GetElement(msg.fElementId);
+      this[msg.tag](el);
+   }
+
+   
    JSROOT.EVE.EveScene = EveScene;
 
    return JSROOT;
