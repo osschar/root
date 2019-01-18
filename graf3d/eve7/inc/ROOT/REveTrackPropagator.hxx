@@ -219,27 +219,24 @@ protected:
    Helix_t fH;                            // Helix.
 
    void RebuildTracks();
-   void
-   Update(const REveVector4D &v, const REveVectorD &p, Bool_t full_update = kFALSE, Bool_t enforce_max_step = kFALSE);
+   void Update(const REveVector4D &v, const REveVectorD &p, Bool_t full_update = kFALSE, Bool_t enforce_max_step = kFALSE);
    void Step(const REveVector4D &v, const REveVectorD &p, REveVector4D &vOut, REveVectorD &pOut);
 
    Bool_t LoopToVertex(REveVectorD &v, REveVectorD &p);
    Bool_t LoopToLineSegment(const REveVectorD &s, const REveVectorD &r, REveVectorD &p);
-   void LoopToBounds(REveVectorD &p);
+   void   LoopToBounds(REveVectorD &p);
 
    Bool_t LineToVertex(REveVectorD &v);
-   void LineToBounds(REveVectorD &p);
+   void   LineToBounds(REveVectorD &p);
 
-   void StepRungeKutta(Double_t step, Double_t *vect, Double_t *vout);
+   void   StepRungeKutta(Double_t step, Double_t *vect, Double_t *vout);
 
-   Bool_t
-   HelixIntersectPlane(const REveVectorD &p, const REveVectorD &point, const REveVectorD &normal, REveVectorD &itsect);
-   Bool_t
-   LineIntersectPlane(const REveVectorD &p, const REveVectorD &point, const REveVectorD &normal, REveVectorD &itsect);
+   Bool_t HelixIntersectPlane(const REveVectorD &p, const REveVectorD &point, const REveVectorD &normal, REveVectorD &itsect);
+   Bool_t LineIntersectPlane(const REveVectorD &p, const REveVectorD &point, const REveVectorD &normal, REveVectorD &itsect);
    Bool_t PointOverVertex(const REveVector4D &v0, const REveVector4D &v, Double_t *p = 0);
 
-   void ClosestPointFromVertexToLineSegment(const REveVectorD &v, const REveVectorD &s, const REveVectorD &r,
-                                            Double_t rMagInv, REveVectorD &c);
+   void   ClosestPointFromVertexToLineSegment(const REveVectorD &v, const REveVectorD &s, const REveVectorD &r,
+                                              Double_t rMagInv, REveVectorD &c);
    Bool_t ClosestPointBetweenLines(const REveVectorD &, const REveVectorD &, const REveVectorD &, const REveVectorD &,
                                    REveVectorD &out);
 
@@ -258,21 +255,20 @@ public:
    void InitTrack(const REveVectorD &v, Int_t charge);
    void ResetTrack();
 
-   Int_t GetCurrentPoint() const;
+   Int_t    GetCurrentPoint() const;
    Double_t GetTrackLength(Int_t start_point = 0, Int_t end_point = -1) const;
 
-   virtual void GoToBounds(REveVectorD &p);
+   virtual void   GoToBounds(REveVectorD &p);
    virtual Bool_t GoToVertex(REveVectorD &v, REveVectorD &p);
    virtual Bool_t GoToLineSegment(const REveVectorD &s, const REveVectorD &r, REveVectorD &p);
 
    // REveVectorF wrappers
-   void InitTrack(const REveVectorF &v, Int_t charge);
-   void GoToBounds(REveVectorF &p);
+   void   InitTrack(const REveVectorF &v, Int_t charge);
+   void   GoToBounds(REveVectorF &p);
    Bool_t GoToVertex(REveVectorF &v, REveVectorF &p);
    Bool_t GoToLineSegment(const REveVectorF &s, const REveVectorF &r, REveVectorF &p);
 
-   Bool_t
-   IntersectPlane(const REveVectorD &p, const REveVectorD &point, const REveVectorD &normal, REveVectorD &itsect);
+   Bool_t IntersectPlane(const REveVectorD &p, const REveVectorD &point, const REveVectorD &normal, REveVectorD &itsect);
 
    void FillPointSet(REvePointSet *ps) const;
 
@@ -305,7 +301,7 @@ public:
    void SetRnrPTBMarkers(Bool_t x);
 
    REveVectorD GetMagField(Double_t x, Double_t y, Double_t z) { return fMagFieldObj->GetField(x, y, z); }
-   void PrintMagField(Double_t x, Double_t y, Double_t z) const;
+   void        PrintMagField(Double_t x, Double_t y, Double_t z) const;
 
    EStepper_e GetStepper() const { return fStepper; }
 

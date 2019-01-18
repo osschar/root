@@ -300,7 +300,7 @@ void REveTrack::SetPathMarks(const REveTrack& t)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Set track's render style.
+/// Set track's propagator.
 /// Reference counts of old and new propagator are updated.
 
 void REveTrack::SetPropagator(REveTrackPropagator *prop)

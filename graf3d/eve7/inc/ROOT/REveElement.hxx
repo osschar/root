@@ -118,6 +118,7 @@ protected:
    std::unique_ptr<REveTrans> fMainTrans;   //  Pointer to main transformation matrix.
 
    void            *fUserData{nullptr};    //! Externally assigned and controlled user data.
+
    std::unique_ptr<REveRenderData> fRenderData;//! Vertex / normal / triangle index information for rendering.
 
    virtual void PreDeleteElement();
@@ -158,16 +159,16 @@ public:
 
    Bool_t         ApplyVizTag(const TString& tag, const TString& fallback_tag="");
 
-   virtual void PropagateVizParamsToProjecteds();
-   virtual void PropagateVizParamsToElements(REveElement* el=0);
-   virtual void CopyVizParams(const REveElement* el);
-   virtual void CopyVizParamsFromDB();
-   void         SaveVizParams (std::ostream& out, const TString& tag, const TString& var);
-   virtual void WriteVizParams(std::ostream& out, const TString& var);
+   virtual void   PropagateVizParamsToProjecteds();
+   virtual void   PropagateVizParamsToElements(REveElement* el=0);
+   virtual void   CopyVizParams(const REveElement* el);
+   virtual void   CopyVizParamsFromDB();
+   void           SaveVizParams (std::ostream& out, const TString& tag, const TString& var);
+   virtual void   WriteVizParams(std::ostream& out, const TString& var);
 
-   REveElement*  GetMaster();
-   REveCompound* GetCompound()                { return fCompound; }
-   void          SetCompound(REveCompound* c) { fCompound = c;    }
+   REveElement*   GetMaster();
+   REveCompound*  GetCompound()                { return fCompound; }
+   void           SetCompound(REveCompound* c) { fCompound = c;    }
 
    REveScene*   GetScene()  { return fScene;  }
    REveElement* GetMother() { return fMother; }
@@ -300,10 +301,6 @@ public:
 
 protected:
    Bool_t  fPickable;
-   Bool_t  fSelected;             //!
-   Bool_t  fHighlighted;          //!
-   Short_t fImpliedSelected;      //!
-   Short_t fImpliedHighlighted;   //!
 
    enum ECompoundSelectionColorBits
    {
@@ -325,29 +322,13 @@ protected:
    UChar_t fCSCBits;
 
 public:
-   typedef void (REveElement::* Select_foo)      (Bool_t);
-   typedef void (REveElement::* ImplySelect_foo) ();
-
    Bool_t IsPickable()    const { return fPickable; }
    void   SetPickable(Bool_t p) { fPickable = p; }
    void   SetPickableRecursively(Bool_t p);
 
    virtual REveElement* ForwardSelection();
-   virtual REveElement* ForwardEdit();
-
-   virtual void SelectElement(Bool_t state);
-   virtual void IncImpliedSelected();
-   virtual void DecImpliedSelected();
-   virtual void UnSelected();
-
-   virtual void HighlightElement(Bool_t state);
-   virtual void IncImpliedHighlighted();
-   virtual void DecImpliedHighlighted();
-   virtual void UnHighlighted();
 
    virtual void FillImpliedSelectedSet(Set_t& impSelSet);
-
-   virtual UChar_t GetSelectedLevel() const;
 
    void   RecheckImpliedSelections();
 
@@ -403,7 +384,7 @@ public:
    void VizDB_UpdateModel(Bool_t update=kTRUE); // *MENU*
    void VizDB_Insert(const std::string& tag, Bool_t replace=kTRUE, Bool_t update=kTRUE); // *MENU*
 
-   ClassDef(REveElement, 0); // Base class for REveUtil visualization elements, providing hierarchy management, rendering control and list-tree item management.
+   ClassDef(REveElement, 0); // Base class for ROOT Event Visualization Environment (EVE) providing hierarchy management and selection and rendering control.
 };
 
 } // namespace Experimental

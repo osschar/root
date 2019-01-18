@@ -34,9 +34,38 @@ REveSelection::REveSelection(const std::string& n, const std::string& t) :
    fActive        (kTRUE),
    fIsMaster      (kTRUE)
 {
-   fSelElement       = &REveElement::SelectElement;
-   fIncImpSelElement = &REveElement::IncImpliedSelected;
-   fDecImpSelElement = &REveElement::DecImpliedSelected;
+   // XXXX Managing complete selection state on element level.
+   //
+   // Method pointers for propagation of selected / implied selected state
+   // to elements. This has to be done differently now -- and kept within
+   // REveSelection.
+   //
+   // From REveElement.h:
+   // typedef void (REveElement::* Select_foo)      (Bool_t);
+   // typedef void (REveElement::* ImplySelect_foo) ();
+   //
+   // From REveSelection.hxx:
+   //    Select_foo       fSelElement;
+   //    ImplySelect_foo  fIncImpSelElement;
+   //    ImplySelect_foo  fDecImpSelElement;
+   //
+   // From this function:
+   // fSelElement       = &REveElement::SelectElement;
+   // fIncImpSelElement = &REveElement::IncImpliedSelected;
+   // fDecImpSelElement = &REveElement::DecImpliedSelected;
+   //
+   // From SetHighlightMode:
+   // fSelElement       = &REveElement::HighlightElement;
+   // fIncImpSelElement = &REveElement::IncImpliedHighlighted;
+   // fDecImpSelElement = &REveElement::DecImpliedHighlighted;
+   //
+   // Note that those REveElementFunctions have been removed.
+   //
+   // See calls commented with SSSS further down.
+   //
+   // Also, see REveManager::PreDeleteElement. We might need some sort of
+   // implied-selected-count after all (global, for all selections,
+   // highlights) ... and traverse all selections if the element gets zapped.
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -50,10 +79,6 @@ void REveSelection::SetHighlightMode()
 
    fPickToSelect = kPS_Projectable;
    fIsMaster     = kFALSE;
-
-   fSelElement       = &REveElement::HighlightElement;
-   fIncImpSelElement = &REveElement::IncImpliedHighlighted;
-   fDecImpSelElement = &REveElement::DecImpliedHighlighted;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -65,10 +90,10 @@ void REveSelection::DoElementSelect(REveSelection::SelMap_i entry)
    REveElement *el  = entry->first;
    Set_t       &set = entry->second;
 
-   (el->*fSelElement)(kTRUE);
+   // SSSS (el->*fSelElement)(kTRUE);
    el->FillImpliedSelectedSet(set);
-   for (Set_i i = set.begin(); i != set.end(); ++i)
-      ((*i)->*fIncImpSelElement)();
+   // SSSS for (Set_i i = set.begin(); i != set.end(); ++i)
+   // SSSS    ((*i)->*fIncImpSelElement)();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -77,13 +102,13 @@ void REveSelection::DoElementSelect(REveSelection::SelMap_i entry)
 
 void REveSelection::DoElementUnselect(REveSelection::SelMap_i entry)
 {
-   REveElement *el  = entry->first;
+   // SSSS REveElement *el  = entry->first;
    Set_t       &set = entry->second;
 
-   for (Set_i i = set.begin(); i != set.end(); ++i)
-      ((*i)->*fDecImpSelElement)();
+   // SSSS for (Set_i i = set.begin(); i != set.end(); ++i)
+   // SSSS    ((*i)->*fDecImpSelElement)();
    set.clear();
-   (el->*fSelElement)(kFALSE);
+   // SSSS (el->*fSelElement)(kFALSE);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -102,6 +127,7 @@ Bool_t REveSelection::AcceptElement(REveElement* el)
 void REveSelection::AddElement(REveElement* el)
 {
    REveElement::AddElement(el);
+   el->IncParentIgnoreCnt();
 
    SelMap_i i = fImpliedSelected.insert(std::make_pair(el, Set_t())).first;
    if (fActive)
@@ -117,6 +143,7 @@ void REveSelection::AddElement(REveElement* el)
 
 void REveSelection::RemoveElement(REveElement* el)
 {
+   el->DecParentIgnoreCnt();
    REveElement::RemoveElement(el);
    SelectionRemoved(el);
 }
@@ -148,6 +175,10 @@ void REveSelection::RemoveElementLocal(REveElement* el)
 
 void REveSelection::RemoveElements()
 {
+   for (auto & el : fChildren)
+   {
+      el->DecParentIgnoreCnt();
+   }
    REveElement::RemoveElements();
    SelectionCleared();
 }
@@ -196,7 +227,7 @@ void REveSelection::RecheckImpliedSet(SelMap_i smi)
       if (smi->second.find(*i) == smi->second.end())
       {
          smi->second.insert(*i);
-         ((*i)->*fIncImpSelElement)();
+         // SSSS ((*i)->*fIncImpSelElement)();
       }
    }
 }
@@ -252,7 +283,7 @@ void REveSelection::SelectionCleared()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Called when secondary selection changed internally.
+/// Emit SelectionRepeated signal.
 
 void REveSelection::SelectionRepeated(REveElement* /*el*/)
 {
@@ -348,8 +379,6 @@ REveElement* REveSelection::MapPickedToSelected(REveElement* el)
 
 void REveSelection::UserPickedElement(REveElement* el, Bool_t multi)
 {
-   REveElement *edit_el = el ? el->ForwardEdit() : 0;
-
    el = MapPickedToSelected(el);
 
    if (el || HasChildren())
@@ -364,13 +393,13 @@ void REveSelection::UserPickedElement(REveElement* el, Bool_t multi)
             AddElement(el);
       }
       if (fIsMaster)
-         REX::gEve->ElementSelect(edit_el ? edit_el : el);
+         REX::gEve->ElementSelect(el);
       REX::gEve->Redraw3D();
    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Called when secondary selection becomes empty.
+/// Called when element selection is repeated.
 
 void REveSelection::UserRePickedElement(REveElement* el)
 {
@@ -383,7 +412,7 @@ void REveSelection::UserRePickedElement(REveElement* el)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Called when secondary selection becomes empty.
+/// Called when an element is unselected.
 
 void REveSelection::UserUnPickedElement(REveElement* el)
 {

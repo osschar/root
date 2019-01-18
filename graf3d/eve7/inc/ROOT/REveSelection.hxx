@@ -37,19 +37,15 @@ private:
 
 protected:
    typedef std::map<REveElement *, Set_t> SelMap_t;
-   typedef std::map<REveElement *, Set_t>::iterator SelMap_i;
+   typedef SelMap_t::iterator             SelMap_i;
 
-   Int_t fPickToSelect;
-   Bool_t fActive;
-   Bool_t fIsMaster;
+   Int_t            fPickToSelect;
+   Bool_t           fActive;
+   Bool_t           fIsMaster;
 
-   SelMap_t fImpliedSelected;
+   SelMap_t         fImpliedSelected;
 
-   Select_foo fSelElement;
-   ImplySelect_foo fIncImpSelElement;
-   ImplySelect_foo fDecImpSelElement;
-
-   void DoElementSelect(SelMap_i entry);
+   void DoElementSelect  (SelMap_i entry);
    void DoElementUnselect(SelMap_i entry);
 
    void RecheckImpliedSet(SelMap_i smi);
@@ -58,23 +54,23 @@ public:
    REveSelection(const std::string& n = "REveSelection", const std::string& t = "");
    virtual ~REveSelection() {}
 
-   void SetHighlightMode();
+   void   SetHighlightMode();
 
-   Int_t GetPickToSelect() const { return fPickToSelect; }
-   void SetPickToSelect(Int_t ps) { fPickToSelect = ps; }
+   Int_t  GetPickToSelect()   const { return fPickToSelect; }
+   void   SetPickToSelect(Int_t ps) { fPickToSelect = ps; }
 
-   Bool_t GetIsMaster() const { return fIsMaster; }
-   void SetIsMaster(Bool_t m) { fIsMaster = m; }
+   Bool_t GetIsMaster()   const { return fIsMaster; }
+   void   SetIsMaster(Bool_t m) { fIsMaster = m; }
 
    virtual Bool_t AcceptElement(REveElement *el);
 
-   virtual void AddElement(REveElement *el);
-   virtual void RemoveElement(REveElement *el);
-   virtual void RemoveElementLocal(REveElement *el);
-   virtual void RemoveElements();
-   virtual void RemoveElementsLocal();
+   virtual void   AddElement(REveElement *el);
+   virtual void   RemoveElement(REveElement *el);
+   virtual void   RemoveElementLocal(REveElement *el);
+   virtual void   RemoveElements();
+   virtual void   RemoveElementsLocal();
 
-   virtual void RemoveImpliedSelected(REveElement *el);
+   virtual void   RemoveImpliedSelected(REveElement *el);
 
    void RecheckImpliedSetForElement(REveElement *el);
 

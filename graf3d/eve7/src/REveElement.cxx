@@ -66,10 +66,6 @@ REveElement::REveElement(const std::string& name, const std::string& title) :
    fMainColorPtr        (0),
    fMainTrans           (),
    fPickable            (kFALSE),
-   fSelected            (kFALSE),
-   fHighlighted         (kFALSE),
-   fImpliedSelected     (0),
-   fImpliedHighlighted  (0),
    fCSCBits             (0),
    fChangeBits          (0),
    fDestructing         (kNone)
@@ -111,10 +107,6 @@ REveElement::REveElement(const REveElement& e) :
    fMainColorPtr        (nullptr),
    fMainTrans           (),
    fPickable            (e.fPickable),
-   fSelected            (kFALSE),
-   fHighlighted         (kFALSE),
-   fImpliedSelected     (0),
-   fImpliedHighlighted  (0),
    fCSCBits             (e.fCSCBits),
    fChangeBits          (0),
    fDestructing         (kNone)
@@ -966,7 +958,7 @@ void REveElement::AddElement(REveElement* el)
    // XXXX This should be element added. Also, should be different for
    // "full (re)construction". Scenes should manage that and have
    // state like: none - constructing - clearing - nominal - updating.
-   // I recon this means n element should have a ptr to its scene.
+   // I recon this means an element should have a ptr to its scene.
    // XXXXElementChanged();
 }
 
@@ -980,6 +972,7 @@ void REveElement::RemoveElement(REveElement* el)
    RemoveElementLocal(el);
    el->RemoveParent(this);
    fChildren.remove(el); --fNumChildren;
+
    // XXXX This should be element removed. Also, think about recursion, deletion etc.
    // XXXXElementChanged();
 }
@@ -1034,7 +1027,7 @@ void REveElement::RemoveElements()
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Perform additional local removal of all elements.
-/// See comment to RemoveElementlocal(REveElement*).
+/// See comment to RemoveElementLocal(REveElement*).
 
 void REveElement::RemoveElementsLocal()
 {
@@ -1498,113 +1491,13 @@ void REveElement::SetPickableRecursively(Bool_t p)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Returns element to be selected on click.
+/// Returns element to be selected when this element is chosen.
 /// If value is zero the selected object will follow rules in
-/// REveSelection.
+/// REveSelection (function MapPickedToSelected).
 
 REveElement* REveElement::ForwardSelection()
 {
    return 0;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Returns element to be displayed in GUI editor on click.
-/// If value is zero the displayed object will follow rules in
-/// REveSelection.
-
-REveElement* REveElement::ForwardEdit()
-{
-   return 0;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Set element's selection state. Stamp appropriately.
-
-void REveElement::SelectElement(Bool_t state)
-{
-   if (fSelected != state) {
-      fSelected = state;
-      if (!fSelected && fImpliedSelected == 0)
-         UnSelected();
-      fParentIgnoreCnt += (fSelected) ? 1 : -1;
-      StampColorSelection();
-   }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Increase element's implied-selection count. Stamp appropriately.
-
-void REveElement::IncImpliedSelected()
-{
-   if (fImpliedSelected++ == 0)
-      StampColorSelection();
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Decrease element's implied-selection count. Stamp appropriately.
-
-void REveElement::DecImpliedSelected()
-{
-   if (--fImpliedSelected == 0)
-   {
-      if (!fSelected)
-         UnSelected();
-      StampColorSelection();
-   }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Virtual function called when both fSelected is false and
-/// fImpliedSelected is 0.
-/// Nothing is done in this base-class version
-
-void REveElement::UnSelected()
-{
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Set element's highlight state. Stamp appropriately.
-
-void REveElement::HighlightElement(Bool_t state)
-{
-   if (fHighlighted != state) {
-      fHighlighted = state;
-      if (!fHighlighted && fImpliedHighlighted == 0)
-         UnHighlighted();
-      fParentIgnoreCnt += (fHighlighted) ? 1 : -1;
-      StampColorSelection();
-   }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Increase element's implied-highlight count. Stamp appropriately.
-
-void REveElement::IncImpliedHighlighted()
-{
-   if (fImpliedHighlighted++ == 0)
-      StampColorSelection();
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Decrease element's implied-highlight count. Stamp appropriately.
-
-void REveElement::DecImpliedHighlighted()
-{
-   if (--fImpliedHighlighted == 0)
-   {
-      if (!fHighlighted)
-         UnHighlighted();
-      StampColorSelection();
-   }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Virtual function called when both fHighlighted is false and
-/// fImpliedHighlighted is 0.
-/// Nothing is done in this base-class version
-
-void REveElement::UnHighlighted()
-{
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1627,19 +1520,6 @@ void REveElement::FillImpliedSelectedSet(Set_t& impSelSet)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Get selection level, needed for rendering selection and
-/// highlight feedback.
-
-UChar_t REveElement::GetSelectedLevel() const
-{
-   if (fSelected)               return 1;
-   if (fImpliedSelected > 0)    return 2;
-   if (fHighlighted)            return 3;
-   if (fImpliedHighlighted > 0) return 4;
-   return 0;
-}
-
-////////////////////////////////////////////////////////////////////////////////
 /// Call this if it is possible that implied-selection or highlight
 /// has changed for this element or for implied-selection this
 /// element is member of and you want to maintain consistent
@@ -1649,11 +1529,21 @@ UChar_t REveElement::GetSelectedLevel() const
 
 void REveElement::RecheckImpliedSelections()
 {
-   if (fSelected || fImpliedSelected)
-      REX::gEve->GetSelection()->RecheckImpliedSetForElement(this);
+   // XXXX MT 2019-01 --- RecheckImpliedSelections
+   //
+   // With removal of selection state from this class there might be some
+   // corner cases requiring checking of implied-selected state in
+   // selection/highlight objects.
+   //
+   // This could be done as part of begin / end changes on the EveManager level.
+   //
+   // See also those functions in TEveSelection.
 
-   if (fHighlighted || fImpliedHighlighted)
-      REX::gEve->GetHighlight()->RecheckImpliedSetForElement(this);
+   // if (fSelected || fImpliedSelected)
+   //    REX::gEve->GetSelection()->RecheckImpliedSetForElement(this);
+
+   // if (fHighlighted || fImpliedHighlighted)
+   //    REX::gEve->GetHighlight()->RecheckImpliedSetForElement(this);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1714,8 +1604,9 @@ Int_t REveElement::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
 
    j["fMainColor"]        = GetMainColor();
    j["fMainTransparency"] = GetMainTransparency();
+   j["fPickable"]         = fPickable;
 
-   if (rnr_offset >=0) {
+   if (rnr_offset >= 0) {
       BuildRenderData();
       if (fRenderData.get())
       {

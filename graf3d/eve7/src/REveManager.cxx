@@ -406,10 +406,11 @@ void REveManager::PreDeleteElement(REveElement* element)
    if (fStampedElements->GetValue((ULong64_t) element, (Long64_t) element) != 0)
       fStampedElements->Remove((ULong64_t) element, (Long64_t) element);
 
-   if (element->fImpliedSelected > 0)
-      fSelection->RemoveImpliedSelected(element);
-   if (element->fImpliedHighlighted > 0)
-      fHighlight->RemoveImpliedSelected(element);
+   // SSSS
+   // if (element->fImpliedSelected > 0)
+   //    fSelection->RemoveImpliedSelected(element);
+   // if (element->fImpliedHighlighted > 0)
+   //    fHighlight->RemoveImpliedSelected(element);
 
    if (element->fElementId != 0)
    {
