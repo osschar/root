@@ -283,14 +283,14 @@
               this.last_json.push(arr[i]);
 
       } else {
-         this.PostProcessSceneChanges();
+         this.CompleteSceneChanges();
       }
    }
 
    //______________________________________________________________________________
 
 
-   EveManager.prototype.PostProcessSceneChanges = function()
+   EveManager.prototype.CompleteSceneChanges = function()
    {
       if (!this.scene_changes) return;
 
@@ -449,7 +449,7 @@
          console.error('Raw data decoding error - length mismatch', lastoff, rawdata.byteLength);
 
       if (this.scene_changes)
-         this.PostProcessSceneChanges();
+         this.CompleteSceneChanges();
       else
          this.ProcessModified(arr[0].fSceneId);
    }
