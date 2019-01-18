@@ -202,19 +202,9 @@
       var elem = this.GetElement(sceneid);
       if (!elem || !elem.$modified) return;
       
-      this.callSceneReceivers(elem, "onSceneChanged", sceneid);
+      this.callSceneReceivers(elem, "onSceneRecreate", sceneid);
 
       delete elem.$modified;
-   }
-
-   EveManager.prototype.ProcessData = function(arr) {
-      if (!arr) return;
-
-      if (arr[0].content == "REveScene::StreamElements")
-         return this.Update(arr);
-
-      if (arr[0].content == "REveManager::DestroyElementsOf")
-         return this.DestroyElements(arr);
    }
 
    EveManager.prototype.ImportSceneJson = function(arr)
