@@ -383,7 +383,7 @@
 
          this.DeleteChildsOf(element);
          element.$modified = true;
-         this.ProcessScenCreate(ids[n]);
+         this.ProcessSceneCreate(ids[n]);
       }
 
       // this.ignore_all = true;
