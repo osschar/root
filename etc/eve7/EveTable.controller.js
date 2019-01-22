@@ -133,7 +133,7 @@ sap.ui.define([
          if (this.mgr) this.mgr.Unregister(this);
       },
 
-      onSceneRecreate: function(element, id) {
+      onSceneCreate: function(element, id) {
          console.log("!!!CHANGED", id);
 
          this.setEveData();
