@@ -189,7 +189,7 @@
    }
 
    // mark object and all its parents as modified
-   EveManager.prototype.MarkModified = function(id) {
+   EveManager.prototype.MarkSceneRrecreate = function(id) {
       while (id) {
          var elem = this.GetElement(id);
          if (!elem) return;
@@ -198,11 +198,11 @@
       }
    }
 
-   EveManager.prototype.ProcessModified = function(sceneid) {
+   EveManager.prototype.ProcessSceneCreate = function(sceneid) {
       var elem = this.GetElement(sceneid);
       if (!elem || !elem.$modified) return;
       
-      this.callSceneReceivers(elem, "onSceneRecreate", sceneid);
+      this.callSceneReceivers(elem, "onSceneCreate", sceneid);
 
       delete elem.$modified;
    }
@@ -247,12 +247,12 @@
             obj = this.map[elem.fElementId] = elem;
          }
 
-         this.MarkModified(elem.fElementId);
+         this.MarkSceneRrecreate(elem.fElementId);
       }
 
       if (arr[0].fTotalBinarySize == 0) {
          console.log("scenemodified ", this.map[arr[0].fSceneId])
-         this.ProcessModified(arr[0].fSceneId);
+         this.ProcessSceneCreate(arr[0].fSceneId);
       }
 
       this.ProcessUpdate(300);
@@ -383,7 +383,7 @@
 
          this.DeleteChildsOf(element);
          element.$modified = true;
-         this.ProcessModified(ids[n]);
+         this.ProcessScenCreate(ids[n]);
       }
 
       // this.ignore_all = true;
@@ -451,7 +451,7 @@
       if (this.scene_changes)
          this.CompleteSceneChanges();
       else
-         this.ProcessModified(arr[0].fSceneId);
+         this.ProcessSceneCreate(arr[0].fSceneId);
    }
 
    JSROOT.EVE.EveManager = EveManager;

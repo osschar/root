@@ -283,7 +283,7 @@
          this.viewer.render();
    }
    
-   EveScene.prototype.onSceneRecreate = function(id)
+   EveScene.prototype.onSceneCreate = function(id)
    {
       this.redrawScene();
    }
