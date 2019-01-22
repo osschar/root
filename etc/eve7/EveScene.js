@@ -283,10 +283,8 @@
          this.viewer.render();
    }
    
-   EveScene.prototype.onSceneChanged = function(id)
+   EveScene.prototype.onSceneCreate = function(id)
    {
-      console.log("EveScene.prototype.onSceneChanged scene changed ... AMT should this be called", id);
-         
       this.redrawScene();
    }
 
