@@ -351,6 +351,7 @@ sap.ui.define([
       
       setElementHighlighted: function(mstrid, col, indx) {
          var items = this.getView().byId("tree").getItems();
+         
          for (var n = 0; n<items.length;++n) {
             var item = items[n],
                 ctxt = item.getBindingContext("treeModel"),
@@ -358,8 +359,9 @@ sap.ui.define([
                 ttt = item.getBindingContext("treeModel").getProperty(path);
 
             var setcol = (col && mstrid && (mstrid == ttt.masterid)) ? "yellow" : "";
+            if (!setcol && ttt.set_color) setcol = ttt.set_color;
 
-            item.$().css("background-color", setcol || ttt.set_color);
+            item.$().css("background-color", setcol);
          }
       },
 
