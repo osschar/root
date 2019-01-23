@@ -359,7 +359,7 @@ sap.ui.define([
                 ttt = item.getBindingContext("treeModel").getProperty(path);
 
             var setcol = (col && mstrid && (mstrid == ttt.masterid)) ? "yellow" : "";
-            if (!setcol && ttt.set_color) setcol = ttt.set_color;
+            if (!setcol && ttt.sel_color) setcol = ttt.sel_color;
 
             item.$().css("background-color", setcol);
          }
