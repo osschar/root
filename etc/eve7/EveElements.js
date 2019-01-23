@@ -64,7 +64,23 @@
    {
    }
 
+   /** Test if render data has vertex buffer. Make logging if not. Only for debug purposes */ 
+   EveElements.prototype.TestRnr = function(name, obj, rnrData) {
+      
+      if (obj && rnrData && rnrData.vtxBuff) return false;
+      
+      var cnt = this[name] || 0;
+      
+      if (cnt++ < 5) console.log(name, obj, rnrData);
+      
+      this[name] = cnt;
+      
+      return true;
+   }
+
    EveElements.prototype.makeHit = function(hit, rnrData) {
+      if (this.TestRnr("hit", hit, rnrData)) return null;
+      
       var hit_size = 8*rnrData.fMarkerSize,
           size = rnrData.vtxBuff.length/3,
           pnts = new JSROOT.Painter.PointsCreator(size, true, hit_size);
@@ -91,6 +107,8 @@
    }
 
    EveElements.prototype.makeTrack = function(track, rnrData) {
+      if (this.TestRnr("track", track, rnrData)) return null;
+      
       var N = rnrData.vtxBuff.length/3;
       var track_width = track.fLineWidth || 1,
           track_color = JSROOT.Painter.root_colors[track.fLineColor] || "rgb(255,0,255)";
@@ -149,6 +167,8 @@
 
    EveElements.prototype.makeJet = function(jet, rnrData)
    {
+      if (this.TestRnr("jet", jet, rnrData)) return null;
+      
       // console.log("make jet ", jet);
       // var jet_ro = new THREE.Object3D();
       var pos_ba = new THREE.BufferAttribute( rnrData.vtxBuff, 3 );
@@ -201,6 +221,9 @@
       // Fourth point is only present in RhoZ when jet hits barrel/endcap transition.
 
       // console.log("makeJetProjected ", jet);
+      
+      if (this.TestRnr("jetp", jet, rnrData)) return null;
+
 
       var pos_ba = new THREE.BufferAttribute( rnrData.vtxBuff, 3 );
       var N      = rnrData.vtxBuff.length / 3;
