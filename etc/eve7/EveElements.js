@@ -505,7 +505,21 @@
 
    StraightLineSetControl.prototype.setSelected = function(col, indx, non_recurive) {
       var m = this.mesh;
-      if (!non_recurive && (m.select_col == col) && (m.select_indx == indx)) { col = null; indx = undefined; }
+      if (!non_recurive) { 
+         if (this.evnt && this.evnt.ctrlKey) {
+            var curr = m.select_indx;
+            if (typeof curr === "number") curr = [curr]; else if (!curr) curr = [];
+            var pos = curr.indexOf(indx);
+            if (col && (pos < 0)) curr.push(indx); else
+            if (!col && (pos >= 0)) curr.splice(pos, 1);
+            indx = curr.length ? curr : undefined;
+            if (!indx) col = null;
+         } else if ((m.select_col == col) && (m.select_indx == indx)) { 
+            col = null; 
+            indx = undefined; 
+         }
+      }
+      
       m.select_col = col;
       m.select_indx = indx;
       if (!non_recurive) this.invokeSceneMethod("processElementSelected", col, indx);
@@ -541,7 +555,14 @@
 
       var geom = new THREE.BufferGeometry();
       geom.addAttribute( 'position', m.children[0].geometry.getAttribute("position") );
-      geom.setDrawRange(index, 2);
+      if (typeof index == "number") {
+         geom.setDrawRange(index, 2);
+      } else {
+         var idcs = [];
+         for (var i = 0; i < index.length; ++i)
+            idcs.push(index[i], index[i]+1);
+         geom.setIndex( idcs );
+      }
       var lineMaterial = new THREE.LineBasicMaterial({ color: color, linewidth: 4 });
       var line = new THREE.LineSegments(geom, lineMaterial);
       m.add(line);
