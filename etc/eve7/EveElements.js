@@ -506,7 +506,7 @@
 
    StraightLineSetControl.prototype.extractIndex = function(intersect) {
       if (!intersect || intersect.index===undefined) return undefined;
-      return intersect.index;
+      return intersect.index/2; // return segment id - not a point
    }
 
    StraightLineSetControl.prototype.setSelected = function(col, indx) {
@@ -580,11 +580,11 @@
       var geom = new THREE.BufferGeometry();
       geom.addAttribute( 'position', m.children[0].geometry.getAttribute("position") );
       if (index.length == 1) {
-         geom.setDrawRange(index[0], 2);
+         geom.setDrawRange(index[0]*2, 2);
       } else if (index.length > 1) {
          var idcs = [];
          for (var i = 0; i < index.length; ++i)
-            idcs.push(index[i], index[i]+1);
+            idcs.push(index[i]*2, index[i]*2+1);
          geom.setIndex( idcs );
       }
       var lineMaterial = new THREE.LineBasicMaterial({ color: color, linewidth: 4 });
@@ -595,8 +595,8 @@
       var el = m.eve_el, mindx = []
 
       for (var i = 0; i < index.length; ++i) {
-         if ((index[i] % 2 == 0) && (index[i] < el.fLinePlexSize*2)) {
-            var lineid = m.eve_indx[index[i]/2];
+         if (index[i] < el.fLinePlexSize) {
+            var lineid = m.eve_indx[index[i]];
 
             for (var k = 0; k < el.fMarkerPlexSize; ++k ) {
                if (m.eve_indx[ k + el.fLinePlexSize] == lineid) mindx.push(k);
