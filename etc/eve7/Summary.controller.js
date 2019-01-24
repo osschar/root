@@ -193,6 +193,7 @@ sap.ui.define([
          this.mgr.RegisterUpdate(this, "UpdateMgr");
          this.mgr.RegisterElementUpdate(this, "updateGED");
          
+         this.selected = {}; // container of selected objects
          // process scene-specific events
          this.mgr.addSceneHandler(this);
       },
@@ -333,7 +334,10 @@ sap.ui.define([
          this.getView().getModel("ged").setData({"widgetlist":modelw});
       },
       
-      setElementSelected: function(mstrid, col, indx) {
+      setElementSelected: function(mstrid, col, indx, from_interactive) {
+         if (!from_interactive) 
+            this.selected[mstrid] = { id: mstrid, col: col, indx: indx };
+         
          var items = this.getView().byId("tree").getItems();
          for (var n = 0; n<items.length;++n) {
             var item = items[n],
