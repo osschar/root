@@ -37,24 +37,24 @@ sap.ui.define([
             console.log("FOUND scene", scene.fSceneId);
 
             this.mgr.RegisterSceneReceiver(scene.fSceneId, this);
-            
+
             this.setEveData();
          }
-         
+
          this.mgr.RegisterUpdate(this, "setEveData");
       },
 
       findTable: function(holder) {
          if ( holder.fRnrSelf && holder._typename == "ROOT::Experimental::REveDataTable" )
             return holder;
-         
+
          for (var i = 0; i < holder.childs.length; ++i)
          {
             return this.findTable(holder.childs[i]);
          }
-            
+
       },
-      
+
       setEveData: function() {
          var element = this.mgr.GetElement(this.elementid);
          console.log("table ", element);
@@ -65,7 +65,7 @@ sap.ui.define([
             this.setupTable(this.tableEveElement);
          }
       },
-      
+
       setupTable: function(eveData) {
          var oTable = this.getView().byId("table");
          console.log(oTable);
@@ -119,7 +119,7 @@ sap.ui.define([
 
          oTable.bindRows("/rows");
       },
-      
+
       onLoadScripts: function() {
          this._load_scripts = true;
          this.checkScenes();
@@ -306,7 +306,7 @@ sap.ui.define([
       beginChanges : function() {
       },
 */
-      
+
 
       sceneElementChange : function(msg)
       {

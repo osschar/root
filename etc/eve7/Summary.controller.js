@@ -7,28 +7,29 @@ sap.ui.define([
    "sap/m/Input",
    "sap/m/CheckBox"
 ], function(Controller, JSONModel, Button, ColorPalettePopover, StandardTreeItem, mInput, mCheckBox) {
+
    "use strict";
 
    var EVEColorButton = Button.extend("sap.ui.jsroot.EVEColorButton", {
       // when default value not specified - openui tries to load custom
-      renderer: {}, // ButtonRenderer.render, 
+      renderer: {}, // ButtonRenderer.render,
 
       metadata: {
          properties: {
             background: 'string'
          }
       },
-      
+
       onAfterRendering: function() {
          this.$().children().css("background-color", this.getBackground());
       }
-      
+
    });
 
    var EveSummaryTreeItem = StandardTreeItem.extend('sap.ui.jsroot.EveSummaryTreeItem', {
       // when default value not specified - openui tries to load custom
       renderer: {},
-      
+
       metadata: {
          properties: {
             background: 'string'
@@ -38,13 +39,13 @@ sap.ui.define([
       onAfterRendering: function() {
          this.$().css("background-color", this.getBackground());
       }
-     
+
    });
 
    return Controller.extend("eve.Summary", {
 
       onInit: function () {
-         
+
          console.log('Summary CONTROLLER INIT');
 
          var data = [{ fName: "Event" }];
@@ -171,22 +172,22 @@ sap.ui.define([
 
       SetMgr : function(mgr) {
          this.mgr = mgr;
-         
+
          this.mgr.RegisterUpdate(this, "UpdateMgr");
          this.mgr.RegisterElementUpdate(this, "updateGED");
-         
+
          this.selected = {}; // container of selected objects
          // process scene-specific events
          this.mgr.addSceneHandler(this);
       },
-      
+
       UpdateMgr : function(mgr) {
-         
+
          console.log('UPDATE MGR', (new Date).toTimeString());
          var model = this.getView().getModel("treeModel");
          model.setData(this.createSummaryModel());
          model.refresh();
-         
+
          var oTree = this.getView().byId("tree");
          oTree.expandToLevel(2);
       },
@@ -234,7 +235,7 @@ sap.ui.define([
                       }
                     */
       },
-      
+
       event: function(lst) {
          this._event = lst;
          // console.log("summary event lst \n", lst);
@@ -315,43 +316,43 @@ sap.ui.define([
 
          this.getView().getModel("ged").setData({"widgetlist":modelw});
       },
-      
+
       /** Selection of element in the other editors */
       setElementSelected: function(mstrid, col, indx, from_interactive) {
-         if (!from_interactive) 
+         if (!from_interactive)
             this.selected[mstrid] = { id: mstrid, col: col, indx: indx };
 
          var model = this.getView().getModel("treeModel");
-         
+
          this.iterateTreeModel(model.getData(), function(elem) {
             if (elem.masterid == mstrid) elem.fHighlight = (col && mstrid) ? "Information" : "None";
          });
-         
+
          model.refresh();
       },
-      
+
       iterateTreeModel: function(data, func) {
          if (!data) return;
-         
+
          for (var k=0;k<data.length;++k) {
             func(data[k]);
             if (data[k].childs)
                this.iterateTreeModel(data[k].childs, func);
          }
       },
-      
+
       setElementHighlighted: function(mstrid, col, indx) {
          var model = this.getView().getModel("treeModel");
-         
+
          this.iterateTreeModel(model.getData(), function(elem) {
             if (elem.masterid == mstrid) elem.fBackground = (col && mstrid) ? "yellow" : "";
          });
-         
+
          model.refresh();
-         
+
          /*
          var items = this.getView().byId("tree").getItems();
-         
+
          for (var n = 0; n<items.length;++n) {
             var item = items[n],
                 ctxt = item.getBindingContext("treeModel"),
@@ -365,7 +366,7 @@ sap.ui.define([
          }
          */
       },
-      
+
       onItemPressed: function(oEvent) {
          var model = oEvent.getParameter("listItem").getBindingContext("treeModel"),
              path =  model.getPath(),
@@ -374,23 +375,23 @@ sap.ui.define([
          if (!ttt || (ttt.childs !== undefined) || !ttt.masterid) return;
 
          var sel_color = ttt.fHighlight == "None" ? "blue" : "";
-         
+
          this.setElementSelected(ttt.masterid, sel_color, undefined);
-         
+
          this.mgr.invokeInOtherScenes(this, "setElementSelected", ttt.masterid, sel_color, undefined);
-         
+
          // var obj = this.mgr.GetElement(ttt.id);
       },
 
-      
+
       onToggleOpenState: function(oEvent) {
       },
 
       onMouseEnter: function(oEvent) {
          var items = this.getView().byId("tree").getItems(), item = null;
          for (var n = 0; n < items.length; ++n)
-            if (items[n].getId() == oEvent.target.id) { 
-               item = items[n]; break; 
+            if (items[n].getId() == oEvent.target.id) {
+               item = items[n]; break;
             }
 
          // var item = this.getView().byId(oEvent.target.id).getControl();
@@ -402,17 +403,17 @@ sap.ui.define([
          var ttt = item.getBindingContext("treeModel").getProperty(path);
 
          var masterid = this.mgr.GetMasterId(ttt.id);
-         
+
          this.mgr.invokeInOtherScenes(this, "setElementHighlighted", masterid, "cyan");
       },
 
       onMouseLeave: function(oEvent) {
          // actual call will be performed 100ms later and can be overwritten
-         
+
          var items = this.getView().byId("tree").getItems(), item = null;
          for (var n = 0; n < items.length; ++n)
-            if (items[n].getId() == oEvent.target.id) { 
-               item = items[n]; break; 
+            if (items[n].getId() == oEvent.target.id) {
+               item = items[n]; break;
             }
 
          // var item = this.getView().byId(oEvent.target.id).getControl();
@@ -424,10 +425,10 @@ sap.ui.define([
          var ttt = item.getBindingContext("treeModel").getProperty(path);
 
          var masterid = this.mgr.GetMasterId(ttt.id);
-         
+
          this.mgr.invokeInOtherScenes(this, "setElementHighlighted", masterid, null);
       },
-      
+
       toggleEditor: function() {
          var pp = this.byId("sumSplitter");
          if (!this.ged) {
@@ -464,7 +465,7 @@ sap.ui.define([
              ttt = item.getBindingContext("treeModel").getProperty(path);
 
          if (!ttt) return;
-         
+
          if (!this.ged || !this.ged.visible) {
             this.toggleEditor();
          } else if (this.ged.editorItemPath == path) {
@@ -500,9 +501,9 @@ sap.ui.define([
          var path = oContext.getPath();
          var idx = path.substring(base.length);
          var customData =  oContext.oModel.oData["widgetlist"][idx].data;
-         var controller = this; 
+         var controller = this;
          var widget = null;
-         
+
          switch (customData._type) {
 
          case "Number":
@@ -550,7 +551,7 @@ sap.ui.define([
                           controller.handleColorSelect(event);
                        }
                    });
-                   
+
                    oCPPop.openBy(colButton);
                    oCPPop.data("myData", customData);
                  }
@@ -608,16 +609,16 @@ sap.ui.define([
       },
 
       sendMethodInvocationRequest: function(kind, event) {
-         
+
          var value = (kind == "Bool") ? event.getSource().getSelected() : event.getParameter("value");
-         
+
          console.log("on change !!!!!!", event.getSource().data("myData"));
 
          if (event.getSource().data("myData").quote !== undefined ) {
               value = "\"" + value + " \"";
          }
          var mir =  event.getSource().data("myData").srv + "( " + value + " )";
-        
+
          console.log("=====> ", mir);
          var obj = {"mir" : mir, "fElementId" : this.editorElement.fElementId, "class" : this.editorElement._typename};
 
@@ -661,7 +662,7 @@ sap.ui.define([
             gedFrame.bindAggregation("content", "ged>/widgetlist", this.gedFactory.bind(this) );
          }
       },
-      
+
       canEdit : function(elem) {
          var t = elem._typename.substring(20);
          var ledit = this.oGuiClassDef;
@@ -692,7 +693,7 @@ sap.ui.define([
             if (this.canEdit(elem))
                newelem.fType = "DetailAndActive";
             else
-               newelem.fType = "Active";         
+               newelem.fType = "Active";
 
             newelem.masterid = elem.fMasterId || elem.fElementId;
 

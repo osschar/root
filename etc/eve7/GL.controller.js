@@ -5,7 +5,7 @@ sap.ui.define([
 ], function (Controller, JSONModel, ResizeHandler) {
 
    "use strict";
-   
+
    var direct_threejs = false;
 
    return Controller.extend("eve.GL", {
@@ -48,7 +48,7 @@ sap.ui.define([
       createThreejsRenderer: function()
       {
          if (!direct_threejs || this.renderer) return;
-         
+
          this.scene      = new THREE.Scene();
          this.camera     = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 100000 );
          this.rot_center = new THREE.Vector3(0,0,0);
@@ -94,25 +94,25 @@ sap.ui.define([
       },
 
       /** returns container for 3d objects */
-      getThreejsContainer: function(name) 
+      getThreejsContainer: function(name)
       {
          var prnt = null;
-         
+
          if (!direct_threejs)
             prnt = this.geo_painter.getExtrasContainer();
          else
             prnt = this.scene;
-         
+
          for (var k=0;k<prnt.children.length;++k)
-            if (prnt.children[k]._eve_name === name) 
+            if (prnt.children[k]._eve_name === name)
                return prnt.children[k];
-         
+
          var obj3d = new THREE.Object3D();
          obj3d._eve_name = name;
          prnt.add(obj3d);
          return obj3d;
       },
-      
+
       // MT-HAKA
       render: function()
       {
@@ -126,7 +126,7 @@ sap.ui.define([
             }
             return;
          }
-         
+
          if ( ! this.dom_registered)
          {
             this.getView().getDomRef().appendChild( this.renderer.domElement );
@@ -211,7 +211,7 @@ sap.ui.define([
 
          this.checkViewReady();
       },
-      
+
       createScenes: function()
       {
          if (this.created_scenes !== undefined) return;
@@ -224,39 +224,39 @@ sap.ui.define([
          for (var k=0;k<element.childs.length;++k)
          {
             var scene = element.childs[k];
-            
+
             var handler = new JSROOT.EVE.EveScene(this.mgr, scene, this);
 
             this.created_scenes.push(handler);
             this.mgr.addSceneHandler(handler);
          }
-         
+
       },
-      
+
       redrawScenes: function() {
          for (var k=0;k<this.created_scenes.length;++k)
             this.created_scenes[k].redrawScene();
       },
-      
+
 
       /** checks if all initialization is performed */
       checkViewReady: function()
       {
          if (!this._load_scripts || !this._render_html || !this.elementid) return;
-         
+
          if (direct_threejs) {
             this.createThreejsRenderer();
             this.createScenes();
             this.redrawScenes();
             return;
          }
-         
+
          if (this.geo_painter) {
             this.redrawScenes();
             return;
          }
 
-         
+
          var options = "";
          if (this.kind != "3D") options = "ortho_camera";
 
@@ -285,11 +285,11 @@ sap.ui.define([
             this.geo_painter._camera.bottom = -this.getView().$().height();
             this.geo_painter._camera.updateProjectionMatrix();
          }
-         
+
          this.painter_ready = true;
          // this.geo_painter._highlight_handlers = [ this ]; // register ourself for highlight handling
          this.last_highlight = null;
-         
+
          // create only when geo painter is ready
          this.createScenes();
          this.redrawScenes();
@@ -311,7 +311,7 @@ sap.ui.define([
          if (this.geo_painter)
             this.geo_painter.CheckResize();
       }
-      
+
    });
 
 });
