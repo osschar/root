@@ -428,71 +428,58 @@ sap.ui.define([
          
          this.mgr.invokeInOtherScenes(this, "setElementHighlighted", masterid, null);
       },
-
-      getGed: function() {
-         if (this.ged) {
-            if (!this.ged.visible) {
-                this.toggleEditor();
-            }
-            return;
-         }
-         
-         var pp = this.byId("sumSplitter");
-         console.log("parent", pp);
-         var panel = new sap.m.Panel("productDetailsPanel", {class:"sapUiSizeCompact",  height: "100%" ,width : "97%"});
-         panel.setHeaderText("ElementGED");
-
-         panel.setLayoutData(new sap.ui.layout.SplitterLayoutData("sld", {size : "30%"}));
-         pp.addContentArea(panel);
-
-         var vert = new sap.ui.layout.VerticalLayout("GED",  {class:"sapUiSizeCompact"});
-
-         vert.addStyleClass("eveTreeItem");
-         vert.addStyleClass("sapUiNoMarginTop");
-         vert.addStyleClass("sapUiNoMarginBottom");
-
-         panel.addContent(vert);
-         this.ged = panel;
-         this.gedVert = vert;
-         this.ged.visible = true;
-      },
-
+      
       toggleEditor: function() {
-         console.log("toggle ");
+         var pp = this.byId("sumSplitter");
          if (!this.ged) {
-            this.getGed();
+            var panel = new sap.m.Panel("productDetailsPanel", { height: "100%" ,width : "97%"});
+            panel.setHeaderText("ElementGED");
+            panel.addStyleClass("sapUiSizeCompact");
+
+            panel.setLayoutData(new sap.ui.layout.SplitterLayoutData("sld", {size : "30%"}));
+            pp.addContentArea(panel);
+
+            var vert = new sap.ui.layout.VerticalLayout("GED",  {});
+            vert.addStyleClass("sapUiSizeCompact");
+            vert.addStyleClass("eveTreeItem");
+            vert.addStyleClass("sapUiNoMarginTop");
+            vert.addStyleClass("sapUiNoMarginBottom");
+
+            panel.addContent(vert);
+            this.ged = panel;
+            this.gedVert = vert;
+            this.ged.visible = true;
+         } else if (this.ged.visible) {
+            pp.removeContentArea(this.ged);
+            this.ged.visible = false;
          } else {
-             var pp = this.byId("sumSplitter");
-             if (this.ged.visible) {
-                console.log("remove ged");
-                pp.removeContentArea(this.ged);
-                this.ged.visible = false;
-             } else {
-                pp.addContentArea(this.ged);
-                this.ged.visible = true;
-             }
+            pp.addContentArea(this.ged);
+            this.ged.visible = true;
          }
       },
 
       onDetailPress: function(oEvent) {
          // when edit button pressed
-         this.getGed();
-         var item = oEvent.getSource();
+         var item = oEvent.getSource(),
+             path = item.getBindingContext("treeModel").getPath(),
+             ttt = item.getBindingContext("treeModel").getProperty(path);
 
-         var path =  item.getBindingContext("treeModel").getPath();
-         // console.log("path XXX ", oEvent.getParameter("listItem").getBindingContext("treeModel").getProperty(path) );
-         var ttt = item.getBindingContext("treeModel").getProperty(path);
+         if (!ttt) return;
+         
+         if (!this.ged || !this.ged.visible) {
+            this.toggleEditor();
+         } else if (this.ged.editorItemPath == path) {
+            this.toggleEditor(); // hide editor when clicked several times
+            return;
+         }
 
-         console.log('path', path, ttt);
+         this.ged.editorItemPath = path;
 
-        if (!ttt) return;
+         this.editorElement = this.mgr.GetElement(ttt.id);
 
-        this.editorElement = this.mgr.GetElement(ttt.id);
-
-         console.log('path', path, 'ttt', this.editorElement._typename);
          var oProductDetailPanel = this.ged;
         // var oProductDetailPanel = this.byId("productDetailsPanel");
-         var title =   this.editorElement.fName + " (" +  this.editorElement._typename.substring(20) + " )" ;
+         var title = this.editorElement.fName + " (" +  this.editorElement._typename.substring(20) + " )" ;
          oProductDetailPanel.setHeaderText(title);
 
          //var oProductDetailPanel = this.byId("productDetailsPanel");
