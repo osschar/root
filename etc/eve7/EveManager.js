@@ -29,7 +29,7 @@
       this.scene_changes = null;
 
       this.hrecv = []; // array of receivers of highlight messages
-      
+
       this.scenes = [];  // list of scene objects
 
       this.EChangeBits = { "kCBColorSelection": 1, "kCBTransBBox": 2, "kCBObjProps": 4, "kCBVisibility": 8 };
@@ -39,7 +39,7 @@
    EveManager.prototype.GetElement = function(id) {
       return this.map[id];
    }
-   
+
    EveManager.prototype.addSceneHandler = function(handler) {
       this.scenes.push(handler);
    }
@@ -51,7 +51,7 @@
             sc[fname](arg1, arg2, arg3, arg4);
       }
    }
-   
+
    /** Attach websocket handle to manager, all communication runs through manager */
    EveManager.prototype.UseConnection = function(handle) {
       this.handle = handle;
@@ -103,7 +103,7 @@
    EveManager.prototype.RegisterSceneReceiver = function(id, receiver, func_name) {
 
       var elem = this.GetElement(id);
-      
+
       if (!elem) return;
 
       if (!elem.$receivers) elem.$receivers = [];
@@ -122,7 +122,7 @@
           }
       }
   }
-  
+
    /** returns master id for given element id
     * master id used for highlighting element in all dependent views */
    EveManager.prototype.GetMasterId = function(elemid) {
@@ -201,7 +201,7 @@
    EveManager.prototype.ProcessSceneCreate = function(sceneid) {
       var elem = this.GetElement(sceneid);
       if (!elem || !elem.$modified) return;
-      
+
       this.callSceneReceivers(elem, "onSceneCreate", sceneid);
 
       delete elem.$modified;
@@ -271,7 +271,7 @@
 
       // do we need this?
       this.callSceneReceivers(scene, "beginChanges");
-      
+
       for (var r = 0; r < removedIds.length; ++r)
          this.callSceneReceivers(scene, "elementRemoved", removedIds[r]);
 
