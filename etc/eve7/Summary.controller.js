@@ -2,33 +2,33 @@ sap.ui.define([
    'sap/ui/core/mvc/Controller',
    "sap/ui/model/json/JSONModel",
    "sap/m/Button",
-   "sap/m/ButtonRenderer",
    "sap/m/ColorPalettePopover",
-   "sap/m/StandardTreeItem"
-], function(Controller, JSONModel, Button, ButtonRenderer, ColorPalettePopover, StandardTreeItem) {
+   "sap/m/StandardTreeItem",
+   "sap/m/Input",
+   "sap/m/CheckBox"
+], function(Controller, JSONModel, Button, ColorPalettePopover, StandardTreeItem, mInput, mCheckBox) {
    "use strict";
 
-   var currentColor = "rgb(100, 0, 0)"
-
    var EVEColorButton = Button.extend("sap.ui.jsroot.EVEColorButton", {
-      renderer: ButtonRenderer.render,
+      // when default value not specified - openui tries to load custom
+      renderer: {}, // ButtonRenderer.render, 
 
-      init: function() {
-         // svg images are always loaded without @2
-         this.addEventDelegate({
-            onAfterRendering: function() {
-               this._setColor();
-               //$("span").children().css('color', currentColor);
-            }
-         }, this);
+      metadata: {
+         properties: {
+            background: 'string'
+         }
+      },
+      
+      onAfterRendering: function() {
+         this.$().children().css("background-color", this.getBackground());
       }
+      
    });
 
-   EVEColorButton.prototype._setColor = function() {
-      this.$().children().css('background-color', this.data("attrcolor"));
-   }
-   
    var EveSummaryTreeItem = StandardTreeItem.extend('sap.ui.jsroot.EveSummaryTreeItem', {
+      // when default value not specified - openui tries to load custom
+      renderer: {},
+      
       metadata: {
          properties: {
             background: 'string'
@@ -37,9 +37,8 @@ sap.ui.define([
 
       onAfterRendering: function() {
          this.$().css("background-color", this.getBackground());
-      },
-
-      renderer: {}
+      }
+     
    });
 
    return Controller.extend("eve.Summary", {
@@ -492,8 +491,7 @@ sap.ui.define([
          gedFrame.destroyContent();
          this.makeDataForGED(this.editorElement);
          // console.log("going to bind >>> ", this.getView().getModel("ged"));
-         var hl = this.gedFactory;
-         gedFrame.bindAggregation("content", "ged>/widgetlist"  , hl );
+         gedFrame.bindAggregation("content", "ged>/widgetlist",  this.gedFactory.bind(this) );
       },
 
       gedFactory:function(sId, oContext) {
@@ -502,92 +500,78 @@ sap.ui.define([
          var path = oContext.getPath();
          var idx = path.substring(base.length);
          var customData =  oContext.oModel.oData["widgetlist"][idx].data;
-         //console.log("model ",  oContext.oModel);
-         var controller =  sap.ui.getCore().byId("TopEveId--Summary").getController();
-         var widget;
+         var controller = this; 
+         var widget = null;
+         
          switch (customData._type) {
 
          case "Number":
-            var widget = new sap.m.Input(sId, {
-               value: {
-                  path: "ged>value"
-               },
-               change: function(event) {
-                  controller.sendMethodInvocationRequest(event.getParameter("value"), event);
-               }
+            widget = new mInput(sId, {
+               value: { path: "ged>value" },
+               change: this.sendMethodInvocationRequest.bind(this, "Number")
             });
             widget.setType(sap.m.InputType.Number);
             break;
 
          case "String":
-            var widget = new sap.m.Input(sId, {
-               value: {
-                  path: "ged>value"
-               },
-               change: function(event) {
-                  controller.sendMethodInvocationRequest(event.getParameter("value"), event);
-               }
+            widget = new mInput(sId, {
+               value: { path: "ged>value" },
+               change: this.sendMethodInvocationRequest.bind(this, "String")
 
             });
             widget.setType(sap.m.InputType.String);
             widget.setWidth("250px"); // AMT this should be handled differently
             break;
          case "Bool":
-            widget = new sap.m.CheckBox(sId, {
-               selected: {
-                  path: "ged>value",
-               },
-               select: function(event) {
-                  controller.sendMethodInvocationRequest(event.getSource().getSelected(), event);
-               }
+            widget = new mCheckBox(sId, {
+               selected: { path: "ged>value" },
+               select: this.sendMethodInvocationRequest.bind(this, "Bool")
             });
             break;
 
          case "Color":
             var colVal = oContext.oModel.oData["widgetlist"][idx].value;
-            currentColor=colVal;
-            var model = controller.getView().getModel("colors");
+            // var model = this.getView().getModel("colors");
             //   model["mainColor"] = colVal;
             //  console.log("col value ", colVal, JSROOT.Painter.root_colors[colVal]);
-            widget = new sap.ui.jsroot.EVEColorButton(sId, {
-               //  text:"x",
+            widget = new EVEColorButton(sId, {
                icon: "sap-icon://palette",
+               background: colVal,
 
                press: function () {
-
+                  var colButton = this;
                   var oCPPop = new ColorPalettePopover( {
                       defaultColor: "cyan",
-                        colors: ['gold','darkorange', 'indianred','rgb(102,51,0)', 'cyan',// 'magenta'
-                                 'blue', 'lime', 'gray','slategray','rgb(204, 198, 170)',
-                                 'white', 'black','red' , 'rgb(102,154,51)', 'rgb(200, 0, 200)'],
-                        colorSelect: controller.handleColorSelect.bind(controller)
+                       colors: ['gold','darkorange', 'indianred','rgb(102,51,0)', 'cyan',// 'magenta'
+                                'blue', 'lime', 'gray','slategray','rgb(204, 198, 170)',
+                                'white', 'black','red' , 'rgb(102,154,51)', 'rgb(200, 0, 200)'],
+                       colorSelect: function(event) {
+                          colButton.setBackground(event.getParameters().value);
+                          controller.handleColorSelect(event);
+                       }
                    });
-
                    
-                   oCPPop.openBy(this);
+                   oCPPop.openBy(colButton);
                    oCPPop.data("myData", customData);
                  }
             });
 
-            widget.data("attrcolor", colVal);
-//            model.attachPropertyChange({ "bla": "ddd"}, controller.colorChange, controller);
             break;
          }
 
-         widget.data("myData", customData);
+         if (widget) widget.data("myData", customData);
 
-         var label = new sap.m.Text(sId + "label", { text:{ path: "ged>name"}});
-         var ll =  controller.maxLabelLength;
-         label.setWidth(ll +"ex");
+         var label = new sap.m.Text(sId + "label", { text: { path: "ged>name" } });
+         label.setWidth(this.maxLabelLength +"ex");
          label.addStyleClass("sapUiTinyMargin");
-         var HL= new sap.ui.layout.HorizontalLayout({
+         var HL = new sap.ui.layout.HorizontalLayout({
             content : [label, widget]
          });
 
          return HL;
       },
 
-      handleColorSelect: function(event, data) {
+      handleColorSelect: function(event) {
           var val = event.getParameters().value;
           var myData = event.getSource().data("myData");
 
@@ -619,12 +603,14 @@ sap.ui.define([
 
 
          var mir =  myData.srv + "((UChar_t)" + rgb.r + ", (UChar_t)" + rgb.g +  ", (UChar_t)" + rgb.b + ")";
-
          var obj = { "mir": mir, "fElementId": this.editorElement.fElementId, "class": this.editorElement._typename };
          this.mgr.handle.Send(JSON.stringify(obj));
       },
 
-      sendMethodInvocationRequest: function(value, event) {
+      sendMethodInvocationRequest: function(kind, event) {
+         
+         var value = (kind == "Bool") ? event.getSource().getSelected() : event.getParameter("value");
+         
          console.log("on change !!!!!!", event.getSource().data("myData"));
 
          if (event.getSource().data("myData").quote !== undefined ) {
@@ -672,8 +658,7 @@ sap.ui.define([
             gedFrame.destroyContent();
             this.makeDataForGED(this.editorElement);
             // console.log("going to bind >>> ", this.getView().getModel("ged"));
-            var hl = this.gedFactory;
-            gedFrame.bindAggregation("content", "ged>/widgetlist"  , hl );
+            gedFrame.bindAggregation("content", "ged>/widgetlist", this.gedFactory.bind(this) );
          }
       },
       
