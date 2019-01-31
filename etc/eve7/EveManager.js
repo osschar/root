@@ -373,6 +373,8 @@
 
       var treeRebuild = header.removedElements.length || (arr.length != nModified );
       if (treeRebuild) this.InvokeReceivers("update", null, 0, this);
+      
+      this.callSceneReceivers(scene, "endChanges", treeRebuild);
    },
 //______________________________________________________________________________
 
@@ -432,7 +434,6 @@
 
       for (var n=1; n<arr.length;++n) {
          var elem = arr[n];
-         console.log("Import binary for elem ", elem);
 
          if (!elem.render_data) continue;
 
@@ -458,12 +459,10 @@
          }
 
          if (rd.index_size) {
-            console.log("import vertex buff");
             rd.idxBuff = new Uint32Array(rawdata, off, rd.index_size);
             off += rd.index_size*4;
          }
 
-         console.log("Import binary for elem finishefd", elem);
          lastoff = off;
       }
 
