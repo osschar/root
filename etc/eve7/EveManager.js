@@ -360,13 +360,11 @@
          {
             // create new
             this.map[em.fElementId] = em;
-            console.log("add element ", em);
             var parent = this.map[em.fMotherId];
             if (!parent.childs)
                parent.childs = [];
 
             parent.childs.push(em);
-            console.log("add element to parent ", parent.fName, parent);
             em.tag = "elementAdded";
             this.callSceneReceivers(scene, "sceneElementChange", em);
          }
