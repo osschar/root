@@ -19,6 +19,7 @@ REveDataProxyBuilderBase::Product::Product(const REveViewContext* c) : m_viewCon
 REveDataProxyBuilderBase::REveDataProxyBuilderBase(std::string type):
    m_type(type),
    m_collection(0),
+   m_interactionList(0),
    m_haveWindow(false)
 {
 }
@@ -74,7 +75,7 @@ void REveDataProxyBuilderBase::Build()
          Clean();
          for (Product_it i = m_products.begin(); i != m_products.end(); ++i)
          {
-             //printf("build() %s \n", m_collection->name().c_str());
+            printf("build() %s \n", m_collection->GetCName());
             REveElement* elms = (*i)->m_elements;
             size_t oldSize = elms->NumChildren();
 
@@ -134,7 +135,7 @@ void REveDataProxyBuilderBase::Build()
                for (size_t cnt = 0; cnt < itemSize; ++cnt, ++elIt)
                {
                   if (cnt >= oldSize )
-                     m_interactionList->Added(*elIt, cnt);
+                       m_interactionList->Added(*elIt, cnt);
                }
             }
          }

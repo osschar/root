@@ -63,6 +63,7 @@ public:
 
    void ReserveItems(Int_t items_size) { fItems.reserve(items_size); }
    void AddItem(void *data_ptr, const std::string& n, const std::string& t);
+   void ClearItems() { fItems.clear(); }
 
    void SetFilterExpr(const TString &filter);
    void ApplyFilter();
