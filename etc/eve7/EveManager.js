@@ -276,11 +276,6 @@
          var id = removedIds[r];
          this.callSceneReceivers(scene, "elementRemoved", id);
          var element = this.GetElement(id);
-         if (!element) {
-            console.log("??????????????????? is that OK ????");
-            continue;
-         }
-         
          this.DeleteChildsOf(element);
 
          // remove from mother
@@ -362,7 +357,7 @@
             this.callSceneReceivers(scene, "sceneElementChange", em);
          }
          else
-          { //AMT !!!
+         {
             // create new
             this.map[em.fElementId] = em;
             console.log("add element ", em);
