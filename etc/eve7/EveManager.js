@@ -271,10 +271,33 @@
 
       // do we need this?
       this.callSceneReceivers(scene, "beginChanges");
+      
+      for (var r = 0; r < removedIds.length; ++r) {
+         var id = removedIds[r];
+         this.callSceneReceivers(scene, "elementRemoved", id);
+         var element = this.GetElement(id);
+         if (!element) {
+            console.log("??????????????????? is that OK ????");
+            continue;
+         }
+         
+         this.DeleteChildsOf(element);
 
-      for (var r = 0; r < removedIds.length; ++r)
-         this.callSceneReceivers(scene, "elementRemoved", removedIds[r]);
+         // remove from mother
+         var mother = this.map[element.fMotherId];
+         var mc = mother.childs;
 
+         for (var i = 0; i < mc.length; ++i) {
+            console.log("comapre ", mc[i], id);
+            if (mc[i].fElementId === id) {
+               console.log("remove from mother ");
+               mc.splice(i, 1);
+            }
+         }
+         delete this.map[id];
+         element = null;
+      }
+         
       // wait for binary if needed
       if (msg.header.fTotalBinarySize)
       {
@@ -339,24 +362,27 @@
             this.callSceneReceivers(scene, "sceneElementChange", em);
          }
          else
-         {
+          { //AMT !!!
             // create new
             this.map[em.fElementId] = em;
+            console.log("add element ", em);
             var parent = this.map[em.fMotherId];
             if (!parent.childs)
                parent.childs = [];
 
             parent.childs.push(em);
+            console.log("add element to parent ", parent.fName, parent);
             em.tag = "elementAdded";
             this.callSceneReceivers(scene, "sceneElementChange", em);
          }
-         this.InvokeReceivers("elem_update", null, 0, em.fElementId);
       }
 
 
       var treeRebuild = header.removedElements.length || (arr.length != nModified );
-      this.callSceneReceivers(scene, "endChanges", treeRebuild);
+      if (treeRebuild) this.InvokeReceivers("update", null, 0, this);
    },
+//______________________________________________________________________________
+
 
    EveManager.prototype.DeleteChildsOf = function(elem) {
       if (!elem || !elem.childs) return;
@@ -413,6 +439,7 @@
 
       for (var n=1; n<arr.length;++n) {
          var elem = arr[n];
+         console.log("Import binary for elem ", elem);
 
          if (!elem.render_data) continue;
 
@@ -438,10 +465,12 @@
          }
 
          if (rd.index_size) {
+            console.log("import vertex buff");
             rd.idxBuff = new Uint32Array(rawdata, off, rd.index_size);
             off += rd.index_size*4;
          }
 
+         console.log("Import binary for elem finishefd", elem);
          lastoff = off;
       }
 
