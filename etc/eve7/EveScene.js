@@ -333,7 +333,6 @@
 
    /** Called when processing changes from server or from interactive handler */
    EveScene.prototype.setElementHighlighted = function(mstrid, col, indx, from_interactive) {
-
       // check if other element was highlighted at same time - redraw it
       if (this.highlight && (this.highlight.id != mstrid)) {
          delete this.highlight;
@@ -396,7 +395,18 @@
       this[msg.tag](el);
    }
 
+   EveScene.prototype.elementRemoved = function(elId) {
+      var el = this.mgr.GetElement(elId);
+      console.log("EveScene elementRemoved  ", el);
+      var obj3d = this.getObj3D(el.fElementId);
+      
+      var container = this.viewer.getThreejsContainer("scene" + this.id);
+      container.remove(obj3d);
+      
+      delete this.id2obj_map[el.fElementId];
 
+   }
+   
    JSROOT.EVE.EveScene = EveScene;
 
    return JSROOT;

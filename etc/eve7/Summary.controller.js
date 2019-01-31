@@ -703,6 +703,10 @@ sap.ui.define([
          }
 
          return tgt;
+      },
+
+      endChanges: function(rebuild) {
+         if (rebuild) updateManger(this.mgr);
       }
 
    });

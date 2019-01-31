@@ -45,6 +45,7 @@ sap.ui.define([
       },
 
       findTable: function(holder) {
+         console.log("find table in ", holder);
          if ( holder.fRnrSelf && holder._typename == "ROOT::Experimental::REveDataTable" )
             return holder;
 
@@ -318,6 +319,14 @@ sap.ui.define([
       endChanges : function() {
          console.log("table controller endchanges ",this.tableEveElement );
          this.setEveData();
+      },
+
+
+      elementRemoved: function(elId) {
+
+      var el = this.mgr.GetElement(elId);
+         console.log("EveTable element remobedf ", el);
+         
       }
    });
 });

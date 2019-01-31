@@ -271,10 +271,28 @@
 
       // do we need this?
       this.callSceneReceivers(scene, "beginChanges");
+      
+      for (var r = 0; r < removedIds.length; ++r) {
+         var id = removedIds[r];
+         this.callSceneReceivers(scene, "elementRemoved", id);
+         var element = this.GetElement(id);
+         this.DeleteChildsOf(element);
 
-      for (var r = 0; r < removedIds.length; ++r)
-         this.callSceneReceivers(scene, "elementRemoved", removedIds[r]);
+         // remove from mother
+         var mother = this.map[element.fMotherId];
+         var mc = mother.childs;
 
+         for (var i = 0; i < mc.length; ++i) {
+            console.log("comapre ", mc[i], id);
+            if (mc[i].fElementId === id) {
+               console.log("remove from mother ");
+               mc.splice(i, 1);
+            }
+         }
+         delete this.map[id];
+         element = null;
+      }
+         
       // wait for binary if needed
       if (msg.header.fTotalBinarySize)
       {
@@ -350,13 +368,16 @@
             em.tag = "elementAdded";
             this.callSceneReceivers(scene, "sceneElementChange", em);
          }
-         this.InvokeReceivers("elem_update", null, 0, em.fElementId);
       }
 
 
       var treeRebuild = header.removedElements.length || (arr.length != nModified );
+      if (treeRebuild) this.InvokeReceivers("update", null, 0, this);
+      
       this.callSceneReceivers(scene, "endChanges", treeRebuild);
    },
+//______________________________________________________________________________
+
 
    EveManager.prototype.DeleteChildsOf = function(elem) {
       if (!elem || !elem.childs) return;
