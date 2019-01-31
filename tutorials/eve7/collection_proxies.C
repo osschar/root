@@ -24,14 +24,18 @@
 #include "TParticle.h"
 #include "TRandom.h"
 #include "TGeoTube.h"
-Color_t trackColor = kGreen + 2;
-Color_t jetColor = kYellow;
+#include "TList.h"
+
 
 namespace REX = ROOT::Experimental;
+
+int eventId = 0;
 
 //==============================================================================
 //============== EMULATE FRAMEWORK CLASSES =====================================
 //==============================================================================
+
+
 // a demo class, can be provided from experiment framework
 class XYJet : public TParticle
 {
@@ -45,10 +49,85 @@ public:
    void SetEtaSize(float iEtaSize) { m_etaSize = iEtaSize; }
    void SetPhiSize(float iPhiSize) { m_phiSize = iPhiSize; }
    XYJet(Int_t pdg, Int_t status, Int_t mother1, Int_t mother2, Int_t daughter1, Int_t daughter2, Double_t px, Double_t py, Double_t pz, Double_t etot):
-      TParticle(pdg, status, mother1, mother2, daughter1, daughter2, px, py, pz, etot,  0, 0, 0, 0) {}
+    TParticle(pdg, status, mother1, mother2, daughter1, daughter2, px, py, pz, etot,  0, 0, 0, 0) {}
 
    ClassDef(XYJet, 1);
 };
+
+class Event {
+public:
+   void MakeJets(int N)
+   {
+      TRandom &r = * gRandom;
+      r.SetSeed(0);
+      TList* list = new TList();
+      list->SetName("XYJets");
+      for (int i = 1; i <= N; ++i)
+      {
+         double pt  = r.Uniform(0.5, 10);
+         double eta = r.Uniform(-2.55, 2.55);
+         double phi = r.Uniform(0, TMath::TwoPi());
+
+         double px = pt * std::cos(phi);
+         double py = pt * std::sin(phi);
+         double pz = pt * (1. / (std::tan(2*std::atan(std::exp(-eta)))));
+
+         auto jet = new XYJet(0, 0, 0, 0, 0, 0, px, py, pz, std::sqrt(px*px + py*py + pz*pz + 80*80));
+         jet->SetEtaSize(r.Uniform(0.02, 0.2));
+         jet->SetPhiSize(r.Uniform(0.01, 0.3));
+         list->Add(jet);
+      }
+      m_data.push_back(list);
+   }
+
+   void MakeParticles(int N)
+   {
+      TRandom &r = * gRandom;
+      r.SetSeed(0);
+      TList* list = new TList();
+      list->SetName("XYTracks");
+      for (int i = 1; i <= N; ++i)
+      {
+         double pt  = r.Uniform(0.5, 10);
+         double eta = r.Uniform(-2.55, 2.55);
+         double phi = r.Uniform(0, TMath::TwoPi());
+
+         double px = pt * std::cos(phi);
+         double py = pt * std::sin(phi);
+         double pz = pt * (1. / (std::tan(2*std::atan(std::exp(-eta)))));
+
+         printf("Event::MakeParticles %2d: pt=%.2f, eta=%.2f, phi=%.2f\n", i, pt, eta, phi);
+
+         auto particle = new TParticle(0, 0, 0, 0, 0, 0,
+                                       px, py, pz, std::sqrt(px*px + py*py + pz*pz + 80*80),
+                                       0, 0, 0, 0 );
+
+         int pdg = 11 * (r.Integer(2) > 0 ? 1 : -1);
+         particle->SetPdgCode(pdg);
+
+         list->Add(particle);
+      }
+      m_data.push_back(list);
+   }
+
+   std::vector<TList*> m_data;
+
+   void Clear() {
+
+      for (auto &l : m_data)
+         delete l;
+      m_data.clear();
+   }
+
+   void Create() {
+      printf("Event Create %d !!!! \n", eventId);
+      Clear();
+      MakeJets(4);
+      MakeParticles(1);
+      eventId++;
+   }
+};
+
 //==============================================================================
 //============ TABLE HELPER CLASSES ============================================
 //==============================================================================
@@ -110,9 +189,10 @@ class XYJetProxyBuilder: public REX::REveDataSimpleProxyBuilderTemplate<XYJet>
    {
       auto jet = new REX::REveJetCone();
       jet->SetCylinder(2*context->GetMaxR(), context->GetMaxZ());
-      jet->AddEllipticCone(dj.Eta(), dj.GetPolarPhi(), dj.GetEtaSize(), dj.GetPhiSize());
+      jet->AddEllipticCone(dj.Eta(), dj.Phi(), dj.GetEtaSize(), dj.GetPhiSize());
+      printf("============== BUILD jet %s (%f, %f)\n",iItemHolder->GetCName(),   dj.GetPolarPhi(), dj.GetEtaSize());
       SetupAddElement(jet, iItemHolder);
-      jet->SetName(Form("element %s", iItemHolder->GetName().c_str()));
+      jet->SetName(Form("element %s event %d", iItemHolder->GetName().c_str(), eventId));
    }
 };
 
@@ -122,6 +202,7 @@ class TrackProxyBuilder : public REX::REveDataSimpleProxyBuilderTemplate<TPartic
    virtual void Build(const TParticle& p, REX::REveElement* iItemHolder, const REX::REveViewContext* context)
    {
       const TParticle* x = &p;
+      printf("==============  BUILD track %s (pt=%f, eta=%f) \n", iItemHolder->GetCName(), p.Pt(), p.Eta());
       auto track = new REX::REveTrack((TParticle*)(x), 1, context->GetPropagator());
       track->MakeTrack();
       SetupAddElement(track, iItemHolder, false);
@@ -184,6 +265,8 @@ public:
 class XYManager
 {
 private:
+   Event* m_event;
+   
    std::vector <REX::REveScene*> m_scenes;
    REX::REveViewContext* m_viewContext;
 
@@ -196,7 +279,8 @@ private:
    TableHandle::TableSpecs  m_tableFormats;
 
 public:
-   XYManager() {
+   XYManager(Event* event): m_event(event), m_viewContext(0), m_mngRhoZ(0), m_collections(0)
+   {
       createScenesAndViews();
 
       // table specs
@@ -220,10 +304,12 @@ public:
       prop->SetMaxR(r);
       prop->SetMaxZ(z);
       prop->SetMaxOrbs(6);
-
+      prop->IncRefCount();
+      
       m_viewContext = new REX::REveViewContext();
       m_viewContext->SetBarrel(r, z);
       m_viewContext->SetTrackPropagator(prop);
+      //  m_viewContext->IncRefCount();
    }
 
    void createScenesAndViews()
@@ -235,7 +321,7 @@ public:
       m_scenes.push_back(REX::gEve->GetEventScene());
 
       // RhoZ
-      if (1) {
+      if (0) {
          auto rhoZEventScene = REX::gEve->SpawnNewScene("RhoZ Scene","Projected");
          m_mngRhoZ = new REX::REveProjectionManager(REX::REveProjection::kPT_RhoZ);
          m_mngRhoZ->SetImportEmpty(true);
@@ -245,10 +331,12 @@ public:
       }
 
       // Table
-      auto tableScene  = REX::gEve->SpawnNewScene("Tables", "Tables");
-      auto tableView = REX::gEve->SpawnNewViewer("Table", "Table View");
-      tableView->AddScene(tableScene);
-      m_scenes.push_back(tableScene);
+      if (0) {
+         auto tableScene  = REX::gEve->SpawnNewScene("Tables", "Tables");
+         auto tableView = REX::gEve->SpawnNewViewer("Table", "Table View");
+         tableView->AddScene(tableScene);
+         m_scenes.push_back(tableScene);
+      }
 
    }
 
@@ -256,6 +344,7 @@ public:
    REX::REveDataProxyBuilderBase*  makeGLBuilderForType(TClass* c)
    {
       std::string cn = c->GetName();
+      printf("proxy builder for type %s\n", c->GetName());
       if (cn == "XYJet") {
          return new XYJetProxyBuilder();
       }
@@ -265,8 +354,48 @@ public:
       }
    }
 
+   void LoadCurrentEvent(REX::REveDataCollection* collection)
+   {
+      printf("load current event \n");
+      for (auto &l : m_event->m_data) {
+         TIter next(l);
+         int i = 1;
+         if (collection->GetName() == std::string(l->GetName()))
+         {
+            printf("collection for list %s %s\n", collection->GetCName(), l->GetName());
+            collection->ClearItems();
+            collection->RemoveElements();
+            
+            for (int i = 0; i <= l->GetLast(); ++i)
+            {
+               TString pname; pname.Form("item %2d", i);
+               collection->AddItem(l->At(i), pname.Data(), "");
+               collection->GetDataItem(i)->SetMainColorPtr(collection->GetMainColorPtr());
+            }
+         }
+      }      
+   }
+
+   void NextEvent() {
+      printf("XYManager next event %d\n", m_collections->NumChildren());
+      for (auto it = m_collections->BeginChildren(); it !=  m_collections->EndChildren(); it++)
+      {
+         printf("rrrr collection updarte \n");
+         REX::REveDataCollection* c = dynamic_cast<REX::REveDataCollection*>(*it);
+         LoadCurrentEvent(c);
+      }
+      
+      for (auto proxy : m_builders) {
+         printf("call proxy builder %s \n", proxy->Collection()->GetCName());
+         proxy->Build();
+      }
+   }
+   
    void addCollection(REX::REveDataCollection* collection)
    {
+      // load data
+      LoadCurrentEvent(collection);
+      
       // GL view types
       auto glBuilder = makeGLBuilderForType(collection->GetItemClass());
       glBuilder->SetCollection(collection);
@@ -284,12 +413,13 @@ public:
       m_builders.push_back(glBuilder);
       glBuilder->Build();
 
-      // Table view types      {
-      bool showTable = !m_collections->HasChildren();
-      auto tableBuilder = new TableProxyBuilder();
-      tableBuilder->SetCollection(collection);
-      tableBuilder->SetHaveAWindow(showTable);
-      tableBuilder->SetTableEntries(m_tableFormats[collection->GetName()]);
+      if (0) {
+         // Table view types      {
+         bool showTable = !m_collections->HasChildren();
+         auto tableBuilder = new TableProxyBuilder();
+         tableBuilder->SetCollection(collection);
+         tableBuilder->SetHaveAWindow(showTable);
+         tableBuilder->SetTableEntries(m_tableFormats[collection->GetName()]);
 
          REX::REveElement* tablep = tableBuilder->CreateProduct(m_viewContext);
          for (REX::REveScene* scene : m_scenes) {
@@ -299,9 +429,10 @@ public:
             }
          }
 
-      m_builders.push_back(tableBuilder);
+         m_builders.push_back(tableBuilder);
+      }
+      
       m_collections->AddElement(collection);
-
       collection->SetHandlerFunc([&] (REX::REveDataCollection* collection) { this->CollectionChanged( collection ); });
       collection->SetHandlerFuncIds([&] (REX::REveDataCollection* collection, const REX::REveDataCollection::Ids_t& ids) { this->ModelChanged( collection, ids ); });
    }
@@ -330,96 +461,63 @@ public:
 
 //==============================================================================
 //==============================================================================
-// ================= EMULATE FRAMEWORK DATA  ===================================
-//==============================================================================
-//==============================================================================
-REX::REveDataCollection* makeTrackCollection(const char* name, int N)
+
+#pragma link C++ class EventManager+;
+
+class EventManager : public REX::REveElement
 {
-   REX::REveDataCollection* collection = new REX::REveDataCollection(name);
-   collection->SetItemClass(TParticle::Class());
-   //collection->SetMainColorRGB((UChar_t)100, 0, 0);
-   collection->SetMainColorPtr(&trackColor);
-   TRandom &r = * gRandom;
-   r.SetSeed(0);
+private:
+   Event* m_event;
+   XYManager* m_xymng;
+   
+public:
+   EventManager(Event* e, XYManager* m): m_event(e), m_xymng(m) {}
 
-   for (int i = 1; i <= N; ++i)
+   virtual ~EventManager() {}
+
+   virtual void NextEvent()
    {
-      double pt  = r.Uniform(0.5, 10);
-      double eta = r.Uniform(-2.55, 2.55);
-      double phi = r.Uniform(0, TMath::TwoPi());
-
-      double px = pt * std::cos(phi);
-      double py = pt * std::sin(phi);
-      double pz = pt * (1. / (std::tan(2*std::atan(std::exp(-eta)))));
-
-      // printf("%2d: pt=%.2f, eta=%.2f, phi=%.2f\n", i, pt, eta, phi);
-
-      auto particle = new TParticle(0, 0, 0, 0, 0, 0,
-                    px, py, pz, std::sqrt(px*px + py*py + pz*pz + 80*80),
-                    0, 0, 0, 0 );
-
-      int pdg = 11 * (r.Integer(2) > 0 ? 1 : -1);
-      particle->SetPdgCode(pdg);
-
-
-      TString pname; pname.Form("item %2d", i);
-      collection->AddItem(particle, pname.Data(), "");
-      collection->GetDataItem(i-1)->SetMainColorPtr(collection->GetMainColorPtr());
+      m_event->Create();
+      m_xymng->NextEvent();
    }
 
-   return collection;
-}
+   ClassDef(EventManager, 1);
+};
 
-REX::REveDataCollection* makeJetCollection(const char* name, int N)
-{
-   REX::REveDataCollection* collection = new REX::REveDataCollection(name);
-   collection->SetItemClass(XYJet::Class());
-   collection->SetMainColorPtr(&jetColor);
-
-
-   TRandom &r = * gRandom;
-   r.SetSeed(0);
-
-   for (int i = 1; i <= N; ++i)
-   {
-      double pt  = r.Uniform(0.5, 10);
-      double eta = r.Uniform(-2.55, 2.55);
-      double phi = r.Uniform(0, TMath::TwoPi());
-
-      double px = pt * std::cos(phi);
-      double py = pt * std::sin(phi);
-      double pz = pt * (1. / (std::tan(2*std::atan(std::exp(-eta)))));
-
-      auto jet = new XYJet(0, 0, 0, 0, 0, 0, px, py, pz, std::sqrt(px*px + py*py + pz*pz + 80*80));
-      jet->SetEtaSize(r.Uniform(0.02, 0.2));
-      jet->SetPhiSize(r.Uniform(0.01, 0.3));
-
-      TString pname; pname.Form("item %2d", i);
-      collection->AddItem(jet, pname.Data(), "");
-      collection->GetDataItem(i-1)->SetMainColorPtr(collection->GetMainColorPtr());
-   }
-
-   return collection;
-}
-
-//==============================================================================
-//==============================================================================
+//______________________________________________________________________________
 
 
 void collection_proxies()
 {
    REX::REveManager::Create();
 
-   auto xyManager = new XYManager();
-
-   auto trackCollection = makeTrackCollection("XYTracks", 10);
-   trackCollection->SetFilterExpr("i.Pt() > 0.1 && std::abs(i.Eta()) < 1");
-   xyManager->addCollection(trackCollection);
+   auto event = new Event();
+   event->Create();
+   
+   auto xyManager = new XYManager(event);
 
    if (1) {
-   auto jetCollection = makeJetCollection("XYJets", 4);
-   xyManager->addCollection(jetCollection);
+   REX::REveDataCollection* trackCollection = new REX::REveDataCollection("XYTracks");
+   trackCollection->SetItemClass(TParticle::Class());
+   Color_t trackColor = kGreen;
+   trackCollection->SetMainColorPtr(&trackColor);
+   //trackCollection->SetFilterExpr("i.Pt() > 0.1 && std::abs(i.Eta()) < 1");
+   xyManager->addCollection(trackCollection);
+   }
+   
+   if (0) {
+      REX::REveDataCollection* jetCollection = new REX::REveDataCollection("XYJets");
+      jetCollection->SetItemClass(XYJet::Class());
+      Color_t jetColor = kYellow;
+      jetCollection->SetMainColorPtr(&jetColor);
+      xyManager->addCollection(jetCollection);
    }
 
+   
+   auto eventMng = new EventManager(event, xyManager);
+   eventMng->SetName("EventManager");
+   REX::gEve->GetWorld()->AddElement(eventMng);
+   REX::gEve->GetWorld()->AddCommand("NextEvent", "sap-icon://step", eventMng, "NextEvent()");
+   
    REX::gEve->Show();
 }
