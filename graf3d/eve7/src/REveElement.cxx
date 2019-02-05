@@ -50,11 +50,10 @@ fChildClass member.
 REveElement::REveElement(const std::string& name, const std::string& title) :
    fName                (name),
    fTitle               (title),
-   fParents             (),
+   fAunts               (),
    fChildren            (),
    fVizTag              (),
    fNumChildren         (0),
-   fParentIgnoreCnt     (0),
    fDenyDestroy         (0),
    fDestroyOnZeroRefCnt (kTRUE),
    fRnrSelf             (kTRUE),
@@ -88,14 +87,13 @@ REveElement::REveElement(const std::string& name, const std::string& title) :
 REveElement::REveElement(const REveElement& e) :
    fName                (e.fName),
    fTitle               (e.fTitle),
-   fParents             (),
+   fAunts               (),
    fChildren            (),
    fChildClass          (e.fChildClass),
    fCompound            (nullptr),
    fVizModel            (nullptr),
    fVizTag              (e.fVizTag),
    fNumChildren         (0),
-   fParentIgnoreCnt     (0),
    fDenyDestroy         (0),
    fDestroyOnZeroRefCnt (e.fDestroyOnZeroRefCnt),
    fRnrSelf             (e.fRnrSelf),
@@ -131,15 +129,11 @@ REveElement::~REveElement()
       fDestructing = kStandard;
       RemoveElementsInternal();
 
-      for (auto &p : fParents)
+      for (auto &au : fAunts)
       {
-         p->RemoveElementLocal(this);
-         p->fChildren.remove(this);
-         --(p->fNumChildren);
+         au->RemoveNieceInternal(this);
       }
    }
-
-   fParents.clear();
 }
 
 ElementId_t REveElement::get_mother_id() const
@@ -164,9 +158,13 @@ void REveElement::assign_element_id_recurisvely()
 void REveElement::assign_scene_recursively(REveScene* s)
 {
    assert(fScene == 0);
+
    fScene = s;
 
-   if (fDestructing == kNone && fScene && fScene->IsAcceptingChanges()) {
+   // XXX MT -- Why do we have fDestructing here? Can this really happen?
+   //           If yes, shouldn't we block it in AddElement() already?
+   if (fDestructing == kNone && fScene && fScene->IsAcceptingChanges())
+   {
        s->SceneElementAdded(this);
    }
    for (auto &c : fChildren)
@@ -181,9 +179,9 @@ void REveElement::assign_scene_recursively(REveScene* s)
 
 void REveElement::PreDeleteElement()
 {
-   if (fElementId != 0) {
+   if (fElementId != 0)
+   {
       REX::gEve->PreDeleteElement(this);
-      if (fScene->IsAcceptingChanges()) fScene->SceneElementRemoved( fElementId);
    }
 }
 
@@ -268,8 +266,6 @@ void REveElement::NameTitleChanged()
    // Should send out some message. Need a new stamp type?
 }
 
-//******************************************************************************
-
 ////////////////////////////////////////////////////////////////////////////////
 /// Set visualization-parameter model element.
 /// Calling of this function from outside of EVE should in principle
@@ -278,15 +274,7 @@ void REveElement::NameTitleChanged()
 
 void REveElement::SetVizModel(REveElement* model)
 {
-   if (fVizModel) {
-      --fParentIgnoreCnt;
-      fVizModel->RemoveElement(this);
-   }
    fVizModel = model;
-   if (fVizModel) {
-      fVizModel->AddElement(this);
-      ++fParentIgnoreCnt;
-   }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -295,7 +283,7 @@ void REveElement::SetVizModel(REveElement* model)
 /// If the tag is not found in VizDB, the old model-element is kept
 /// and false is returned.
 
-Bool_t REveElement::FindVizModel()
+Bool_t REveElement::SetVizModelByTag()
 {
    REveElement* model = REX::gEve->FindVizDBEntry(fVizTag);
    if (model)
@@ -312,7 +300,7 @@ Bool_t REveElement::FindVizModel()
 ////////////////////////////////////////////////////////////////////////////////
 /// Set the VizTag, find model-element from the VizDB and copy
 /// visualization-parameters from it. If the model is not found and
-/// fallback_tag is non-null, its search is attempted as well.
+/// fallback_tag is non-null, search for it is attempted as well.
 /// For example: ApplyVizTag("TPC Clusters", "Clusters");
 ///
 /// If the model-element can not be found a warning is printed and
@@ -320,23 +308,25 @@ Bool_t REveElement::FindVizModel()
 
 Bool_t REveElement::ApplyVizTag(const TString& tag, const TString& fallback_tag)
 {
-   SetVizTag(tag);
-   if (FindVizModel())
+   REveElement* model;
+
+   if ((model = REX::gEve->FindVizDBEntry(tag)) != nullptr)
    {
-      CopyVizParamsFromDB();
-      return kTRUE;
+      SetVizTag(tag);
    }
-   if ( ! fallback_tag.IsNull())
+   else if ( ! fallback_tag.IsNull() && (model = REX::gEve->FindVizDBEntry(fallback_tag)) != nullptr)
    {
       SetVizTag(fallback_tag);
-      if (FindVizModel())
-      {
-         CopyVizParamsFromDB();
-         return kTRUE;
-      }
+   }
+
+   if (model)
+   {
+      SetVizModel(model);
+      CopyVizParamsFromDB();
+      return true;
    }
    Warning("REveElement::ApplyVizTag", "entry for tag '%s' not found in VizDB.", tag.Data());
-   return kFALSE;
+   return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -359,19 +349,18 @@ void REveElement::PropagateVizParamsToProjecteds()
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Propagate visualization parameters from element el (defaulting
-/// to this) to all elements (children).
+/// to this) to all children.
 ///
 /// The primary use of this is for model-elements from
 /// visualization-parameter database.
 
-void REveElement::PropagateVizParamsToElements(REveElement* el)
+void REveElement::PropagateVizParamsToChildren(REveElement* el)
 {
-   if (el == 0)
-      el = this;
+   if (el == 0) el = this;
 
-   for (List_i i=fChildren.begin(); i!=fChildren.end(); ++i)
+   for (auto &c : fChildren)
    {
-      (*i)->CopyVizParams(el);
+      c->CopyVizParams(el);
    }
 }
 
@@ -379,15 +368,13 @@ void REveElement::PropagateVizParamsToElements(REveElement* el)
 /// Copy visualization parameters from element el.
 /// This method needs to be overriden by any class that introduces
 /// new parameters.
-/// Color is copied in sub-classes which define it.
-/// See, for example, REvePointSet::CopyVizParams(),
-/// REveLine::CopyVizParams() and REveTrack::CopyVizParams().
 
 void REveElement::CopyVizParams(const REveElement* el)
 {
    fCanEditMainColor        = el->fCanEditMainColor;
    fCanEditMainTransparency = el->fCanEditMainTransparency;
    fMainTransparency        = el->fMainTransparency;
+   if (fMainColorPtr == & fDefaultColor) fDefaultColor = el->GetMainColor();
 
    AddStamp(kCBColorSelection | kCBObjProps);
 }
@@ -492,8 +479,12 @@ void REveElement::VizDB_UpdateModel(Bool_t update)
       fVizModel->CopyVizParams(this);
       if (update)
       {
-         fVizModel->PropagateVizParamsToElements(fVizModel);
-         REX::gEve->Redraw3D();
+         // XXX Back references from vizdb templates have been removed in Eve7.
+         // XXX We could traverse all scenes and elementes and reset those that
+         // XXX have a matching fVizModel. Or something.
+         Error("VizDB_UpdateModel", "update from vizdb -> elements not implemented.");
+         // fVizModel->PropagateVizParamsToElements(fVizModel);
+         // REX::gEve->Redraw3D();
       }
    }
    else
@@ -527,7 +518,7 @@ void REveElement::VizDB_Insert(const std::string& tag, Bool_t replace, Bool_t up
 /// Returns the master element - that is:
 /// - master of projectable, if this is a projected;
 /// - master of compound, if fCompound is set;
-/// - master of first compound parent, if kSCBTakeAnyParentAsMaster bit is set;
+/// - master of mother, if kSCBTakeMotherAsMaster bit is set;
 /// If non of the above is true, *this* is returned.
 
 REveElement* REveElement::GetMaster()
@@ -541,46 +532,36 @@ REveElement* REveElement::GetMaster()
    {
       return fCompound->GetMaster();
    }
-   if (TestCSCBits(kCSCBTakeAnyParentAsMaster))
+   if (TestCSCBits(kCSCBTakeMotherAsMaster) && fMother)
    {
-      for (List_i i = fParents.begin(); i != fParents.end(); ++i)
-         if (dynamic_cast<REveCompound*>(*i))
-            return (*i)->GetMaster();
+      return fMother->GetMaster();
    }
    return this;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Add el into the list parents.
+/// Add el into the list aunts.
 ///
-/// Adding parent is subordinate to adding an element.
+/// Adding aunt is subordinate to adding a niece.
 /// This is an internal function.
 
-void REveElement::AddParent(REveElement* el)
+void REveElement::AddAunt(REveAunt* au)
 {
-   assert(el != 0);
+   assert(au != 0);
 
-   if (fParents.empty())
-   {
-      fMother = el;
-   }
-   fParents.push_back(el);
+   fAunts.push_back(au);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Remove el from the list of parents.
-/// Removing parent is subordinate to removing an element.
+/// Remove el from the list of aunts.
+/// Removing aunt is subordinate to removing a niece.
 /// This is an internal function.
 
-void REveElement::RemoveParent(REveElement* el)
+void REveElement::RemoveAunt(REveAunt* au)
 {
-   static const REveException eh("REveElement::RemoveParent ");
+   assert(au != 0);
 
-   assert(el != 0);
-
-   if (el == fMother) fMother = 0;
-   fParents.remove(el);
-   CheckReferenceCount(eh);
+   fAunts.remove(au);
 }
 
 /******************************************************************************/
@@ -594,25 +575,13 @@ void REveElement::CheckReferenceCount(const REveException& eh)
    if (fDestructing != kNone)
       return;
 
-   if (NumParents() <= fParentIgnoreCnt &&
-       fDestroyOnZeroRefCnt             && fDenyDestroy <= 0)
+   if (fMother == nullptr && fDestroyOnZeroRefCnt && fDenyDestroy <= 0)
    {
-      if (REX::gEve && REX::gEve->GetUseOrphanage())
-      {
-         if (gDebug > 0)
-            Info(eh, "moving to orphanage '%s' on zero reference count.", GetCName());
+      if (gDebug > 0)
+         Info(eh, "auto-destructing '%s' on zero reference count.", GetCName());
 
-         PreDeleteElement();
-         REX::gEve->GetOrphanage()->AddElement(this);
-      }
-      else
-      {
-         if (gDebug > 0)
-            Info(eh, "auto-destructing '%s' on zero reference count.", GetCName());
-
-         PreDeleteElement();
-         delete this;
-      }
+      PreDeleteElement();
+      delete this;
    }
 }
 
@@ -622,31 +591,9 @@ void REveElement::CheckReferenceCount(const REveException& eh)
 ///
 /// Overriden in REveScene to include itself and return.
 
-void REveElement::CollectSceneParents(List_t& scenes)
+void REveElement::CollectScenes(List_t& scenes)
 {
-   for (List_i p=fParents.begin(); p!=fParents.end(); ++p)
-      (*p)->CollectSceneParents(scenes);
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Collect scene-parents from all children. This is needed to
-/// automatically detect which scenes need to be updated during/after
-/// a full sub-tree update.
-/// Argument parent specifies parent in traversed hierarchy for which we can
-/// skip the upwards search.
-
-void REveElement::CollectSceneParentsFromChildren(List_t&      scenes,
-                                                  REveElement* parent)
-{
-   for (List_i p=fParents.begin(); p!=fParents.end(); ++p)
-   {
-      if (*p != parent) (*p)->CollectSceneParents(scenes);
-   }
-
-   for (List_i c=fChildren.begin(); c!=fChildren.end(); ++c)
-   {
-      (*c)->CollectSceneParentsFromChildren(scenes, this);
-   }
+   if (fScene) scenes.push_back(fScene);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -756,10 +703,19 @@ void REveElement::PropagateRnrStateToProjecteds()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// Set up element to use built-in main color and set flags allowing editing
+/// of main color and transparency.
+
+void REveElement::SetupDefaultColorAndTransparency(Color_t col, Bool_t can_edit_color, Bool_t can_edit_transparency)
+{
+   fMainColorPtr = & fDefaultColor;
+   fDefaultColor = col;
+   fCanEditMainColor = can_edit_color;
+   fCanEditMainTransparency = can_edit_transparency;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// Set main color of the element.
-///
-///
-/// List-tree-items are updated.
 
 void REveElement::SetMainColor(Color_t color)
 {
@@ -934,32 +890,30 @@ void REveElement::AddElement(REveElement* el)
 {
    static const REveException eh("REveElement::AddElement ");
 
-   assert(el != 0);
+   if (el == 0)              throw eh + "called with nullptr argument.";
+   if ( ! AcceptElement(el)) throw eh + Form("parent '%s' rejects '%s'.", GetCName(), el->GetCName());
+   if (el->fElementId)       throw eh + "element already has an id.";
+   // if (el->fScene)           throw eh + "element already has a Scene.";
+   if (el->fMother)          throw eh + "element already has a Mother.";
 
-   if ( ! AcceptElement(el))
-      throw eh + Form("parent '%s' rejects '%s'.", GetCName(), el->GetCName());
+   // XXX Implement reparent --> MoveElement() ????
+   //     Actually, better to do new = old.Clone(), RemoveElement(old), AddElement(new);
+   //     Or do magick with Inc/DecDenyDestroy().
+   //     PITA with existing children !!!! Need to re-scene them.
 
-   if (el->fElementId == 0 && fElementId != 0)
-   {
-      el->assign_element_id_recurisvely();
-   }
-   if (el->fScene == 0 && fScene != 0)
-   {
-      el->assign_scene_recursively(fScene);
-   }
-   if (el->fMother == 0)
-   {
-      el->fMother = this;
-   }
+   if (fElementId)             el->assign_element_id_recurisvely();
+   if (fScene && ! el->fScene) el->assign_scene_recursively(fScene);
 
-   el->AddParent(this);
+   el->fMother = this;
+
    fChildren.push_back(el); ++fNumChildren;
 
    // XXXX This should be element added. Also, should be different for
    // "full (re)construction". Scenes should manage that and have
    // state like: none - constructing - clearing - nominal - updating.
    // I recon this means an element should have a ptr to its scene.
-   // XXXXElementChanged();
+   //
+   // ElementChanged();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -967,14 +921,28 @@ void REveElement::AddElement(REveElement* el)
 
 void REveElement::RemoveElement(REveElement* el)
 {
-   assert(el != 0);
+   static const REveException eh("REveElement::RemoveElement ");
+
+   if (el == 0)             throw eh + "called with nullptr argument.";
+   if (el->fMother != this) throw eh + "this element is not mother of el.";
 
    RemoveElementLocal(el);
-   el->RemoveParent(this);
+
+   if (fScene && fScene->IsAcceptingChanges())
+   {
+      fScene->SceneElementRemoved(fElementId);
+   }
+
+   el->fMother = 0;
+   el->fScene  = 0;
+
+   el->CheckReferenceCount();
+
    fChildren.remove(el); --fNumChildren;
 
    // XXXX This should be element removed. Also, think about recursion, deletion etc.
-   // XXXXElementChanged();
+   //
+   // ElementChanged();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -999,15 +967,21 @@ void REveElement::RemoveElementLocal(REveElement* /*el*/)
 
 void REveElement::RemoveElementsInternal()
 {
-   // for (sLTI_i i=fItems.begin(); i!=fItems.end(); ++i)
-   // {
-   //    DestroyListSubTree(i->fTree, i->fItem);
-   // }
    RemoveElementsLocal();
-   for (List_i i=fChildren.begin(); i!=fChildren.end(); ++i)
+
+   for (auto &c : fChildren)
    {
-      (*i)->RemoveParent(this);
+      if (fScene && fScene->IsAcceptingChanges())
+      {
+         fScene->SceneElementRemoved(fElementId);
+      }
+
+      c->fMother = 0;
+      c->fScene  = 0;
+
+      c->CheckReferenceCount();
    }
+
    fChildren.clear(); fNumChildren = 0;
 }
 
@@ -1245,14 +1219,10 @@ void REveElement::AnnihilateRecursively()
    }
 
    // same as REveElement::RemoveElementsInternal(), except parents are ignored
-   // for (sLTI_i i=fItems.begin(); i!=fItems.end(); ++i)
-   // {
-   //    DestroyListSubTree(i->fTree, i->fItem);
-   // }
    RemoveElementsLocal();
-   for (List_i i=fChildren.begin(); i!=fChildren.end(); ++i)
+   for (auto &c : fChildren)
    {
-      (*i)->AnnihilateRecursively();
+      c->AnnihilateRecursively();
    }
 
    fChildren.clear();
@@ -1274,13 +1244,6 @@ void REveElement::Annihilate()
 {
    static const REveException eh("REveElement::Annihilate ");
 
-   if (fParents.size() > 1)
-   {
-      Warning(eh, "More than one parent for '%s': %d. Refusing to delete.",
-              GetCName(), (Int_t) fParents.size());
-      return;
-   }
-
    fDestructing = kAnnihilate;
 
    // recursive annihilation of projecteds
@@ -1291,14 +1254,17 @@ void REveElement::Annihilate()
    }
 
    // detach from the parent
-   while (!fParents.empty())
+   if (fMother)
    {
-      fParents.front()->RemoveElement(this);
+      fMother->RemoveElement(this);
    }
+
+   // XXXX wont the above already start off the destruction cascade ?????
 
    AnnihilateRecursively();
 
-   REX::gEve->Redraw3D();
+   // XXXX ????? Anihalate flag ???? Is it different than regular remove ????
+   // REX::gEve->Redraw3D();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1306,7 +1272,7 @@ void REveElement::Annihilate()
 
 void REveElement::AnnihilateElements()
 {
-   while (!fChildren.empty())
+   while ( ! fChildren.empty())
    {
       REveElement* c = fChildren.front();
       c->Annihilate();
@@ -1428,35 +1394,6 @@ void REveElement::DecDenyDestroy()
 {
    if (--fDenyDestroy <= 0)
       CheckReferenceCount("REveElement::DecDenyDestroy ");
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Get number of parents that should be ignored in doing
-/// reference-counting.
-///
-/// For example, this is used when subscribing an element to a
-/// visualization-database model object.
-
-Int_t REveElement::GetParentIgnoreCnt() const
-{
-   return fParentIgnoreCnt;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Increase number of parents ignored in reference-counting.
-
-void REveElement::IncParentIgnoreCnt()
-{
-   ++fParentIgnoreCnt;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Decrease number of parents ignored in reference-counting.
-
-void REveElement::DecParentIgnoreCnt()
-{
-   if (--fParentIgnoreCnt <= 0)
-      CheckReferenceCount("REveElement::DecParentIgnoreCnt ");
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1606,8 +1543,10 @@ Int_t REveElement::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
    j["fMainTransparency"] = GetMainTransparency();
    j["fPickable"]         = fPickable;
 
-   if (rnr_offset >= 0) {
+   if (rnr_offset >= 0)
+   {
       BuildRenderData();
+
       if (fRenderData.get())
       {
          nlohmann::json rd = {};
@@ -1628,7 +1567,8 @@ Int_t REveElement::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
          return 0;
       }
    }
-   else {
+   else
+   {
       return 0;
    }
 }

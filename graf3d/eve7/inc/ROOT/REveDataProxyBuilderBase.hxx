@@ -2,6 +2,7 @@
 #define ROOT7_REveDataProxyBuilderBase
 
 #include <ROOT/REveElement.hxx>
+#include <ROOT/REveCompound.hxx>
 #include <ROOT/REveDataClasses.hxx>
 
 namespace ROOT {
@@ -15,8 +16,8 @@ class REveDataProxyBuilderBase
 public:
    struct Product
    {
-      const REveViewContext*  m_viewContext;
-      REveElement*        m_elements;
+      const REveViewContext   *m_viewContext;
+      REveCompound            *m_elements;
 
       Product(const REveViewContext* c);
       virtual ~Product();

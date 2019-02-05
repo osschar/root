@@ -24,16 +24,14 @@ Description of REveCompound
 
 REveCompound::REveCompound(const std::string& n, const std::string& t,
                            Bool_t doColor, Bool_t doTransparency) :
-   REveElement   (n, t),
-   fCompoundOpen (0)
+   REveElement     (n, t),
+   fCompoundOpen   (0),
+   fDoColor        (doColor),
+   fDoTransparency (doTransparency)
 {
-   if (doColor) {
-      fCanEditMainColor = kTRUE;
-      SetMainColorPtr(&fColor);
-   }
-   if (doTransparency)
+   if (fDoColor)
    {
-      fCanEditMainTransparency = kTRUE;
+      SetupDefaultColorAndTransparency(0, fDoColor, fDoTransparency);
    }
 }
 
@@ -49,6 +47,8 @@ REveCompound::REveCompound(const std::string& n, const std::string& t,
 
 void REveCompound::SetMainColor(Color_t color)
 {
+   if ( ! fDoColor) return;
+
    Color_t old_color = GetMainColor();
 
    REveElement::SetMainColor(color);
@@ -78,6 +78,8 @@ void REveCompound::SetMainColor(Color_t color)
 
 void REveCompound::SetMainTransparency(Char_t t)
 {
+   if ( ! fDoTransparency) return;
+
    Char_t old_t = GetMainTransparency();
 
    REveElement::SetMainTransparency(t);

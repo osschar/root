@@ -295,7 +295,7 @@ TClass* REveLine::ProjectedClass(const REveProjection*) const
 
 Int_t REveLine::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
 {
-   Int_t ret = REveElement::WriteCoreJson(j, rnr_offset);
+   Int_t ret = REvePointSet::WriteCoreJson(j, rnr_offset);
 
    j["fLineWidth"] = GetLineWidth();
    j["fLineStyle"] = GetLineStyle();

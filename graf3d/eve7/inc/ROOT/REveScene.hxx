@@ -84,7 +84,7 @@ public:
    REveScene(const std::string& n = "REveScene", const std::string& t = "");
    virtual ~REveScene();
 
-   virtual void CollectSceneParents(List_t &scenes);
+   void CollectSceneParents(List_t &scenes); // override;
 
    virtual Bool_t SingleRnrState() const { return kTRUE; }
 

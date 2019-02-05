@@ -167,7 +167,8 @@ void REveScene::StreamElements()
    fOutputBinary.resize(fTotalBinarySize);
    Int_t off = 0;
 
-   for (auto &&e : fElsWithBinaryData) {
+   for (auto &&e : fElsWithBinaryData)
+   {
       auto rd_size = e->fRenderData->Write(&fOutputBinary[off], fOutputBinary.size() - off);
       off += rd_size;
    }
@@ -202,7 +203,23 @@ void REveScene::StreamJsonRecurse(REveElement *el, nlohmann::json &jarr)
 
    for (auto &&c : el->fChildren)
    {
-      StreamJsonRecurse(c, jarr);
+      // Stream only objects element el is a mother of.
+      //
+      // XXXX This is spooky side effect of multi-parenting.
+      //
+      // In particular screwed up for selection.
+      // Selection now streams element ids and implied selected ids
+      // and secondary-ids as part of core json.
+      //
+      // I wonder how this screws up REveProjectionManager (should
+      // we hold a map of already streamed ids?).
+      //
+      // Do uncles and aunts and figure out a clean way for backrefs.
+
+      if (c->GetMother() == el)
+      {
+         StreamJsonRecurse(c, jarr);
+      }
    }
 }
 

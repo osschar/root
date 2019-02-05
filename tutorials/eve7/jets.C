@@ -35,7 +35,6 @@ void makeJets(int N_Jets, REX::REveElement* jetHolder)
 
       jetHolder->AddElement(jet);
    }
-   event->AddElement(jetHolder);
 }
 
 void jets()
@@ -44,7 +43,7 @@ void jets()
 
    REX::REveElement* jetHolder = new REX::REveElement("Jets");
    eveMng->GetEventScene()->AddElement(jetHolder);
-   makeJets(1, jetHolder);
+   makeJets(10, jetHolder);
 
    eveMng->Show();
 }

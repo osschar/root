@@ -30,8 +30,9 @@ private:
    REveCompound &operator=(const REveCompound &); // Not implemented
 
 protected:
-   Color_t fColor{0};     // Color of the object.
    Short_t fCompoundOpen; // If more than zero, tag new children as compound members.
+   Bool_t  fDoColor;
+   Bool_t  fDoTransparency;
 
 public:
    REveCompound(const std::string& n = "REveCompound", const std::string& t = "",
