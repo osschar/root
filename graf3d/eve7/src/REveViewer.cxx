@@ -153,7 +153,6 @@ REveViewerList::~REveViewerList()
 void REveViewerList::AddElement(REveElement* el)
 {
    REveElement::AddElement(el);
-   el->IncParentIgnoreCnt();
 }
 
 ////////////////////////////////////////////////////////////////////////////////

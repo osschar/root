@@ -109,6 +109,8 @@
 
 // REveElement
 #pragma link C++ class ROOT::Experimental::REveElement+;
+#pragma link C++ class ROOT::Experimental::REveAunt+;
+#pragma link C++ class ROOT::Experimental::REveAuntAsList+;
 
 #pragma link C++ class std::list<ROOT::Experimental::REveElement*>;
 #pragma link C++ class std::list<ROOT::Experimental::REveElement*>::iterator;

@@ -200,22 +200,23 @@ void REveDataItem::SetItemColorRGB(UChar_t r, UChar_t g, UChar_t b)
 {
    Color_t color = TColor::GetColor(r, g, b);
    REveElement::SetMainColor(color);
-   REveDataCollection* c = dynamic_cast<REveDataCollection*>(*fParents.begin());
+   REveDataCollection* c = dynamic_cast<REveDataCollection*>(fMother);
    c->ItemChanged(this);
 }
 
 void REveDataItem::SetItemRnrSelf(bool iRnrSelf)
 {
    REveElement::SetRnrSelf(iRnrSelf);
-   REveDataCollection* c = dynamic_cast<REveDataCollection*>(*fParents.begin());
+   REveDataCollection* c = dynamic_cast<REveDataCollection*>(fMother);
    c->ItemChanged(this);
 }
 
 void REveDataItem::SetFiltered(bool f)
 {
-  if (f != fFiltered) {
-         fFiltered = f;
-         StampObjProps();
+  if (f != fFiltered)
+  {
+     fFiltered = f;
+     StampObjProps();
   }
 }
 

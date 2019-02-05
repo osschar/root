@@ -66,24 +66,12 @@ REveManager::REveManager() : // (Bool_t map_window, Option_t* opt) :
 
    fMacroFolder (nullptr),
 
-   fViewers        (nullptr),
-   fScenes         (nullptr),
-   fGlobalScene    (nullptr),
-   fEventScene     (nullptr),
-
    fRedrawDisabled (0),
    fResetCameras   (kFALSE),
    fDropLogicals   (kFALSE),
    fKeepEmptyCont  (kFALSE),
    fTimerActive    (kFALSE),
-   fRedrawTimer    (),
-
-   fStampedElements(0),
-   fSelection      (0),
-   fHighlight      (0),
-
-   fOrphanage      (0),
-   fUseOrphanage   (kFALSE)
+   fRedrawTimer    ()
 {
    // Constructor.
 
@@ -104,18 +92,6 @@ REveManager::REveManager() : // (Bool_t map_window, Option_t* opt) :
 
    fStampedElements = new TExMap;
 
-   fSelection = new REveSelection("Global Selection");
-   fSelection->IncDenyDestroy();
-   AssignElementId(fSelection);
-   fHighlight = new REveSelection("Global Highlight");
-   fHighlight->SetHighlightMode();
-   fHighlight->IncDenyDestroy();
-   AssignElementId(fHighlight);
-
-   fOrphanage = new REveElement("Global Orphanage");
-   fOrphanage->IncDenyDestroy();
-   AssignElementId(fOrphanage);
-
    fRedrawTimer.Connect("Timeout()", "ROOT::Experimental::REveManager", this, "DoRedraw3D()");
    fMacroFolder = new TFolder("EVE", "Visualization macros");
    gROOT->GetListOfBrowsables()->Add(fMacroFolder);
@@ -123,6 +99,17 @@ REveManager::REveManager() : // (Bool_t map_window, Option_t* opt) :
    fWorld = new REveScene("EveWorld", "Top-level Eve Scene");
    fWorld->IncDenyDestroy();
    AssignElementId(fWorld);
+
+   fSelectionList = new REveElement("Selection List");
+   fSelectionList->IncDenyDestroy();
+   fWorld->AddElement(fSelectionList);
+   fSelection = new REveSelection("Global Selection");
+   fSelection->IncDenyDestroy();
+   fSelectionList->AddElement(fSelection);
+   fHighlight = new REveSelection("Global Highlight");
+   fHighlight->SetHighlightMode();
+   fHighlight->IncDenyDestroy();
+   fSelectionList->AddElement(fHighlight);
 
    fViewers = new REveViewerList("Viewers");
    fViewers->IncDenyDestroy();
@@ -193,7 +180,6 @@ REveManager::~REveManager()
    // fWindowManager->Destroy();
    // fWindowManager = 0;
 
-   fOrphanage->DecDenyDestroy();
    fHighlight->DecDenyDestroy();
    fSelection->DecDenyDestroy();
 
@@ -205,17 +191,6 @@ REveManager::~REveManager()
    delete fVizDB;
    delete fExcHandler;
    delete fStampedElements;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Clear the orphanage.
-
-void REveManager::ClearOrphanage()
-{
-   Bool_t old_state = fUseOrphanage;
-   fUseOrphanage = kFALSE;
-   fOrphanage->DestroyElements();
-   fUseOrphanage = old_state;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -300,9 +275,10 @@ void REveManager::ElementChanged(REveElement* element, Bool_t update_scenes, Boo
 {
    static const REveException eh("REveElement::ElementChanged ");
 
+   // XXXXis this still needed at all ????
    if (update_scenes) {
       REveElement::List_t scenes;
-      element->CollectSceneParents(scenes);
+      element->CollectScenes(scenes);
       ScenesChanged(scenes);
    }
 
@@ -399,32 +375,38 @@ void REveManager::AssignElementId(REveElement* element)
 /// Called from REveElement prior to its destruction so the
 /// framework components (like object editor) can unreference it.
 
-void REveManager::PreDeleteElement(REveElement* element)
+void REveManager::PreDeleteElement(REveElement* el)
 {
-   // XXXX if (fScenes) fScenes->DestroyElementRenderers(element);
+   static const REveException eh("REveManager::PreDeleteElement ");
 
-   if (fStampedElements->GetValue((ULong64_t) element, (Long64_t) element) != 0)
-      fStampedElements->Remove((ULong64_t) element, (Long64_t) element);
+   if (fStampedElements->GetValue((ULong64_t) el, (Long64_t) el) != 0)
+      fStampedElements->Remove((ULong64_t) el, (Long64_t) el);
 
-   // SSSS
-   // if (element->fImpliedSelected > 0)
-   //    fSelection->RemoveImpliedSelected(element);
-   // if (element->fImpliedHighlighted > 0)
-   //    fHighlight->RemoveImpliedSelected(element);
-
-   if (element->fElementId != 0)
+   if (el->fImpliedSelected > 0)
    {
-      auto it = fElementIdMap.find(element->fElementId);
+      for (auto slc : fSelectionList->fChildren)
+      {
+         REveSelection *sel = dynamic_cast<REveSelection*>(slc);
+         sel->RemoveImpliedSelectedReferencesTo(el);
+      }
+
+      if (el->fImpliedSelected != 0)
+         Error(eh, "ImpliedSelected not zero (%d) after cleanup of selections.", el->fImpliedSelected);
+   }
+
+   if (el->fElementId != 0)
+   {
+      auto it = fElementIdMap.find(el->fElementId);
       if (it != fElementIdMap.end())
       {
-         if (it->second == element)
+         if (it->second == el)
          {
             fElementIdMap.erase(it);
             --fNumElementIds;
          }
          else Error("PreDeleteElement", "element ptr in ElementIdMap does not match the argument element.");
       }
-      else Error("PreDeleteElement", "element id %u was not registered in ElementIdMap.", element->fElementId);
+      else Error("PreDeleteElement", "element id %u was not registered in ElementIdMap.", el->fElementId);
    }
    else Error("PreDeleteElement", "element with 0 ElementId passed in.");
 }

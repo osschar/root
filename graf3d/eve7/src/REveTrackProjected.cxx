@@ -327,7 +327,9 @@ void REveTrackProjected::BuildRenderData()
 {
    REveTrack::BuildRenderData();
 
-   fRenderData->Reserve(0, 0, fBreakPoints.size());
-
-   fRenderData->PushI(&fBreakPoints[0], fBreakPoints.size());
+   if (fRenderData && ! fBreakPoints.empty())
+   {
+      fRenderData->Reserve(0, 0, fBreakPoints.size());
+      fRenderData->PushI(fBreakPoints);
+   }
 }

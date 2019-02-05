@@ -55,8 +55,9 @@ public:
 
    virtual Bool_t HasProjecteds() const { return !fProjectedList.empty(); }
 
-   ProjList_i BeginProjecteds() { return fProjectedList.begin(); }
-   ProjList_i EndProjecteds() { return fProjectedList.end(); }
+   ProjList_t &RefProjecteds()   { return fProjectedList;         }
+   ProjList_i  BeginProjecteds() { return fProjectedList.begin(); }
+   ProjList_i  EndProjecteds()   { return fProjectedList.end();   }
 
    virtual void AddProjected(REveProjected *p) { fProjectedList.push_back(p); }
    virtual void RemoveProjected(REveProjected *p) { fProjectedList.remove(p); }

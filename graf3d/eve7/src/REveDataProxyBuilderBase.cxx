@@ -27,19 +27,19 @@ REveDataProxyBuilderBase::REveDataProxyBuilderBase(std::string type):
 REveDataProxyBuilderBase::Product::~Product()
 {
    // remove product from projected scene (RhoPhi or RhoZ)
-   REveProjectable* pable = dynamic_cast<REveProjectable*>(m_elements);
-   // don't have to check cast, because TEveElementList is TEveProjectable
-   for (REveProjectable::ProjList_i i = pable->BeginProjecteds(); i != pable->EndProjecteds(); ++i)
+   for (auto i : m_elements->RefProjecteds())
    {
-      REveElement* projected  = (*i)->GetProjectedAsElement();
-      (*projected->BeginParents())->RemoveElement(projected);
+      REveElement *projected = i->GetProjectedAsElement();
+      projected->GetMother()->RemoveElement(projected);
    }
 
+   // XXXX This might break now ... m_elements will auto drestruct, no?
+   // We don't set incdenydestroy or additional something, do we?
+
    // remove from 3D scenes
-   while (m_elements->HasParents())
+   if (m_elements->HasMother())
    {
-      REveElement* parent = *m_elements->BeginParents();
-      parent->RemoveElement(m_elements);
+      m_elements->GetMother()->RemoveElement(m_elements);
    }
 
    m_elements->Annihilate();
@@ -273,7 +273,7 @@ REveDataProxyBuilderBase::SetupAddElement(REveElement* el, REveElement* parent, 
 void
 REveDataProxyBuilderBase::SetupElement(REveElement* el, bool color) const
 {
-   el->CSCTakeAnyParentAsMaster();
+   el->CSCTakeMotherAsMaster();
    el->SetPickable(true);
    el->SetMainColor(m_collection->GetMainColor());
    if (color)
@@ -291,7 +291,7 @@ REveCompound*
 REveDataProxyBuilderBase::CreateCompound(bool set_color, bool propagate_color_to_all_children) const
 {
    REveCompound* c = new REveCompound();
-   c->CSCTakeAnyParentAsMaster();
+   c->CSCTakeMotherAsMaster();
    c->CSCImplySelectAllChildren();
    c->SetPickable(true);
    if (set_color)
