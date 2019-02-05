@@ -55,7 +55,7 @@ REveDataSimpleProxyBuilder::Build(const REveDataCollection* collection,
          itemHolder = CreateCompound(true, true);
          itemHolder->SetMainColorPtr(collection->GetMainColorPtr());
          SetupAddElement(itemHolder, product, true);
-         itemHolder->SetName(Form("compound %d", index));
+         itemHolder->SetName(Form("compound %d ", index));
 
       }
       auto di = Collection()->GetDataItem(index);

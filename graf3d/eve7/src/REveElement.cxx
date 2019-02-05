@@ -124,6 +124,10 @@ REveElement::REveElement(const REveElement& e) :
 
 REveElement::~REveElement()
 {
+   if (fScene->IsAcceptingChanges()) {
+         printf("PreDeleteElement add to remove list (SCENE =%s) %d \n", fScene->GetCName(), fElementId);
+         fScene->SceneElementRemoved( fElementId);
+   }
    if (fDestructing != kAnnihilate)
    {
       fDestructing = kStandard;

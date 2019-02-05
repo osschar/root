@@ -75,7 +75,7 @@ void REveDataProxyBuilderBase::Build()
          Clean();
          for (Product_it i = m_products.begin(); i != m_products.end(); ++i)
          {
-            printf("build() %s \n", m_collection->GetCName());
+            // printf("REveDataProxyBuilderBase::Build() %s \n", m_collection->GetCName());
             REveElement* elms = (*i)->m_elements;
             size_t oldSize = elms->NumChildren();
 

@@ -66,7 +66,7 @@ protected:
    // If I remove a parent, i have to remove all the children.
    // So this has to be done right on both sides (on eve element and here).
    // I might need a set, so i can easily check if parent is in the removed / added list already.
-   Set_t fAddedElements;
+   List_t fAddedElements;
    std::vector<ElementId_t> fRemovedElements;
 
    std::vector<std::unique_ptr<REveClient>> fSubscribers;
