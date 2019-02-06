@@ -29,8 +29,7 @@
 
 namespace REX = ROOT::Experimental;
 
-int eventId = 0;
-
+bool gRhoZView = false;
 //==============================================================================
 //============== EMULATE FRAMEWORK CLASSES =====================================
 //==============================================================================
@@ -56,6 +55,12 @@ public:
 
 class Event {
 public:
+   Event(): eventId(0), N_tracks(0), N_jets(0) {}
+   int eventId;
+   int N_tracks;
+   int N_jets;
+
+   
    void MakeJets(int N)
    {
       TRandom &r = * gRandom;
@@ -120,10 +125,9 @@ public:
    }
 
    void Create() {
-      printf("Event Create %d !!!! \n", eventId);
       Clear();
       MakeJets(4);
-      MakeParticles(1);
+      MakeParticles(10);
       eventId++;
    }
 };
@@ -190,9 +194,9 @@ class XYJetProxyBuilder: public REX::REveDataSimpleProxyBuilderTemplate<XYJet>
       auto jet = new REX::REveJetCone();
       jet->SetCylinder(2*context->GetMaxR(), context->GetMaxZ());
       jet->AddEllipticCone(dj.Eta(), dj.Phi(), dj.GetEtaSize(), dj.GetPhiSize());
-      printf("============== BUILD jet %s (%f, %f)\n",iItemHolder->GetCName(),   dj.GetPolarPhi(), dj.GetEtaSize());
+      // printf("============== BUILD jet %s (%f, %f)\n",iItemHolder->GetCName(),   dj.GetPolarPhi(), dj.GetEtaSize());
       SetupAddElement(jet, iItemHolder);
-      jet->SetName(Form("element %s event %d", iItemHolder->GetName().c_str(), eventId));
+      jet->SetName(Form("element %s", iItemHolder->GetName().c_str()));
    }
 };
 
@@ -202,12 +206,12 @@ class TrackProxyBuilder : public REX::REveDataSimpleProxyBuilderTemplate<TPartic
    virtual void Build(const TParticle& p, REX::REveElement* iItemHolder, const REX::REveViewContext* context)
    {
       const TParticle* x = &p;
-      printf("==============  BUILD track %s (pt=%f, eta=%f) \n", iItemHolder->GetCName(), p.Pt(), p.Eta());
+      // printf("==============  BUILD track %s (pt=%f, eta=%f) \n", iItemHolder->GetCName(), p.Pt(), p.Eta());
       auto track = new REX::REveTrack((TParticle*)(x), 1, context->GetPropagator());
       track->MakeTrack();
       SetupAddElement(track, iItemHolder, false);
       iItemHolder->AddElement(track);
-      track->SetName(Form("element %s", iItemHolder->GetCName()));
+      track->SetName(Form("element %s id=%d", iItemHolder->GetCName(), track->GetElementId()));
    }
 };
 
@@ -235,6 +239,7 @@ public:
 
       auto table = new REX::REveDataTable("testTable");
       table->SetCollection(collection);
+      product->AddElement(table);
 
       for (const TableEntry& spec : m_specs) {
          auto c = new REX::REveDataColumn(spec.fName.c_str());
@@ -244,7 +249,6 @@ public:
          c->SetPrecision(spec.fPrecision);
       }
 
-      product->AddElement(table);
       m_table = table;
    }
 
@@ -321,7 +325,7 @@ public:
       m_scenes.push_back(REX::gEve->GetEventScene());
 
       // RhoZ
-      if (0) {
+      if (1) {
          auto rhoZEventScene = REX::gEve->SpawnNewScene("RhoZ Scene","Projected");
          m_mngRhoZ = new REX::REveProjectionManager(REX::REveProjection::kPT_RhoZ);
          m_mngRhoZ->SetImportEmpty(true);
@@ -331,7 +335,7 @@ public:
       }
 
       // Table
-      if (0) {
+      if (1) {
          auto tableScene  = REX::gEve->SpawnNewScene("Tables", "Tables");
          auto tableView = REX::gEve->SpawnNewViewer("Table", "Table View");
          tableView->AddScene(tableScene);
@@ -344,7 +348,7 @@ public:
    REX::REveDataProxyBuilderBase*  makeGLBuilderForType(TClass* c)
    {
       std::string cn = c->GetName();
-      printf("proxy builder for type %s\n", c->GetName());
+      // printf("proxy builder for type %s\n", c->GetName());
       if (cn == "XYJet") {
          return new XYJetProxyBuilder();
       }
@@ -356,15 +360,15 @@ public:
 
    void LoadCurrentEvent(REX::REveDataCollection* collection)
    {
-      printf("load current event \n");
+      //  printf("load current event \n");
       for (auto &l : m_event->m_data) {
          TIter next(l);
          int i = 1;
          if (collection->GetName() == std::string(l->GetName()))
          {
-            printf("collection for list %s %s\n", collection->GetCName(), l->GetName());
+            // printf("collection for list %s %s\n", collection->GetCName(), l->GetName());
             collection->ClearItems();
-            collection->RemoveElements();
+            collection->DestroyElements();
             
             for (int i = 0; i <= l->GetLast(); ++i)
             {
@@ -377,16 +381,14 @@ public:
    }
 
    void NextEvent() {
-      printf("XYManager next event %d\n", m_collections->NumChildren());
       for (auto it = m_collections->BeginChildren(); it !=  m_collections->EndChildren(); it++)
       {
-         printf("rrrr collection updarte \n");
          REX::REveDataCollection* c = dynamic_cast<REX::REveDataCollection*>(*it);
          LoadCurrentEvent(c);
       }
       
       for (auto proxy : m_builders) {
-         printf("call proxy builder %s \n", proxy->Collection()->GetCName());
+         // printf("call proxy builder %s \n", proxy->Collection()->GetCName());
          proxy->Build();
       }
    }
@@ -413,7 +415,7 @@ public:
       m_builders.push_back(glBuilder);
       glBuilder->Build();
 
-      if (0) {
+      if (1) {
          // Table view types      {
          bool showTable = !m_collections->HasChildren();
          auto tableBuilder = new TableProxyBuilder();
@@ -444,13 +446,13 @@ public:
 
 
    void CollectionChanged(REX::REveDataCollection* collection) {
-      printf("collection changes %s \n", collection->GetCName());
+      printf("collection changes not implemented %s!\n", collection->GetCName());
    }
 
    void ModelChanged(REX::REveDataCollection* collection, const REX::REveDataCollection::Ids_t& ids) {
       for (auto proxy : m_builders) {
          if (proxy->Collection() == collection) {
-            // printf("XXXXX Model changes check proxy %s: \n", proxy->Type().c_str());
+            // printf("Model changes check proxy %s: \n", proxy->Type().c_str());
             proxy->ModelChanges(ids);
          }
       }
@@ -493,19 +495,22 @@ void collection_proxies()
 
    auto event = new Event();
    event->Create();
+   event->N_tracks = 10;
+   event->N_jets = 4;
    
+   // debug settings
    auto xyManager = new XYManager(event);
 
    if (1) {
-   REX::REveDataCollection* trackCollection = new REX::REveDataCollection("XYTracks");
-   trackCollection->SetItemClass(TParticle::Class());
-   Color_t trackColor = kGreen;
-   trackCollection->SetMainColorPtr(&trackColor);
-   //trackCollection->SetFilterExpr("i.Pt() > 0.1 && std::abs(i.Eta()) < 1");
-   xyManager->addCollection(trackCollection);
+      REX::REveDataCollection* trackCollection = new REX::REveDataCollection("XYTracks");
+      trackCollection->SetItemClass(TParticle::Class());
+      Color_t trackColor = kGreen;
+      trackCollection->SetMainColorPtr(&trackColor);
+      //trackCollection->SetFilterExpr("i.Pt() > 0.1 && std::abs(i.Eta()) < 1");
+      xyManager->addCollection(trackCollection);
    }
    
-   if (0) {
+   if (1) {
       REX::REveDataCollection* jetCollection = new REX::REveDataCollection("XYJets");
       jetCollection->SetItemClass(XYJet::Class());
       Color_t jetColor = kYellow;

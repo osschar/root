@@ -214,7 +214,9 @@
       var container = this.viewer.getThreejsContainer("scene" + this.id);
 
       container.add(obj3d);
-      console.log("element added ", el);
+
+      this.id2obj_map[el.fElementId] = obj3d;
+      if (el.fMasterId) this.mid2obj_map[el.fMasterId] = obj3d;      
    }
 
    EveScene.prototype.visibilityChanged = function(el)
@@ -395,16 +397,21 @@
       this[msg.tag](el);
    }
 
-   EveScene.prototype.elementRemoved = function(elId) {
-      var el = this.mgr.GetElement(elId);
-      console.log("EveScene elementRemoved  ", el);
-      var obj3d = this.getObj3D(el.fElementId);
-      
-      var container = this.viewer.getThreejsContainer("scene" + this.id);
-      container.remove(obj3d);
-      
-      delete this.id2obj_map[el.fElementId];
-
+   EveScene.prototype.elementsRemoved = function(ids) {
+      for (var  i = 0; i < ids.length; i++)
+      {
+         var elId = ids[i];
+         var obj3d = this.getObj3D(elId);
+         if (!obj3d) {
+            console.log("ERROOR cant find obj3d");
+         }
+         
+         var container = this.viewer.getThreejsContainer("scene" + this.id);
+         container.remove(obj3d);
+         
+         // console.log("EveScene elementRemoved AFTER ",  container);
+         delete this.id2obj_map[elId];
+      }
    }
    
    JSROOT.EVE.EveScene = EveScene;
