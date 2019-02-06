@@ -311,7 +311,7 @@ void REveTrackListProjected::SetDepth(Float_t d, REveElement* el)
 
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Creates client rendering info
+/// Creates client representation.
 
 Int_t REveTrackProjected::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
 {
@@ -322,6 +322,8 @@ Int_t REveTrackProjected::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
    return ret;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+/// Creates client rendering info.
 
 void REveTrackProjected::BuildRenderData()
 {

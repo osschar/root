@@ -90,8 +90,6 @@ REveManager::REveManager() : // (Bool_t map_window, Option_t* opt) :
 
    fElementIdMap[0] = nullptr; // do not increase count for null element.
 
-   fStampedElements = new TExMap;
-
    fRedrawTimer.Connect("Timeout()", "ROOT::Experimental::REveManager", this, "DoRedraw3D()");
    fMacroFolder = new TFolder("EVE", "Visualization macros");
    gROOT->GetListOfBrowsables()->Add(fMacroFolder);
@@ -190,7 +188,6 @@ REveManager::~REveManager()
    delete fGeometries;
    delete fVizDB;
    delete fExcHandler;
-   delete fStampedElements;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -296,18 +293,6 @@ void REveManager::ScenesChanged(REveElement::List_t& scenes)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Mark element as changed -- it will be processed on next redraw.
-
-void REveManager::ElementStamped(REveElement* element)
-{
-   UInt_t slot;
-   if (fStampedElements->GetValue((ULong64_t) element, (Long64_t) element, slot) == 0)
-   {
-      fStampedElements->AddAt(slot, (ULong64_t) element, (Long64_t) element, 1);
-   }
-}
-
-////////////////////////////////////////////////////////////////////////////////
 /// Add an element. If parent is not specified it is added into
 /// current event (which is created if does not exist).
 
@@ -378,9 +363,6 @@ void REveManager::AssignElementId(REveElement* element)
 void REveManager::PreDeleteElement(REveElement* el)
 {
    static const REveException eh("REveManager::PreDeleteElement ");
-
-   if (fStampedElements->GetValue((ULong64_t) el, (Long64_t) el) != 0)
-      fStampedElements->Remove((ULong64_t) el, (Long64_t) el);
 
    if (el->fImpliedSelected > 0)
    {

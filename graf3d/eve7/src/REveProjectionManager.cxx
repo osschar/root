@@ -363,7 +363,7 @@ void REveProjectionManager::ProjectChildrenRecurse(REveElement* el)
       el->ElementChanged(kFALSE);
    }
 
-   for (auto &c : fChildren)  ProjectChildrenRecurse(c);
+   for (auto &c : el->RefChildren())  ProjectChildrenRecurse(c);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

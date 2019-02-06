@@ -119,9 +119,6 @@ protected:
    ElementId_t                                   fNumElementIds =  0;
    ElementId_t                                   fMaxElementIds = -1;
 
-   // Fine grained scene updates.
-   TExMap                   *fStampedElements = nullptr;
-
    // Selection / highlight elements
    REveElement              *fSelectionList = nullptr;
    REveSelection            *fSelection     = nullptr;
@@ -176,9 +173,6 @@ public:
    void ElementChanged(REveElement* element, Bool_t update_scenes=kTRUE, Bool_t redraw=kFALSE);
    void ScenesChanged(REveElement::List_t& scenes);
 
-   // Fine grained updates via stamping.
-   void ElementStamped(REveElement* element);
-
    void AddElement(REveElement* element, REveElement* parent=0);
    void AddGlobalElement(REveElement* element, REveElement* parent=0);
 
@@ -222,8 +216,6 @@ public:
    // applications.
 
    void    EnforceTimerActive (Bool_t ta) { fTimerActive = ta; }
-
-   TExMap* PtrToStampedElements() { return fStampedElements; }
 
    void HttpServerCallback(unsigned connid, const std::string &arg);
    // void Send(void* buff, unsigned connid);

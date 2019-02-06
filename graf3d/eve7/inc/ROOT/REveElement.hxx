@@ -196,7 +196,7 @@ public:
    TClass* GetChildClass() const { return fChildClass; }
    void    SetChildClass(TClass* c) { fChildClass = c; }
 
-   const List_t& RefChildren() const { return  fChildren;     }
+   List_t  RefChildren()         { return  fChildren;     }
    List_i  BeginChildren()       { return  fChildren.begin(); }
    List_i  EndChildren()         { return  fChildren.end();   }
    List_ci BeginChildren() const { return  fChildren.begin(); }

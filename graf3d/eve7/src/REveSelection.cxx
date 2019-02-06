@@ -489,12 +489,25 @@ void REveSelection::NewElementPicked(REveElement *pel, bool multi, bool secondar
    }
 }
 
+////////////////////////////////////////////////////////////////////////////////
+/// Remove pointers to el from implied selected sets.
+
 int REveSelection::RemoveImpliedSelectedReferencesTo(REveElement *el)
 {
-   assert(false && "Implement me!");
+   int count = 0;
 
-   // XXXX implement, check how / when needed
-   // loop over selection map and remove el from sets
+   for (SelMap_i i = fMap.begin(); i != fMap.end(); ++i)
+   {
+      auto j = i->second.f_implied.find(el);
+
+      if (j != i->second.f_implied.end())
+      {
+         i->second.f_implied.erase(j);
+         ++count;
+      }
+   }
+
+   return count;
 }
 
 
