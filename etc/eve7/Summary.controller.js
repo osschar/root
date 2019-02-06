@@ -100,6 +100,11 @@ sap.ui.define([
                member: "fMainColor",
                srv  : "SetMainColorRGB",
                _type   : "Color"
+            }, {
+               name : "Destroy ",
+               member: "fElementId",
+               srv  : "Destroy",
+               _type   : "Action"
             }],
             "REveElementList" : [ {sub: ["REveElement"]}],
             "REveGeoShape" : [ {sub: ["REveElement"]}, ],
@@ -163,6 +168,11 @@ sap.ui.define([
             }, {
                name : "LineWidth",
                _type   : "Number"
+            }, {
+               name : "Destroy ",
+               member: "fElementId",
+               srv  : "Destroy",
+               _type   : "Action"
             }],
            "REveDataGeoShape" : [{
             }]
@@ -190,6 +200,17 @@ sap.ui.define([
 
          var oTree = this.getView().byId("tree");
          oTree.expandToLevel(2);
+
+         // hide editor
+         if (this.ged) {
+            /*
+            var pp = this.byId("sumSplitter");
+            this.ged.visible = false;
+            pp.removeContentArea(this.ged);
+*/        var gedFrame =  this.gedVert;//this.getView().byId("GED");
+         gedFrame.unbindElement();
+            gedFrame.destroyContent();
+         }
       },
 
       addNodesToTreeItemModel: function(el, model) {
@@ -371,7 +392,8 @@ sap.ui.define([
          var model = oEvent.getParameter("listItem").getBindingContext("treeModel"),
              path =  model.getPath(),
              ttt = model.getProperty(path);
-
+         
+         console.log("Summary::onItemPressed ", this.mgr.GetElement(ttt.id));
          if (!ttt || (ttt.childs !== undefined) || !ttt.masterid) return;
 
          var sel_color = ttt.fHighlight == "None" ? "blue" : "";
@@ -556,7 +578,14 @@ sap.ui.define([
                    oCPPop.data("myData", customData);
                  }
             });
+            break;
 
+         case "Action":
+            widget = new Button(sId, {
+               //text: "Action",
+               icon: "sap-icon://accept",
+               press: this.sendMethodInvocationRequest.bind(this, "Action")
+            });
             break;
          }
 
@@ -609,8 +638,18 @@ sap.ui.define([
       },
 
       sendMethodInvocationRequest: function(kind, event) {
+         var value = "";
+         switch (kind) {
+         case "Bool":
+            value = event.getSource().getSelected();
+            break;
 
-         var value = (kind == "Bool") ? event.getSource().getSelected() : event.getParameter("value");
+         case "Action":
+            value = "";
+            break;
+         default:
+            value =  event.getParameter("value");
+         }
 
          console.log("on change !!!!!!", event.getSource().data("myData"));
 

@@ -258,41 +258,75 @@
       this.ProcessUpdate(300);
    }
 
+  //______________________________________________________________________________
+
+
+   EveManager.prototype.RecursiveRemove = function(elem, delSet) {
+      var elId = elem.fElementId;
+      var motherId = elem.fMotherId;
+
+      // iterate children
+      if (elem.childs !== undefined) {
+         while (elem.childs.length > 0) {
+            var n = 0;
+            var sub = elem.childs[n];
+            this.RecursiveRemove(sub, delSet);
+         }
+      }
+
+      // delete myself from mater
+      var mother = this.GetElement(motherId);
+      var mc = mother.childs;
+      for (var i = 0; i < mc.length; ++i) {
+      
+         if (mc[i].fElementId === elId) {
+            mc.splice(i, 1);
+         }
+      }    
+
+      delete this.map[elId];
+      delSet.delete(elId);
+
+      console.log(" ecursiveRemove END", elId, delSet);
+     // delete elem;
+   }
+   //______________________________________________________________________________
+
+
+   
    EveManager.prototype.ImportSceneChangeJson = function(msg) {
       var arr = msg.arr;
       this.last_json = null;
       this.scene_changes = msg;
 
       var scene = this.GetElement(msg.header.fSceneId);
+      console.log("ImportSceneChange", scene.fName, msg);
 
       // notify scenes for beginning of changes and
       // notify for element removal
       var removedIds = msg.header["removedElements"];
 
-      // do we need this?
+      // do we need this? -- AMT this is intended to freeze redraws 
       this.callSceneReceivers(scene, "beginChanges");
+
+      // notify controllers
+     this.callSceneReceivers(scene, "elementsRemoved", removedIds);
+
       
+      var delSet = new Set();
       for (var r = 0; r < removedIds.length; ++r) {
-         var id = removedIds[r];
-         this.callSceneReceivers(scene, "elementRemoved", id);
-         var element = this.GetElement(id);
-         this.DeleteChildsOf(element);
-
-         // remove from mother
-         var mother = this.map[element.fMotherId];
-         var mc = mother.childs;
-
-         for (var i = 0; i < mc.length; ++i) {
-            console.log("comapre ", mc[i], id);
-            if (mc[i].fElementId === id) {
-               console.log("remove from mother ");
-               mc.splice(i, 1);
-            }
-         }
-         delete this.map[id];
-         element = null;
+         var id  = removedIds[r];
+         delSet.add(id);
       }
-         
+      console.log("start with delSet ", delSet);
+      while (delSet.size != 0) {
+         var it = delSet.values();
+         var id = it.next().value;
+         console.log("going to call RecursiveRemove .... ", this.map[id]);
+         this.RecursiveRemove(this.GetElement(id), delSet);
+         console.log("complete RecursiveREmove ", delSet);
+      }      
+      
       // wait for binary if needed
       if (msg.header.fTotalBinarySize)
       {
