@@ -106,7 +106,7 @@ void REveScene::SceneElementAdded(REveElement* element)
 {
    assert(fAcceptingChanges);
    // printf("REveScene::SceneElementAdded(\n");
-   fAddedElements.insert(element);
+   fAddedElements.push_back(element);
 }
 
 
