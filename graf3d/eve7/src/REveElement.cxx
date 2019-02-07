@@ -125,13 +125,19 @@ REveElement::REveElement(const REveElement& e) :
 REveElement::~REveElement()
 {
    if (fScene && fScene->IsAcceptingChanges()) {
-         printf("PreDeleteElement add to remove list (SCENE =%s) %d \n", fScene->GetCName(), fElementId);
-         fScene->SceneElementRemoved( fElementId);
+      fScene->SceneElementRemoved( fElementId);
    }
    if (fDestructing != kAnnihilate)
    {
       fDestructing = kStandard;
       RemoveElementsInternal();
+
+      if (fMother)
+      {
+         fMother->RemoveElementLocal(this);         
+        fMother->fChildren.remove(this);
+        --(fMother->fNumChildren);
+      }
 
       for (auto &au : fAunts)
       {
