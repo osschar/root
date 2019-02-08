@@ -195,7 +195,7 @@ class XYJetProxyBuilder: public REX::REveDataSimpleProxyBuilderTemplate<XYJet>
       jet->SetCylinder(2*context->GetMaxR(), context->GetMaxZ());
       jet->AddEllipticCone(dj.Eta(), dj.Phi(), dj.GetEtaSize(), dj.GetPhiSize());
       // printf("============== BUILD jet %s (%f, %f)\n",iItemHolder->GetCName(),   dj.GetPolarPhi(), dj.GetEtaSize());
-      SetupAddElement(jet, iItemHolder);
+      SetupAddElement(jet, iItemHolder, true);
       jet->SetName(Form("element %s", iItemHolder->GetName().c_str()));
    }
 };
@@ -209,7 +209,7 @@ class TrackProxyBuilder : public REX::REveDataSimpleProxyBuilderTemplate<TPartic
       // printf("==============  BUILD track %s (pt=%f, eta=%f) \n", iItemHolder->GetCName(), p.Pt(), p.Eta());
       auto track = new REX::REveTrack((TParticle*)(x), 1, context->GetPropagator());
       track->MakeTrack();
-      SetupAddElement(track, iItemHolder, false);
+      SetupAddElement(track, iItemHolder, true);
       // iItemHolder->AddElement(track);
       track->SetName(Form("element %s id=%d", iItemHolder->GetCName(), track->GetElementId()));
    }
@@ -325,7 +325,7 @@ public:
       m_scenes.push_back(REX::gEve->GetEventScene());
 
       // RhoZ
-      if (1) {
+      if (gRhoZView) {
          auto rhoZEventScene = REX::gEve->SpawnNewScene("RhoZ Scene","Projected");
          m_mngRhoZ = new REX::REveProjectionManager(REX::REveProjection::kPT_RhoZ);
          m_mngRhoZ->SetImportEmpty(true);
@@ -374,7 +374,6 @@ public:
             {
                TString pname; pname.Form("item %2d", i);
                collection->AddItem(l->At(i), pname.Data(), "");
-               collection->GetDataItem(i)->SetMainColorPtr(collection->GetMainColorPtr());
             }
          }
       }      
@@ -489,7 +488,7 @@ public:
 //______________________________________________________________________________
 
 
-void collection_proxies()
+void collection_proxies(bool proj=true)
 {
    REX::REveManager::Create();
 
@@ -497,6 +496,8 @@ void collection_proxies()
    event->Create();
    event->N_tracks = 10;
    event->N_jets = 4;
+
+   gRhoZView = true;
    
    // debug settings
    auto xyManager = new XYManager(event);
@@ -504,8 +505,7 @@ void collection_proxies()
    if (1) {
       REX::REveDataCollection* trackCollection = new REX::REveDataCollection("XYTracks");
       trackCollection->SetItemClass(TParticle::Class());
-      Color_t trackColor = kGreen;
-      trackCollection->SetMainColorPtr(&trackColor);
+      trackCollection->SetMainColor(kGreen);
       //trackCollection->SetFilterExpr("i.Pt() > 0.1 && std::abs(i.Eta()) < 1");
       xyManager->addCollection(trackCollection);
    }
@@ -513,8 +513,7 @@ void collection_proxies()
    if (1) {
       REX::REveDataCollection* jetCollection = new REX::REveDataCollection("XYJets");
       jetCollection->SetItemClass(XYJet::Class());
-      Color_t jetColor = kYellow;
-      jetCollection->SetMainColorPtr(&jetColor);
+      jetCollection->SetMainColor(kYellow);
       xyManager->addCollection(jetCollection);
    }
 
