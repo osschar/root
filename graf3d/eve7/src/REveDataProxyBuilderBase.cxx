@@ -215,12 +215,10 @@ REveDataProxyBuilderBase::ModelChanges(const REveDataCollection::Ids_t& iIds, Pr
       REveElement::List_i itElement = elms->BeginChildren();
       std::advance(itElement, itemIdx);
       REveElement* comp = *itElement;
-      // AMT temporary workaround for use of compunds
-      if (comp->GetMainColor() != item->GetMainColor())
-        comp->SetMainColor(item->GetMainColor());
+      comp->SetMainColor(item->GetMainColor());
       comp->SetRnrSelf(item->GetRnrSelf());
-      applyVisAttrToChildren(comp);
-
+      // AMT temporary workaround for use of compunds
+      // applyVisAttrToChildren(comp);
 
       if (VisibilityModelChanges(*it, *itElement, p->m_viewContext))
       {
