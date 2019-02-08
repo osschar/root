@@ -416,7 +416,9 @@
    EveScene.prototype.sceneElementChange = function(msg)
    {
       var el = this.mgr.GetElement(msg.fElementId);
-      this[msg.tag](el);
+      if (el.render_data) {
+         this[msg.tag](el);
+      }
    }
 
    EveScene.prototype.elementsRemoved = function(ids) {
