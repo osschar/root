@@ -210,7 +210,7 @@ class TrackProxyBuilder : public REX::REveDataSimpleProxyBuilderTemplate<TPartic
       auto track = new REX::REveTrack((TParticle*)(x), 1, context->GetPropagator());
       track->MakeTrack();
       SetupAddElement(track, iItemHolder, false);
-      iItemHolder->AddElement(track);
+      // iItemHolder->AddElement(track);
       track->SetName(Form("element %s id=%d", iItemHolder->GetCName(), track->GetElementId()));
    }
 };
