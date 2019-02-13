@@ -35,10 +35,8 @@ REveDataCollection::REveDataCollection(const std::string& n, const std::string& 
 {
    fChildClass = REveDataItem::Class();
 
-   fCanEditMainColor        = kTRUE;
-   fCanEditMainTransparency = kTRUE;
-   SetMainColorPtr(new Color_t(REveDataCollection::fgDefaultColor));
-
+   SetupDefaultColorAndTransparency(fgDefaultColor, true, true);
+   
    _handler_func = 0;
    _handler_func_ids = 0;
 }
@@ -47,6 +45,7 @@ void REveDataCollection::AddItem(void *data_ptr, const std::string& n, const std
 {
    auto el = new REveDataItem(n, t);
    AddElement(el);
+   el->SetMainColor(GetMainColor());
    fItems.emplace_back(data_ptr, el);
 }
 
@@ -186,7 +185,7 @@ void REveDataCollection::ItemChanged(REveDataItem* iItem)
 REveDataItem::REveDataItem(const std::string& n, const std::string& t) :
    REveElement(n, t)
 {
-   SetMainColorPtr(new Color_t(REveDataCollection::fgDefaultColor));
+   SetupDefaultColorAndTransparency(kMagenta, true, true);
 }
 
 Int_t REveDataItem::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)

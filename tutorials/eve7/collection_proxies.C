@@ -20,6 +20,7 @@
 #include <ROOT/REveProjectionBases.hxx>
 #include <ROOT/REveProjectionManager.hxx>
 #include "ROOT/REveManager.hxx"
+#include "ROOT/REveScalableStraightLineSet.hxx"
 
 #include "TParticle.h"
 #include "TRandom.h"
@@ -71,7 +72,7 @@ public:
       {
          double pt  = r.Uniform(0.5, 10);
          double eta = r.Uniform(-2.55, 2.55);
-         double phi = r.Uniform(0, TMath::TwoPi());
+         double phi = r.Uniform(-TMath::Pi(), TMath::Pi());
 
          double px = pt * std::cos(phi);
          double py = pt * std::sin(phi);
@@ -188,14 +189,60 @@ private:
 //==============================================================================
 class XYJetProxyBuilder: public REX::REveDataSimpleProxyBuilderTemplate<XYJet>
 {
-   using REveDataSimpleProxyBuilderTemplate<XYJet>::Build;
-   virtual void Build(const XYJet& dj, REX::REveElement* iItemHolder, const REX::REveViewContext* context)
+   virtual bool HaveSingleProduct() const { return false; }
+   
+   using REveDataSimpleProxyBuilderTemplate<XYJet>::BuildViewType;
+   virtual void BuildViewType(const XYJet& dj, REX::REveElement* iItemHolder, std::string viewType, const REX::REveViewContext* context)
    {
       auto jet = new REX::REveJetCone();
-      jet->SetCylinder(2*context->GetMaxR(), context->GetMaxZ());
+      jet->SetCylinder(context->GetMaxR(), context->GetMaxZ());
       jet->AddEllipticCone(dj.Eta(), dj.Phi(), dj.GetEtaSize(), dj.GetPhiSize());
-      // printf("============== BUILD jet %s (%f, %f)\n",iItemHolder->GetCName(),   dj.GetPolarPhi(), dj.GetEtaSize());
-      SetupAddElement(jet, iItemHolder);
+      SetupAddElement(jet, iItemHolder, true);
+
+      REX::REveVector p1;
+      REX::REveVector p2;
+
+      float size = 50.f * dj.Pt(); // values are saved in scale
+      double theta = dj.Theta();
+      // printf("%s jet theta =  %f, phi = %f \n",  iItemHolder->GetCName(), theta, dj.Phi());
+      double phi = dj.Phi();
+
+
+      if (viewType == "Projected" )
+      {
+         static const float_t offr = 6;
+         float r_ecal = context->GetMaxR() + offr;
+         float z_ecal = context->GetMaxZ() + offr;
+         
+         float transAngle = abs(atan(r_ecal/z_ecal));
+         double r(0);
+         bool debug = false;
+         if ( theta < transAngle || 3.14-theta < transAngle)
+         {
+            z_ecal = context->GetMaxZ() + offr/transAngle;
+            r = z_ecal/fabs(cos(theta));
+         }
+         else
+         {
+            debug = 3;
+            r = r_ecal/sin(theta);
+         }
+
+         p1.Set( 0., (phi<TMath::Pi() ? r*fabs(sin(theta)) : -r*fabs(sin(theta))), r*cos(theta));
+         p2.Set( 0., (phi<TMath::Pi() ? (r+size)*fabs(sin(theta)) : -(r+size)*fabs(sin(theta))), (r+size)*cos(theta) );
+
+
+         auto marker = new REX::REveScalableStraightLineSet("jetline");
+         marker->SetScaleCenter(p1.fX, p1.fY, p1.fZ);
+         marker->AddLine(p1, p2);   
+         
+         marker->SetLineWidth(4);
+         if (debug)
+             marker->AddMarker(0, 0.9);
+         
+         SetupAddElement(marker, iItemHolder, true);
+      }
+     
       jet->SetName(Form("element %s", iItemHolder->GetName().c_str()));
    }
 };
@@ -209,7 +256,7 @@ class TrackProxyBuilder : public REX::REveDataSimpleProxyBuilderTemplate<TPartic
       // printf("==============  BUILD track %s (pt=%f, eta=%f) \n", iItemHolder->GetCName(), p.Pt(), p.Eta());
       auto track = new REX::REveTrack((TParticle*)(x), 1, context->GetPropagator());
       track->MakeTrack();
-      SetupAddElement(track, iItemHolder, false);
+      SetupAddElement(track, iItemHolder, true);
       // iItemHolder->AddElement(track);
       track->SetName(Form("element %s id=%d", iItemHolder->GetCName(), track->GetElementId()));
    }
@@ -277,7 +324,6 @@ private:
    REX::REveProjectionManager* m_mngRhoZ;
 
    std::vector<REX::REveDataProxyBuilderBase*> m_builders;
-   //   std::vector<REX::REveDataCollection*> m_collections;
    REX::REveScene* m_collections;
 
    TableHandle::TableSpecs  m_tableFormats;
@@ -285,6 +331,20 @@ private:
 public:
    XYManager(Event* event): m_event(event), m_viewContext(0), m_mngRhoZ(0), m_collections(0)
    {
+      //view context
+      float r = 300;
+      float z = 300;
+      auto prop = new REX::REveTrackPropagator();
+      prop->SetMagFieldObj(new REX::REveMagFieldDuo(350, -3.5, 2.0));
+      prop->SetMaxR(r);
+      prop->SetMaxZ(z);
+      prop->SetMaxOrbs(6);
+      prop->IncRefCount();
+      
+      m_viewContext = new REX::REveViewContext();
+      m_viewContext->SetBarrel(r, z);
+      m_viewContext->SetTrackPropagator(prop);
+      
       createScenesAndViews();
 
       // table specs
@@ -298,22 +358,6 @@ public:
          column("phi", 1, "Phi").
          column("etasize", 2, "GetEtaSize").
          column("phisize", 2, "GetPhiSize");
-
-
-      //view context
-      float r = 300;
-      float z = 600;
-      auto prop = new REX::REveTrackPropagator();
-      prop->SetMagFieldObj(new REX::REveMagFieldDuo(350, -3.5, 2.0));
-      prop->SetMaxR(r);
-      prop->SetMaxZ(z);
-      prop->SetMaxOrbs(6);
-      prop->IncRefCount();
-      
-      m_viewContext = new REX::REveViewContext();
-      m_viewContext->SetBarrel(r, z);
-      m_viewContext->SetTrackPropagator(prop);
-      //  m_viewContext->IncRefCount();
    }
 
    void createScenesAndViews()
@@ -324,14 +368,26 @@ public:
       // 3D
       m_scenes.push_back(REX::gEve->GetEventScene());
 
+      // Geometry 
+      auto b1 = new REX::REveGeoShape("Barrel 1");
+      float dr = 3;
+      b1->SetShape(new TGeoTube(m_viewContext->GetMaxR() , m_viewContext->GetMaxR() + dr, m_viewContext->GetMaxZ()));
+      b1->SetMainColor(kCyan);
+      REX::gEve->GetGlobalScene()->AddElement(b1);
+      
+
       // RhoZ
-      if (1) {
+      if (gRhoZView) {
          auto rhoZEventScene = REX::gEve->SpawnNewScene("RhoZ Scene","Projected");
          m_mngRhoZ = new REX::REveProjectionManager(REX::REveProjection::kPT_RhoZ);
          m_mngRhoZ->SetImportEmpty(true);
          auto rhoZView = REX::gEve->SpawnNewViewer("RhoZ View", "");
          rhoZView->AddScene(rhoZEventScene);
          m_scenes.push_back(rhoZEventScene);
+         
+         auto pgeoScene  = REX::gEve->SpawnNewScene("Projection Geometry","xxx");
+         m_mngRhoZ->ImportElements(b1,pgeoScene );
+         rhoZView->AddScene(pgeoScene);
       }
 
       // Table
@@ -374,7 +430,6 @@ public:
             {
                TString pname; pname.Form("item %2d", i);
                collection->AddItem(l->At(i), pname.Data(), "");
-               collection->GetDataItem(i)->SetMainColorPtr(collection->GetMainColorPtr());
             }
          }
       }      
@@ -402,8 +457,8 @@ public:
       auto glBuilder = makeGLBuilderForType(collection->GetItemClass());
       glBuilder->SetCollection(collection);
       glBuilder->SetHaveAWindow(true);
-      REX::REveElement* product = glBuilder->CreateProduct(m_viewContext);
       for (REX::REveScene* scene : m_scenes) {
+         REX::REveElement* product = glBuilder->CreateProduct(scene->GetTitle(), m_viewContext);
          if (strncmp(scene->GetCTitle(), "Table", 5) == 0) continue;
          if (!strncmp(scene->GetCTitle(), "Projected", 8)) {
             m_mngRhoZ->ImportElements(product, scene);
@@ -423,7 +478,7 @@ public:
          tableBuilder->SetHaveAWindow(showTable);
          tableBuilder->SetTableEntries(m_tableFormats[collection->GetName()]);
 
-         REX::REveElement* tablep = tableBuilder->CreateProduct(m_viewContext);
+         REX::REveElement* tablep = tableBuilder->CreateProduct("table-type", m_viewContext);
          for (REX::REveScene* scene : m_scenes) {
             if (strncmp(scene->GetCTitle(), "Table", 5) == 0) {
                scene->AddElement(tablep);
@@ -489,7 +544,7 @@ public:
 //______________________________________________________________________________
 
 
-void collection_proxies()
+void collection_proxies(bool proj=true)
 {
    REX::REveManager::Create();
 
@@ -497,6 +552,8 @@ void collection_proxies()
    event->Create();
    event->N_tracks = 10;
    event->N_jets = 4;
+
+   gRhoZView = true;
    
    // debug settings
    auto xyManager = new XYManager(event);
@@ -504,8 +561,7 @@ void collection_proxies()
    if (1) {
       REX::REveDataCollection* trackCollection = new REX::REveDataCollection("XYTracks");
       trackCollection->SetItemClass(TParticle::Class());
-      Color_t trackColor = kGreen;
-      trackCollection->SetMainColorPtr(&trackColor);
+      trackCollection->SetMainColor(kGreen);
       //trackCollection->SetFilterExpr("i.Pt() > 0.1 && std::abs(i.Eta()) < 1");
       xyManager->addCollection(trackCollection);
    }
@@ -513,8 +569,7 @@ void collection_proxies()
    if (1) {
       REX::REveDataCollection* jetCollection = new REX::REveDataCollection("XYJets");
       jetCollection->SetItemClass(XYJet::Class());
-      Color_t jetColor = kYellow;
-      jetCollection->SetMainColorPtr(&jetColor);
+      jetCollection->SetMainColor(kYellow);
       xyManager->addCollection(jetCollection);
    }
 
