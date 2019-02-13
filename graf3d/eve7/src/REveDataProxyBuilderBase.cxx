@@ -7,7 +7,7 @@ using namespace ROOT::Experimental;
 namespace REX = ROOT::Experimental;
 
 
-REveDataProxyBuilderBase::Product::Product(const REveViewContext* c) : m_viewContext(c), m_elements(0)
+REveDataProxyBuilderBase::Product::Product(std::string iViewType, const REveViewContext* c) : m_viewType(iViewType), m_viewContext(c), m_elements(0)
 {
    m_elements = new REveCompound("ProxyProduct", "", false);
    m_elements->IncDenyDestroy();
@@ -79,7 +79,14 @@ void REveDataProxyBuilderBase::Build()
             REveElement* elms = (*i)->m_elements;
             size_t oldSize = elms->NumChildren();
 
-            Build(m_collection, elms, (*i)->m_viewContext);
+            if (HaveSingleProduct())
+            {
+               Build(m_collection, elms, (*i)->m_viewContext);
+            }
+            else
+            {
+               BuildViewType(m_collection, elms, (*i)->m_viewType, (*i)->m_viewContext);
+            }
 
             // Project all children of current product.
             // If product is not registered into any projection-manager,
@@ -153,23 +160,38 @@ void REveDataProxyBuilderBase::Build()
 void
 REveDataProxyBuilderBase::Build(const REveDataCollection*, REveElement*, const REveViewContext*)
 {
-   assert("virtual build(const REveEventItem*, REveElement*, const REveViewContext*) not implemented by inherited class");
+   assert("virtual Build(const REveEventItem*, REveElement*, const REveViewContext*) not implemented by inherited class");
 }
 
+
+void
+REveDataProxyBuilderBase::BuildViewType(const REveDataCollection*, REveElement*, std::string, const REveViewContext*)
+{
+   assert("virtual BuildViewType(const FWEventItem*, TEveElementList*, FWViewType::EType, const FWViewContext*) not implemented by inherited class");
+}
 
 //______________________________________________________________________________
 
 
 REveElement*
-REveDataProxyBuilderBase::CreateProduct( const REveViewContext* viewContext)
+REveDataProxyBuilderBase::CreateProduct( std::string viewType, const REveViewContext* viewContext)
 {
    if ( m_products.empty() == false)
    {
+      if (HaveSingleProduct()) {
          return m_products.back()->m_elements;
+      }
+      else {
+
+         for (Product_it i = m_products.begin(); i!= m_products.end(); ++i)
+         {
+            if (viewType == (*i)->m_viewType)
+               return (*i)->m_elements;
+         }
+      }
    }
 
-
-   Product* product = new Product(viewContext);
+   Product* product = new Product(viewType, viewContext);
    m_products.push_back(product);
 
    if (m_collection)

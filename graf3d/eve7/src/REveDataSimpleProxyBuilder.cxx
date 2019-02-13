@@ -34,7 +34,6 @@ REveDataSimpleProxyBuilder::Clean()
 
 //______________________________________________________________________________
 
-// AMT: looks like collection parameter is not necessary, maybe for callbacks
 void
 REveDataSimpleProxyBuilder::Build(const REveDataCollection* collection,
                                   REveElement* product, const REveViewContext* vc)
@@ -53,7 +52,7 @@ REveDataSimpleProxyBuilder::Build(const REveDataCollection* collection,
       else
       {
          itemHolder = CreateCompound(true, true);
-         itemHolder->SetMainColorPtr(collection->GetMainColorPtr());
+         itemHolder->SetMainColor(collection->GetMainColor());
          SetupAddElement(itemHolder, product, true);
          itemHolder->SetName(Form("compound %d", index));
 
@@ -62,6 +61,37 @@ REveDataSimpleProxyBuilder::Build(const REveDataCollection* collection,
       if (di->GetRnrSelf() && !di->GetFiltered())
       {
          Build(collection->GetDataPtr(index), itemHolder, vc);
+      }
+   }
+}
+
+void
+REveDataSimpleProxyBuilder::BuildViewType(const REveDataCollection* collection,
+                                          REveElement* product, std::string viewType, const REveViewContext* vc)
+{
+   size_t size = collection->GetNItems();
+   REveElement::List_i pIdx = product->BeginChildren();
+   for (int index = 0; index < static_cast<int>(size); ++index)
+   {
+      REveElement* itemHolder = 0;
+      if (index <  product->NumChildren())
+      {
+         itemHolder = *pIdx;
+         itemHolder->SetRnrSelfChildren(true, true);
+         ++pIdx;
+      }
+      else
+      {
+         itemHolder = CreateCompound(true, true);
+         itemHolder->SetMainColor(collection->GetMainColor());
+         SetupAddElement(itemHolder, product, true);
+         itemHolder->SetName(Form("compound %d", index));
+
+      }
+      auto di = Collection()->GetDataItem(index);
+      if (di->GetRnrSelf() && !di->GetFiltered())
+      {
+         BuildViewType(collection->GetDataPtr(index), itemHolder, viewType, vc);
       }
    }
 }

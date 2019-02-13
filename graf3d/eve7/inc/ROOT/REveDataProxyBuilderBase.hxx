@@ -16,10 +16,11 @@ class REveDataProxyBuilderBase
 public:
    struct Product
    {
+      std::string              m_viewType;
       const REveViewContext   *m_viewContext;
       REveCompound            *m_elements;
 
-      Product(const REveViewContext* c);
+      Product(std::string viewType, const REveViewContext* c);
       virtual ~Product();
    };
 
@@ -41,7 +42,7 @@ public:
    void Build();
    // virtual void Build(REveElement* product);
 
-   REveElement* CreateProduct(const REveViewContext*);
+   REveElement* CreateProduct(std::string viewType, const REveViewContext*);
    //  void removePerViewProduct(const REveViewContext* vc);
 
    void ModelChanges(const REveDataCollection::Ids_t&);
@@ -55,12 +56,16 @@ public:
 
    std::string Type() const { return m_type; }
 
+   // const member functions   
+   virtual bool HaveSingleProduct() const { return true; }
+   
 protected:
    // Override this if visibility changes can cause (re)-creation of proxies.
    // Returns true if new proxies were created.
    virtual bool VisibilityModelChanges(int idx, REveElement*, const REveViewContext*);
 
    virtual void Build(const REveDataCollection* iItem, REveElement* product, const REveViewContext*);
+   virtual void BuildViewType(const REveDataCollection* iItem, REveElement* product, std::string viewType, const REveViewContext*);
 
    virtual void ModelChanges(const REveDataCollection::Ids_t&, Product*);
 
