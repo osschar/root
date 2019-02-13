@@ -25,6 +25,7 @@ ROOT_STANDARD_LIBRARY_PACKAGE(ROOTEve
      inc/ROOT/REveProjectionManager.hxx
      inc/ROOT/REveProjections.hxx
      inc/ROOT/REveRenderData.hxx
+     inc/ROOT/REveScalableStraightLineSet.hxx
      inc/ROOT/REveScene.hxx
      inc/ROOT/REveSceneInfo.hxx
      inc/ROOT/REveSecondarySelectable.hxx
@@ -75,6 +76,7 @@ ROOT_STANDARD_LIBRARY_PACKAGE(ROOTEve
      src/REveProjectionManager.cxx
      src/REveProjections.cxx
      src/REveRenderData.cxx
+     src/REveScalableStraightLineSet.cxx
      src/REveScene.cxx
      src/REveSceneInfo.cxx
      src/REveSecondarySelectable.cxx
