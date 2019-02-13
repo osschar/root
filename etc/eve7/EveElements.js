@@ -628,7 +628,7 @@
 
       var mainColor = JSROOT.Painter.root_colors[el.fMainColor];
 
-      mainColor = "lightgreen";
+     // mainColor = "lightgreen";
 
       var buf = new Float32Array(el.fLinePlexSize * 6);
       for (var i = 0; i < el.fLinePlexSize * 6; ++i)
