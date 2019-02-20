@@ -12,7 +12,7 @@
 #ifndef ROOT7_REveElement_hxx
 #define ROOT7_REveElement_hxx
 
-#include <ROOT/REveUtil.hxx>
+#include <ROOT/REveTypes.hxx>
 #include <ROOT/REveVector.hxx>
 #include <ROOT/REveProjectionBases.hxx>
 
@@ -51,8 +51,6 @@ namespace nlohmann {
 
 namespace ROOT {
 namespace Experimental {
-
-typedef unsigned int ElementId_t;
 
 class REveAunt;
 class REveScene;
@@ -183,7 +181,7 @@ public:
 
    virtual void AddAunt(REveAunt* au);
    virtual void RemoveAunt(REveAunt* au);
-   virtual void CheckReferenceCount(const REveException& eh="REveElement::CheckReferenceCount ");
+   virtual void CheckReferenceCount(const std::string& from="<unknown>");
    virtual void CollectScenes(List_t& scenes);
 
    AuntList_i  BeginAunts()        { return  fAunts.begin();  }

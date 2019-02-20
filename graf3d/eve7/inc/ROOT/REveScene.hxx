@@ -99,9 +99,8 @@ public:
    void SceneElementChanged(REveElement *element);
    void SceneElementAdded(REveElement *element);
    void SceneElementRemoved(ElementId_t id);
-
    void EndAcceptingChanges();
-   void ProcessChanges(); // should return net message or talk to gEve about it
+   void ProcessChanges();
 
    void StreamElements();
    void StreamJsonRecurse(REveElement *el, nlohmann::json &jobj);

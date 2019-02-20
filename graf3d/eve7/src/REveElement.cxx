@@ -10,6 +10,7 @@
  *************************************************************************/
 
 #include <ROOT/REveElement.hxx>
+#include <ROOT/REveUtil.hxx>
 #include <ROOT/REveScene.hxx>
 #include <ROOT/REveCompound.hxx>
 #include <ROOT/REveTrans.hxx>
@@ -127,6 +128,7 @@ REveElement::~REveElement()
    if (fScene && fScene->IsAcceptingChanges()) {
       fScene->SceneElementRemoved( fElementId);
    }
+
    if (fDestructing != kAnnihilate)
    {
       fDestructing = kStandard;
@@ -580,7 +582,7 @@ void REveElement::RemoveAunt(REveAunt* au)
 /// Check external references to this and eventually auto-destruct
 /// the render-element.
 
-void REveElement::CheckReferenceCount(const REveException& eh)
+void REveElement::CheckReferenceCount(const std::string& from)
 {
    if (fDestructing != kNone)
       return;
@@ -588,7 +590,8 @@ void REveElement::CheckReferenceCount(const REveException& eh)
    if (fMother == nullptr && fDestroyOnZeroRefCnt && fDenyDestroy <= 0)
    {
       if (gDebug > 0)
-         Info(eh, "auto-destructing '%s' on zero reference count.", GetCName());
+         Info("REveElement::CheckReferenceCount", "(called from %s) auto-destructing '%s' on zero reference count.",
+              from.c_str(), GetCName());
 
       PreDeleteElement();
       delete this;
@@ -950,7 +953,8 @@ void REveElement::RemoveElement(REveElement* el)
 
    fChildren.remove(el); --fNumChildren;
 
-   // XXXX This should be element removed. Also, think about recursion, deletion etc.
+   // XXXX This should be ElementRemoved(). Also, think about recursion, deletion etc.
+   // Also, this seems to be done above, in the call to fScene.
    //
    // ElementChanged();
 }
@@ -1534,7 +1538,9 @@ const std::string& REveElement::ToString(Bool_t b)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Write core json. If rnr_offset negative, render data will not be written
+/// Write core json. If rnr_offset is negative, render data shall not be
+/// written.
+/// Returns number of bytes written into binary render data.
 
 Int_t REveElement::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
 {

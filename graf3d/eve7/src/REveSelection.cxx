@@ -16,6 +16,8 @@
 
 #include "TClass.h"
 
+#include "json.hpp"
+
 using namespace ROOT::Experimental;
 namespace REX = ROOT::Experimental;
 
@@ -416,16 +418,22 @@ void REveSelection::UserUnPickedElement(REveElement* el)
 
 //==============================================================================
 
-void REveSelection::NewElementPicked(REveElement *pel, bool multi, bool secondary, const std::set<int>& secondary_idcs)
+void REveSelection::NewElementPicked(ElementId_t id, bool multi, bool secondary, const std::set<int>& secondary_idcs)
 {
-   REveElement *el = MapPickedToSelected(pel);
+   static const REveException eh("REveSelection::NewElementPicked ");
+
+   REveElement *pel = REX::gEve->FindElementById(id);
+
+   if ( ! pel) throw eh + "picked element id=" + id + " not found.";
+
+   REveElement *el  = MapPickedToSelected(pel);
 
    printf("REveSelection::NewElementPicked %p -> %p, multi: %d, secondary: %d", pel, el, multi, secondary);
    if (secondary)
    {
-      printf(" -> ( ");
+      printf(" { ");
       for (auto si : secondary_idcs) printf("%d ", si);
-      printf(")");
+      printf("}");
    }
    printf("\n");
 
@@ -478,15 +486,17 @@ void REveSelection::NewElementPicked(REveElement *pel, bool multi, bool secondar
          }
          else
          {
-            // if needed, clear selection
-            // insert new record
+            if (HasNieces()) RemoveNieces();
+            AddNiece(el);
          }
       }
-      else
+      else // Single selection with zero element --> clear selection.
       {
-         // Single selection with zero element --> clear selection.
+         if (HasNieces()) RemoveNieces();
       }
    }
+
+   StampObjProps();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -518,12 +528,30 @@ Int_t REveSelection::WriteCoreJson(nlohmann::json &j, Int_t /* rnr_offset */)
 {
    REveElement::WriteCoreJson(j, -1);
 
-   // XXXX
-   // - loop over elements
-   // - collect state
-   // ? should also have "global" / total selection set? all primaries and implied elements
+   nlohmann::json sel_list = nlohmann::json::array();
 
-   // XXXX bummer, with uncles or aunts children will be something else ...
+   for (SelMap_i i = fMap.begin(); i != fMap.end(); ++i)
+   {
+      nlohmann::json rec = {}, imp = nlohmann::json::array(), sec = nlohmann::json::array();
+
+      rec["primary"] = i->first->GetElementId();
+
+      // XXX if not empty ???
+      for (auto &imp_el : i->second.f_implied) imp.push_back(imp_el->GetElementId());
+      rec["implied"]  = imp;
+
+      // XXX if not empty / f_is_sec is false ???
+      for (auto &sec_id : i->second.f_sec_idcs) sec.push_back(sec_id);
+      rec["sec_idcs"] = sec;
+
+      sel_list.push_back(rec);
+   }
+
+   j["sel_list"] = sel_list;
+
+   j["UT_PostStream"] = "UT_Selection_Refresh_State"; // XXXX to be canonized
+
+   // std::cout << j.dump(2) << std::endl;
 
    return 0;
 }

@@ -30,8 +30,10 @@
 
    EveElemControl.prototype = Object.create(JSROOT.Painter.GeoDrawingControl.prototype);
 
-   EveElemControl.prototype.invokeSceneMethod = function(fname, arg1, arg2) {
-      if (!this.mesh) return false;
+   EveElemControl.prototype.invokeSceneMethod = function(fname, arg1, arg2)
+   {
+      if ( ! this.mesh) return false;
+
       var s = this.mesh.scene;
       if (s && (typeof s[fname] == "function"))
          return s[fname](this.mesh, arg1, arg2, this.evnt);
@@ -40,7 +42,8 @@
 
    EveElemControl.prototype.separateDraw = false;
 
-   EveElemControl.prototype.setHighlight = function(col, indx) {
+   EveElemControl.prototype.setHighlight = function(col, indx)
+   {
       // special hook here
       if (this.invokeSceneMethod("processElementHighlighted", col, indx))
          return true;
@@ -48,13 +51,14 @@
       return this.drawSpecial(col || this.mesh.select_col, indx);
    }
 
-   EveElemControl.prototype.setSelected = function(col, indx) {
+   EveElemControl.prototype.setSelected = function(col, indx)
+   {
       if (this.invokeSceneMethod("processElementSelected", col, indx))
          return true;
       // should not be used, keep as fallback
       var m = this.mesh;
       if ((m.select_col == col) && (m.select_indx == indx)) { col = null; indx = undefined; }
-      m.select_col = col;
+      m.select_col  = col;
       m.select_indx = indx;
       // special hook here
       return this.drawSpecial(col, indx);
@@ -87,16 +91,16 @@
    EveElements.prototype.makeHit = function(hit, rnrData) {
       if (this.TestRnr("hit", hit, rnrData)) return null;
 
-      var hit_size = 8*rnrData.fMarkerSize,
-          size = rnrData.vtxBuff.length/3,
-          pnts = new JSROOT.Painter.PointsCreator(size, true, hit_size);
+      var hit_size = 8 * rnrData.fMarkerSize;
+      var size     = rnrData.vtxBuff.length / 3;
+      var pnts     = new JSROOT.Painter.PointsCreator(size, true, hit_size);
 
-      for (var i=0;i<size;i++)
+      for (var i=0; i<size; i++)
          pnts.AddPoint(rnrData.vtxBuff[i*3],rnrData.vtxBuff[i*3+1],rnrData.vtxBuff[i*3+2]);
 
       var mesh = pnts.CreatePoints(JSROOT.Painter.root_colors[hit.fMarkerColor]);
 
-      /// use points control to toggle highlight and selection
+      // use points control to toggle highlight and selection
       // mesh.get_ctrl = function() { return new JSROOT.Painter.PointsControl(this); }
 
       mesh.get_ctrl = function() { return new EveElemControl(this); }
@@ -112,15 +116,17 @@
       return mesh;
    }
 
-   EveElements.prototype.makeTrack = function(track, rnrData) {
+   EveElements.prototype.makeTrack = function(track, rnrData)
+   {
       if (this.TestRnr("track", track, rnrData)) return null;
 
       var N = rnrData.vtxBuff.length/3;
-      var track_width = track.fLineWidth || 1,
-          track_color = JSROOT.Painter.root_colors[track.fLineColor] || "rgb(255,0,255)";
+      var track_width = track.fLineWidth || 1;
+      var track_color = JSROOT.Painter.root_colors[track.fLineColor] || "rgb(255,0,255)";
+
       if (JSROOT.browser.isWin) track_width = 1;  // not supported on windows
 
-      var buf = new Float32Array((N-1)*6), pos = 0;
+      var buf = new Float32Array((N-1) * 6), pos = 0;
       for (var k=0;k<(N-1);++k) {
          buf[pos]   = rnrData.vtxBuff[k*3];
          buf[pos+1] = rnrData.vtxBuff[k*3+1];
@@ -489,7 +495,8 @@
    ////////////////////////////////////////////////////////////////////////////////////////////
 
 
-   function StraightLineSetControl(mesh) {
+   function StraightLineSetControl(mesh)
+   {
       EveElemControl.call(this, mesh);
    }
 
@@ -497,19 +504,22 @@
 
    StraightLineSetControl.prototype.separateDraw = true;
 
-   StraightLineSetControl.prototype.cleanup = function() {
+   StraightLineSetControl.prototype.cleanup = function()
+   {
       if (!this.mesh) return;
       this.drawSpecial(null, undefined, "h");
       this.drawSpecial(null, undefined, "s");
       delete this.mesh;
    }
 
-   StraightLineSetControl.prototype.extractIndex = function(intersect) {
+   StraightLineSetControl.prototype.extractIndex = function(intersect)
+   {
       if (!intersect || intersect.index===undefined) return undefined;
       return intersect.index/2; // return segment id - not a point
    }
 
-   StraightLineSetControl.prototype.setSelected = function(col, indx) {
+   StraightLineSetControl.prototype.setSelected = function(col, indx)
+   {
       if (this.invokeSceneMethod("processElementSelected", col, indx))
          return true;
 
@@ -539,7 +549,8 @@
       return this.drawSpecial(col, indx, "s");
    }
 
-   StraightLineSetControl.prototype.setHighlight = function(col, indx) {
+   StraightLineSetControl.prototype.setHighlight = function(col, indx)
+   {
       if (this.invokeSceneMethod("processElementHighlighted", col, indx))
          return true;
 
@@ -547,75 +558,92 @@
       return this.drawSpecial(col, indx, "h");
    }
 
-   StraightLineSetControl.prototype.checkHighlightIndex = function(indx) {
+   StraightLineSetControl.prototype.checkHighlightIndex = function(indx)
+   {
       if (this.mesh && this.mesh.scene)
          return this.invokeSceneMethod("processCheckHighlight", indx);
 
       return true; // means index is different
    }
 
-   StraightLineSetControl.prototype.drawSpecial = function(color, index, prefix) {
-      if (!prefix) prefix = "s";
+   StraightLineSetControl.prototype.drawSpecial = function(color, index, prefix)
+   {
+      if ( ! prefix) prefix = "s";
 
-      var m = this.mesh, ll = prefix +"l_special", mm = prefix+"m_special", did_change = false;
-      if (m[ll]) {
+      var did_change = false;
+
+      var m  = this.mesh;
+      var ll = prefix + "l_special";
+      var mm = prefix + "m_special";
+
+      if (m[ll])
+      {
          m.remove(m[ll]);
          JSROOT.Painter.DisposeThreejsObject(m[ll]);
          delete m[ll];
          did_change = true;
       }
-      if (m[mm]) {
+      if (m[mm])
+      {
          m.remove(m[mm]);
          JSROOT.Painter.DisposeThreejsObject(m[mm]);
          delete m[mm];
          did_change = true;
       }
 
-      if (!color)
+      if ( ! color)
          return did_change;
 
       if (typeof index == "number") index = [ index ]; else
-      if (!index) index = [];
+      if ( ! index) index = [];
 
       var geom = new THREE.BufferGeometry();
       geom.addAttribute( 'position', m.children[0].geometry.getAttribute("position") );
-      if (index.length == 1) {
+      if (index.length == 1)
+      {
          geom.setDrawRange(index[0]*2, 2);
-      } else if (index.length > 1) {
+      } else if (index.length > 1)
+      {
          var idcs = [];
          for (var i = 0; i < index.length; ++i)
             idcs.push(index[i]*2, index[i]*2+1);
          geom.setIndex( idcs );
       }
       var lineMaterial = new THREE.LineBasicMaterial({ color: color, linewidth: 4 });
-      var line = new THREE.LineSegments(geom, lineMaterial);
-      m.add(line);
+      var line         = new THREE.LineSegments(geom, lineMaterial);
       line.jsroot_special = true; // special object, exclude from intersections
+      m.add(line);
       m[ll] = line;
+
       var el = m.eve_el, mindx = []
 
-      for (var i = 0; i < index.length; ++i) {
-         if (index[i] < el.fLinePlexSize) {
+      for (var i = 0; i < index.length; ++i)
+      {
+         if (index[i] < el.fLinePlexSize)
+         {
             var lineid = m.eve_indx[index[i]];
 
-            for (var k = 0; k < el.fMarkerPlexSize; ++k ) {
+            for (var k = 0; k < el.fMarkerPlexSize; ++k )
+            {
                if (m.eve_indx[ k + el.fLinePlexSize] == lineid) mindx.push(k);
             }
          }
       }
 
-      if (mindx.length > 0) {
+      if (mindx.length > 0)
+      {
          var pnts = new JSROOT.Painter.PointsCreator(mindx.length, true, 5);
 
          var arr = m.children[1].geometry.getAttribute("position").array;
 
-         for (var i = 0; i < mindx.length; ++i) {
+         for (var i = 0; i < mindx.length; ++i)
+         {
             var p = mindx[i]*3;
             pnts.AddPoint(arr[p], arr[p+1], arr[p+2] );
          }
          var mark = pnts.CreatePoints(color);
-         m.add(mark);
          mark.jsroot_special = true; // special object, exclude from intersections
+         m.add(mark);
          m[mm] = mark;
       }
 
@@ -663,6 +691,10 @@
 
       return obj3d;
    }
+
+
+   //==============================================================================
+   //==============================================================================
 
    JSROOT.EVE.EveElements = EveElements;
 

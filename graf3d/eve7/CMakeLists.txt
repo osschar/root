@@ -38,6 +38,7 @@ ROOT_STANDARD_LIBRARY_PACKAGE(ROOTEve
      inc/ROOT/REveTrackPropagator.hxx
      inc/ROOT/REveTrans.hxx
      inc/ROOT/REveTreeTools.hxx
+     inc/ROOT/REveTypes.hxx
      inc/ROOT/REveUtil.hxx
      inc/ROOT/REveVector.hxx
      inc/ROOT/REveViewer.hxx
@@ -91,6 +92,7 @@ ROOT_STANDARD_LIBRARY_PACKAGE(ROOTEve
      src/REveTrackPropagator.cxx
      src/REveTrans.cxx
      src/REveTreeTools.cxx
+     src/REveTypes.cxx
      src/REveUtil.cxx
      src/REveVector.cxx
      src/REveViewer.cxx

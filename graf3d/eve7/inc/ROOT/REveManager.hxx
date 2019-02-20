@@ -115,9 +115,9 @@ protected:
 
    // ElementId management
    std::unordered_map<ElementId_t, REveElement*> fElementIdMap;
-   ElementId_t                                   fLastElementId =  0;
-   ElementId_t                                   fNumElementIds =  0;
-   ElementId_t                                   fMaxElementIds = -1;
+   ElementId_t                                   fLastElementId = 0;
+   ElementId_t                                   fNumElementIds = 0;
+   ElementId_t                                   fMaxElementIds = std::numeric_limits<ElementId_t>::max();
 
    // Selection / highlight elements
    REveElement              *fSelectionList = nullptr;
@@ -215,7 +215,7 @@ public:
    // Access to internals, needed for low-level control in advanced
    // applications.
 
-   void    EnforceTimerActive (Bool_t ta) { fTimerActive = ta; }
+   void EnforceTimerActive (Bool_t ta) { fTimerActive = ta; }
 
    void HttpServerCallback(unsigned connid, const std::string &arg);
    // void Send(void* buff, unsigned connid);

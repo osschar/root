@@ -10,6 +10,7 @@
  *************************************************************************/
 
 #include <ROOT/REveDataClasses.hxx>
+#include <ROOT/REveUtil.hxx>
 
 #include "TROOT.h"
 #include "TMethod.h"

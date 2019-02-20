@@ -10,6 +10,7 @@
  *************************************************************************/
 
 #include <ROOT/REveGeoShape.hxx>
+#include <ROOT/REveUtil.hxx>
 #include <ROOT/REveTrans.hxx>
 #include <ROOT/REveManager.hxx>
 #include <ROOT/REvePolygonSetProjected.hxx>

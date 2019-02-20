@@ -276,11 +276,11 @@ void REveTrackPropagator::OnZeroRefCount()
 /// Check reference count - virtual from REveElement.
 /// Must also take into account references from REveRefBackPtr.
 
-void REveTrackPropagator::CheckReferenceCount(const REveException& eh)
+void REveTrackPropagator::CheckReferenceCount(const std::string& from)
 {
    if (fRefCount <= 0)
    {
-      REveElement::CheckReferenceCount(eh);
+      REveElement::CheckReferenceCount(from);
    }
 }
 

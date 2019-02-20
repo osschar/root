@@ -34,10 +34,10 @@ public:
 
    struct Record
    {
-      REveElement    *f_primary; // it's also implied through the map
+      REveElement    *f_primary; // it's also implied through the map -- XXXX do i need it ????
       Set_t           f_implied;
       std::set<int>   f_sec_idcs;
-      bool            f_is_sec;   // is secondary-selected
+      bool            f_is_sec;   // is secondary-selected -- XXXX do i need it ????
 
       Record(REveElement *el) :
          f_primary (el),
@@ -127,7 +127,7 @@ public:
    virtual void UserRePickedElement(REveElement *el);
    virtual void UserUnPickedElement(REveElement *el);
 
-   void NewElementPicked(REveElement *pel, bool multi, bool secondary, const std::set<int>& secondary_idcs={});
+   void NewElementPicked(ElementId_t id, bool multi, bool secondary, const std::set<int>& secondary_idcs={});
 
    int  RemoveImpliedSelectedReferencesTo(REveElement *el);
 

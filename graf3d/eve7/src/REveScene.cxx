@@ -126,7 +126,11 @@ void REveScene::EndAcceptingChanges()
 
 void REveScene::ProcessChanges()
 {
-   // should return net message or talk to gEve about it
+   if (IsChanged())
+   {
+      StreamRepresentationChanges();
+      SendChangesToSubscribers();
+   }
 }
 
 void REveScene::StreamElements()
@@ -341,7 +345,9 @@ REveScene::SendChangesToSubscribers()
 Bool_t
 REveScene::IsChanged() const
 {
-   printf("REveScene::IsChanged %s %d\n", GetCName(), fAddedElements.empty());
+   printf("REveScene::IsChanged %s (changed=%d, added=%d, removed=%d)\n", GetCName(),
+          (int) fChangedElements.size(), (int) fAddedElements.size(), (int) fRemovedElements.size());
+
    return ! (fChangedElements.empty() && fAddedElements.empty() && fRemovedElements.empty());
 }
 
@@ -560,14 +566,10 @@ void REveSceneList::DestroyElementRenderers(REveElement* element)
 
 void REveSceneList::ProcessSceneChanges()
 {
-   printf("ProcessSceneChanges\n");
+   printf("REveSceneList::ProcessSceneChanges\n");
 
-   for (List_i sIt=fChildren.begin(); sIt!=fChildren.end(); ++sIt)
+   for (auto &el : fChildren)
    {
-      REveScene* s = (REveScene*) *sIt;
-      if (s->IsChanged()) {
-         s->StreamRepresentationChanges();
-         s->SendChangesToSubscribers();
-      }
+      ((REveScene*) el)->ProcessChanges();
    }
 }

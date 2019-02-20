@@ -245,11 +245,11 @@ public:
                        Bool_t own_field = kTRUE);
    virtual ~REveTrackPropagator();
 
-   virtual void OnZeroRefCount();
+   void OnZeroRefCount(); // override
 
-   virtual void CheckReferenceCount(const REveException &eh = "REveElement::CheckReferenceCount ");
+   void CheckReferenceCount(const std::string& from="<unknown>"); // override
 
-   virtual void ElementChanged(Bool_t update_scenes = kTRUE, Bool_t redraw = kFALSE);
+   void ElementChanged(Bool_t update_scenes = kTRUE, Bool_t redraw = kFALSE); // override
 
    // propagation
    void InitTrack(const REveVectorD &v, Int_t charge);

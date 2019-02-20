@@ -17,15 +17,15 @@
 
    /// constructor, handle for REveScene class
 
-   function EveScene(mgr,scene,viewer)
+   function EveScene(mgr, scene, viewer)
    {
-      this.mgr = mgr;
-      this.scene = scene;
-      this.id = scene.fSceneId;
-      this.viewer = viewer;
+      this.mgr     = mgr;
+      this.scene   = scene;
+      this.id      = scene.fSceneId;
+      this.viewer  = viewer;
       this.creator = new JSROOT.EVE.EveElements();
       this.creator.useIndexAsIs = (JSROOT.GetUrlOption('useindx') !== null);
-      this.id2obj_map = {}; // base on element id
+      this.id2obj_map  = {}; // base on element id
       this.mid2obj_map = {}; // base on master id
 
       this.first_time = true;
@@ -33,12 +33,12 @@
       this.selected = {}; // generic map of selected objects
 
       // register ourself for scene events
-       this.mgr.RegisterSceneReceiver(scene.fSceneId, this);
+      this.mgr.RegisterSceneReceiver(scene.fSceneId, this);
    }
 
    EveScene.prototype.hasRenderData = function(elem)
    {
-      if (elem===undefined)
+      if (elem === undefined)
          elem = this.mgr.GetElement(this.id);
 
       if (!elem) return false;
@@ -51,24 +51,27 @@
 
    EveScene.prototype.makeGLRepresentation = function(elem)
    {
-      if (!elem.render_data) return null;
+      if ( ! elem.render_data) return null;
+
       var fname = elem.render_data.rnr_func;
       var obj3d = this.creator[fname](elem, elem.render_data);
+
       if (obj3d)
       {
          obj3d._typename = "THREE.Mesh";
 
          // SL: this is just identifier for highlight, required to show items on other places, set in creator
          obj3d.geo_object = elem.fMasterId || elem.fElementId;
-         obj3d.geo_name = elem.fName; // used for highlight
+         obj3d.geo_name   = elem.fName; // used for highlight
 
          obj3d.scene = this; // required for get changes when highlight/selection is changed
 
          //AMT: reference needed in MIR callback
-         obj3d.eveId = elem.fElementId;
+         obj3d.eveId  = elem.fElementId;
          obj3d.mstrId = elem.fMasterId;
 
-         if (elem.render_data.matrix) {
+         if (elem.render_data.matrix)
+         {
             obj3d.matrixAutoUpdate = false;
             obj3d.matrix.fromArray( elem.render_data.matrix );
             obj3d.updateMatrixWorld(true);
@@ -201,11 +204,12 @@
       this.viewer.render();
    }
 
-   EveScene.prototype.elementAdded = function(el) {
-      if (!this.viewer) return;
+   EveScene.prototype.elementAdded = function(el)
+   {
+      if ( ! this.viewer) return;
 
       var obj3d =  this.makeGLRepresentation(el);
-      if (!obj3d) return;
+      if ( ! obj3d) return;
 
       // AMT this is an overkill, temporary solution
       var scene = this.mgr.GetElement(el.fSceneId);
@@ -249,6 +253,29 @@
    /** interactive handler. Calculates selection state, apply to element and distribute to other scene */
    EveScene.prototype.processElementSelected = function(obj3d, col, indx, evnt)
    {
+      // MT BEGIN
+
+      console.log("EveScene.prototype.processElementSelected", obj3d, col, indx, evnt);
+
+      var is_multi  = evnt && evnt.ctrlKey;
+      var is_secsel = indx !== undefined;
+
+      var fcall = "NewElementPicked(" + obj3d.eveId + `, ${is_multi}, ${is_secsel}`;
+      if (is_secsel)
+      {
+         fcall += ", { " + (Array.isArray(indx) ? indx.join(", ") : indx) + " }";
+      }
+      fcall += ")";
+
+      this.mgr.SendMIR({ "mir":        fcall,
+                         "fElementId": this.mgr.global_selection_id,
+                         "class":      "REX::REveSelection"
+                       });
+
+      // return true;
+
+      // MT END -- Sergey's code below
+
       // first decide if element selected or not
 
       var id  = obj3d.mstrId;
@@ -317,9 +344,13 @@
    }
 
    /** interactive handler */
-   EveScene.prototype.processElementHighlighted = function(obj3d, col, indx, evnt) {
+   EveScene.prototype.processElementHighlighted = function(obj3d, col, indx, evnt)
+   {
       var id = obj3d.mstrId;
       // id = obj3d.eveId;
+
+      // MT XXXX
+      console.log("EveScene.prototype.processElementHighlighted", obj3d, col, indx, evnt);
 
       this.setElementHighlighted(id, col, indx, true);
 
@@ -330,11 +361,12 @@
    }
 
    /** returns true if highlight index is differs from current */
-   EveScene.prototype.processCheckHighlight = function(obj3d, indx) {
+   EveScene.prototype.processCheckHighlight = function(obj3d, indx)
+   {
       var id = obj3d.mstrId;
       // id = obj3d.eveId;
 
-      if (!this.highlight || (this.highlight.id != id)) return true;
+      if ( ! this.highlight || (this.highlight.id != id)) return true;
 
       // TODO: make precise checks with all combinations
       return (indx !== this.highlight.indx);
@@ -369,8 +401,8 @@
    EveScene.prototype.drawSpecial = function(mstrid, prefer_highlight)
    {
       var obj3d = this.getObj3D( mstrid, true );
-      if (!obj3d || !obj3d.get_ctrl) obj3d = this.getObj3D( mstrid );
-      if (!obj3d || !obj3d.get_ctrl) return false;
+      if ( ! obj3d || ! obj3d.get_ctrl) obj3d = this.getObj3D( mstrid );
+      if ( ! obj3d || ! obj3d.get_ctrl) return false;
 
       var h1 = this.highlight && (this.highlight.id == mstrid) ? this.highlight : null;
       var h2 = this.selected[mstrid];
@@ -397,13 +429,16 @@
       return did_change;
    }
 
-   EveScene.prototype.elementRemoved = function() {
+   EveScene.prototype.elementRemoved = function()
+   {
    }
 
-   EveScene.prototype.beginChanges = function() {
+   EveScene.prototype.beginChanges = function()
+   {
    }
 
-   EveScene.prototype.endChanges = function() {
+   EveScene.prototype.endChanges = function()
+   {
       if (this.viewer)
          this.viewer.render();
    }

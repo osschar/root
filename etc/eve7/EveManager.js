@@ -32,20 +32,34 @@
 
       this.scenes = [];  // list of scene objects
 
+      // Set through Update Trigger UT_Refresh_Selection_State and name match
+      // upon arrival of EveWorld. See also comments there.
+      this.global_selection_id = null;
+      this.global_highlight_id = null;
+
       this.EChangeBits = { "kCBColorSelection": 1, "kCBTransBBox": 2, "kCBObjProps": 4, "kCBVisibility": 8 };
    }
 
+
+   //==============================================================================
+   // BEGIN protoype functions
+   //==============================================================================
+
    /** Returns element with given ID */
-   EveManager.prototype.GetElement = function(id) {
+   EveManager.prototype.GetElement = function(id)
+   {
       return this.map[id];
    }
 
-   EveManager.prototype.addSceneHandler = function(handler) {
+   EveManager.prototype.addSceneHandler = function(handler)
+   {
       this.scenes.push(handler);
    }
 
-   EveManager.prototype.invokeInOtherScenes = function(scene, fname, arg1, arg2, arg3, arg4) {
-      for (var i=0;i<this.scenes.length;++i) {
+   EveManager.prototype.invokeInOtherScenes = function(scene, fname, arg1, arg2, arg3, arg4)
+   {
+      for (var i=0; i < this.scenes.length; ++i)
+      {
          var sc = this.scenes[i];
          if ((sc !== scene) && (typeof sc[fname] == "function"))
             sc[fname](arg1, arg2, arg3, arg4);
@@ -53,7 +67,8 @@
    }
 
    /** Attach websocket handle to manager, all communication runs through manager */
-   EveManager.prototype.UseConnection = function(handle) {
+   EveManager.prototype.UseConnection = function(handle)
+   {
       this.handle = handle;
 
       handle.SetReceiver(this);
@@ -61,8 +76,8 @@
    }
 
    /** Called when data comes via the websocket */
-   EveManager.prototype.OnWebsocketMsg = function(handle, msg, offset) {
-
+   EveManager.prototype.OnWebsocketMsg = function(handle, msg, offset)
+   {
       // if (this.ignore_all) return;
 
       if (typeof msg != "string") {
@@ -96,6 +111,13 @@
       if (!cmd || !this.handle) return;
       var obj = { "mir": cmd.func, "fElementId": cmd.elementid, "class": cmd.elementclass };
       this.handle.Send(JSON.stringify(obj));
+   }
+
+   EveManager.prototype.SendMIR = function(mir)
+   {
+      if ( ! mir || ! this.handle) return;
+
+      this.handle.Send(JSON.stringify(mir));
    }
 
    /** Configure receiver for scene-respective events. Following event used:
@@ -188,8 +210,9 @@
             this.hrecv.splice(n, 1);
    }
 
-   // mark object and all its parents as modified
-   EveManager.prototype.MarkSceneRrecreate = function(id) {
+   // mark object and all its ancestors as modified
+   EveManager.prototype.MarkSceneRecreate = function(id)
+   {
       while (id) {
          var elem = this.GetElement(id);
          if (!elem) return;
@@ -225,7 +248,7 @@
 
          var obj = this.map[elem.fElementId];
 
-         if ( ! obj)
+         if ( ! obj) // YYYY isn't it an error if obj exists?
          {
             // element did not exist up to now
             var parent = null;
@@ -244,10 +267,14 @@
 
             parent.childs.push(elem);
 
+            // YYYY why?
             obj = this.map[elem.fElementId] = elem;
          }
 
-         this.MarkSceneRrecreate(elem.fElementId);
+         this.ParseUpdateTriggersAndProcessPostStream(elem);
+
+         // YYYY MT - why do we need this?
+         this.MarkSceneRecreate(elem.fElementId);
       }
 
       if (arr[0].fTotalBinarySize == 0) {
@@ -258,8 +285,7 @@
       this.ProcessUpdate(300);
    }
 
-  //______________________________________________________________________________
-
+   //______________________________________________________________________________
 
    EveManager.prototype.RecursiveRemove = function(elem, delSet) {
       var elId = elem.fElementId;
@@ -290,11 +316,11 @@
       console.log(" ecursiveRemove END", elId, delSet);
      // delete elem;
    }
+
    //______________________________________________________________________________
-
-
    
-   EveManager.prototype.ImportSceneChangeJson = function(msg) {
+   EveManager.prototype.ImportSceneChangeJson = function(msg)
+   {
       var arr = msg.arr;
       this.last_json = null;
       this.scene_changes = msg;
@@ -310,8 +336,7 @@
       this.callSceneReceivers(scene, "beginChanges");
 
       // notify controllers
-     this.callSceneReceivers(scene, "elementsRemoved", removedIds);
-
+      this.callSceneReceivers(scene, "elementsRemoved", removedIds);
       
       var delSet = new Set();
       for (var r = 0; r < removedIds.length; ++r) {
@@ -383,6 +408,9 @@
             if (em.changeBit & this.EChangeBits.kCBObjProps) {
                delete obj.render_data;
                jQuery.extend(obj, em);
+
+               this.ParseUpdateTriggersAndProcessPostStream(em);
+
                tag = "replaceElement";
             }
 
@@ -390,15 +418,18 @@
             em.tag = tag;
             this.callSceneReceivers(scene, "sceneElementChange", em);
          }
-         else
+         else // YYYY MT - Does this ever happen? Don't we have special handler for new elements?
          {
             // create new
             this.map[em.fElementId] = em;
-            var parent = this.map[em.fMotherId];
-            if (!parent.childs)
-               parent.childs = [];
 
+            var parent = this.map[em.fMotherId];
+            if (!parent.childs) // YYYY do we really need to create arrays here? Can it really be undef?
+               parent.childs = [];
             parent.childs.push(em);
+
+            this.ParseUpdateTriggersAndProcessPostStream(elem);
+
             em.tag = "elementAdded";
             this.callSceneReceivers(scene, "sceneElementChange", em);
          }
@@ -410,8 +441,8 @@
       
       this.callSceneReceivers(scene, "endChanges", treeRebuild);
    },
-//______________________________________________________________________________
 
+   //______________________________________________________________________________
 
    EveManager.prototype.DeleteChildsOf = function(elem) {
       if (!elem || !elem.childs) return;
@@ -509,8 +540,76 @@
          this.ProcessSceneCreate(arr[0].fSceneId);
    }
 
+
+   //------------------------------------------------------------------------------
+   // XXXX UT = UpdateTrigger functions. XXXX Can /should we place them
+   // somewhere else?
+   // ------------------------------------------------------------------------------
+
+   EveManager.prototype.ParseUpdateTriggersAndProcessPostStream = function(el)
+   {
+      // console.log("EveManager.ParseUpdateTriggersAndProcessPostStream", el.UT_PostStream, this[el.UT_PostStream]);
+
+      if (el.UT_PostStream !== undefined && typeof this[el.UT_PostStream] == "function")
+      {
+         this[el.UT_PostStream](el);
+         delete el.UT_PostStream
+      }
+      // XXXX This is called before renderdata. Do we really need post stream or is PostScene
+      //      sufficient? Think.
+
+      // XXXX MT check also for PostScene and PostUpdate, put them somewhere and delete them.
+   }
+
+   EveManager.prototype.UT_Selection_Refresh_State = function(el)
+   {
+      // el - rep of a REveSelection object.
+
+      console.log("UpdateTrigger UT_Selection_Refresh_State called for ", el.fName);
+
+      // XXXX Hack to assign global selection / highlight ids.
+      // This would be more properly done by having REveWorld : public REveScene and store
+      // ids there. These will also be needed for viewers, scenes, cameras etc.
+      // I somewhat dislike setting this through name match (and class::WriteCoreJson() as
+      // it defines the UT function so we sort of know what kind of objects this function
+      // will be called for.
+      // We shall see -- but it would better be soon as things are getting messy :)
+      //
+      if (el._is_registered === undefined)
+      {
+         if (el.fName == "Global Selection") this.global_selection_id = el.fElementId;
+         if (el.fName == "Global Highlight") this.global_highlight_id = el.fElementId;
+
+         el._selection_set = new Set;
+
+         el._is_registered = true;
+      }
+
+      console.log("And now process the bloody selection.")
+
+      //for (el["sel_list"]
+      //el.
+
+
+      // XXXX Oh, blimy, on first arrival, if selection is set, the selected
+      // elements have not yet been received and so this will fail. Also true
+      // for newly subscribed scenes, once we start supporting this.
+      // So, we need something like reapply selections after new scenes arrive.
+   }
+
+
+   //==============================================================================
+   // END protoype functions
+   //==============================================================================
+
    JSROOT.EVE.EveManager = EveManager;
 
    return JSROOT;
 
 }));
+
+// Matevz's notes ... here for lack of better ideas.
+//
+// 1. elementid, fElementId, eveId --> this is ultra confusing, decide and use consistently.
+//    Maybe also on the eve side. m_eid ?
+//    Ditto for fMasterId, mstrId, something else, probably

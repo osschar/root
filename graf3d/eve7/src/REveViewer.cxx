@@ -11,6 +11,7 @@
 
 #include <ROOT/REveViewer.hxx>
 
+#include <ROOT/REveUtil.hxx>
 #include <ROOT/REveScene.hxx>
 #include <ROOT/REveSceneInfo.hxx>
 #include <ROOT/REveManager.hxx>

@@ -11,6 +11,7 @@
 
 #include <ROOT/REveManager.hxx>
 
+#include <ROOT/REveUtil.hxx>
 #include <ROOT/REveSelection.hxx>
 #include <ROOT/REveViewer.hxx>
 #include <ROOT/REveScene.hxx>
@@ -136,7 +137,11 @@ REveManager::REveManager() : // (Bool_t map_window, Option_t* opt) :
 
    fWebWindow =  ROOT::Experimental::RWebWindowsManager::Instance()->CreateWindow();
 
-   TString evedir = TString::Format("%s/eve7", TROOT::GetEtcDir().Data());
+   TString evedir = gEnv->GetValue("WebEve.Eve7JsDir", "");
+   if (evedir.IsNull())
+   {
+      evedir = TString::Format("%s/eve7", TROOT::GetEtcDir().Data());
+   }
    if (gSystem->ExpandPathName(evedir)) {
       Warning("REveManager", "problems resolving %s for HTML sources", evedir.Data());
       evedir = ".";
@@ -246,7 +251,8 @@ void REveManager::DoRedraw3D()
    static const REveException eh("REveManager::DoRedraw3D ");
 
    // Process changes in scenes.
-   fScenes ->ProcessSceneChanges();
+   fWorld ->ProcessChanges();
+   fScenes->ProcessSceneChanges();
 
 
    fResetCameras = kFALSE;
@@ -349,7 +355,13 @@ void REveManager::AssignElementId(REveElement* element)
    if (fNumElementIds == fMaxElementIds)
       throw eh + "ElementId map is full.";
 
+next_free_id:
    while (fElementIdMap.find(++fLastElementId) != fElementIdMap.end());
+   if (fLastElementId == 0) goto next_free_id;
+   // MT - alternatively, we could spawn a thread to find next thousand or so ids and
+   // put them in a vector of ranges. Or collect them when they are freed.
+   // Don't think this won't happen ... online event display can run for months
+   // and easily produce 100000 objects per minute -- about a month to use up all id space!
 
    element->fElementId = fLastElementId;
    fElementIdMap.insert(std::make_pair(fLastElementId, element));
@@ -731,14 +743,18 @@ REveManager::RExceptionHandler::Handle(std::exception& exc)
 
 void REveManager::HttpServerCallback(unsigned connid, const std::string &arg)
 {
+   static const REveException eh("REveManager::HttpServerCallback ");
+
    if (arg == "CONN_READY")
    {
       fConnList.emplace_back(connid);
       printf("connection established %u\n", connid);
 
-      printf("\nEVEMNG ............. streaming the world scene.\n");
 
       // This prepares core and render data buffers.
+      printf("\nEVEMNG ............. streaming the world scene.\n");
+
+      fWorld->AddSubscriber(std::make_unique<REveClient>(connid, fWebWindow));
       fWorld->StreamElements();
 
       printf("   sending json, len = %d\n", (int) fWorld->fOutputJson.size());
@@ -759,8 +775,16 @@ void REveManager::HttpServerCallback(unsigned connid, const std::string &arg)
 
          printf("   sending json, len = %d\n", (int) scene->fOutputJson.size());
          Send(connid, scene->fOutputJson);
-         printf("   sending binary, len = %d\n", scene->fTotalBinarySize);
-         SendBinary(connid, &scene->fOutputBinary[0], scene->fTotalBinarySize);
+
+         if (scene->fTotalBinarySize > 0)
+         {
+            printf("   sending binary, len = %d\n", scene->fTotalBinarySize);
+            SendBinary(connid, &scene->fOutputBinary[0], scene->fTotalBinarySize);
+         }
+         else
+         {
+            printf("   NOT sending binary, len = %d\n", scene->fTotalBinarySize);
+         }
       }
       return;
    }
@@ -789,11 +813,13 @@ void REveManager::HttpServerCallback(unsigned connid, const std::string &arg)
          REveScene* scene = dynamic_cast<REveScene*>(*i);
          scene->RemoveSubscriber(connid);
       }
+      fWorld->RemoveSubscriber(connid);
 
       return;
    }
    else
    {
+      fWorld->BeginAcceptingChanges();
       fScenes->AcceptChanges(true);
 
       // MIR
@@ -804,12 +830,17 @@ void REveManager::HttpServerCallback(unsigned connid, const std::string &arg)
       int id = cj["fElementId"];
 
       auto el =  FindElementById(id);
-      char cmd[128];
-      sprintf(cmd, "((%s*)%p)->%s;", ctype.c_str(), el, mir.c_str());
+      char cmd[1024];
+      int  np = snprintf(cmd, 1024, "((%s*)%p)->%s;", ctype.c_str(), el, mir.c_str());
+      if (np >= 1024)
+         throw eh + "MIR command buffer too small -- tell Matevz to implement auto resizing.";
+
       printf("MIR cmd %s\n", cmd);
       gROOT->ProcessLine(cmd);
 
       fScenes->AcceptChanges(false);
+      fWorld->EndAcceptingChanges();
+
       Redraw3D();
 
 
@@ -840,6 +871,9 @@ void REveManager::SendBinary(unsigned connid, const void *data, std::size_t len)
 
 void REveManager::DestroyElementsOf(REveElement::List_t& els)
 {
+   // XXXXX - not called, what's with end accepting changes?
+
+   fWorld->EndAcceptingChanges();
    fScenes->AcceptChanges(false);
 
    nlohmann::json jarr = nlohmann::json::array();
@@ -872,6 +906,8 @@ void REveManager::DestroyElementsOf(REveElement::List_t& els)
 
 void REveManager::BroadcastElementsOf(REveElement::List_t& els)
 {
+   // XXXXX - not called, what's with begin accepting changes?
+
    for (auto & ep : els)
    {
       REveScene* scene = dynamic_cast<REveScene*>(ep);
@@ -892,13 +928,16 @@ void REveManager::BroadcastElementsOf(REveElement::List_t& els)
       }
    }
 
-   // AMT: This call may not be necessary
+   // AMT: These calls may not be necessary
    fScenes->AcceptChanges(true);
+   fWorld->BeginAcceptingChanges();
 }
 
 //////////////////////////////////////////////////////////////////
-/// Show eve manager in specified browser
-/// If rootrc variable WebEve.DisableShow configured, just HTTP server will be started and URL printout
+/// Show eve manager in specified browser.
+
+/// If rootrc variable WebEve.DisableShow is set, HTTP server will be
+/// started and access URL printed on stdout.
 
 void REveManager::Show(const RWebDisplayArgs &args)
 {
