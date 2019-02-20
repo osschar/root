@@ -8,8 +8,9 @@
 namespace ROOT {
 namespace Experimental {
 
-class REveDataInteractionList;
+//class REveDataInteractionList;
 class REveViewContext;
+class REveTrackPropagator;
 
 class REveDataProxyBuilderBase
 {
@@ -30,12 +31,12 @@ public:
    const REveDataCollection* Collection() const { return m_collection;  }
 
    // ---------- constructor/destructor  ---------------------
-   
+
    REveDataProxyBuilderBase(std::string type);
    virtual ~REveDataProxyBuilderBase() {}
 
    void SetCollection(REveDataCollection*);
-   virtual void SetInteractionList(REveDataInteractionList*, const std::string&);
+   //   virtual void SetInteractionList(REveDataInteractionList*, const std::string&);
 
    virtual void CollectionBeingDestroyed(const REveDataCollection*);
 
@@ -56,9 +57,9 @@ public:
 
    std::string Type() const { return m_type; }
 
-   // const member functions   
+   // const member functions
    virtual bool HaveSingleProduct() const { return true; }
-   
+
 protected:
    // Override this if visibility changes can cause (re)-creation of proxies.
    // Returns true if new proxies were created.
@@ -79,15 +80,15 @@ protected:
 
 private:
    std::string           m_type;
-   
+
    const REveDataCollection*   m_collection;
 
    float                 m_layer;
-   REveDataInteractionList*  m_interactionList;
+   //   REveDataInteractionList*  m_interactionList;
    bool                  m_haveWindow;
    bool                  m_modelsChanged;
 
-   
+
    ClassDef(REveDataProxyBuilderBase, 0);
 
 };

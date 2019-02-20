@@ -4,7 +4,6 @@ ROOT_STANDARD_LIBRARY_PACKAGE(ROOTEve
      inc/ROOT/REveClient.hxx
      inc/ROOT/REveCompound.hxx
      inc/ROOT/REveDataClasses.hxx
-     inc/ROOT/REveDataCollectionManager.hxx
      inc/ROOT/REveDataProxyBuilderBase.hxx
      inc/ROOT/REveDataSimpleProxyBuilder.hxx
      inc/ROOT/REveDataSimpleProxyBuilderTemplate.hxx
@@ -32,6 +31,8 @@ ROOT_STANDARD_LIBRARY_PACKAGE(ROOTEve
      inc/ROOT/REveSelection.hxx
      inc/ROOT/REveShape.hxx
      inc/ROOT/REveStraightLineSet.hxx
+     inc/ROOT/REveTableInfo.hxx
+     inc/ROOT/REveTableProxyBuilder.hxx     
      inc/ROOT/REveTrack.hxx
      inc/ROOT/REveTrackProjected.hxx
      inc/ROOT/REveTrackPropagator.hxx
@@ -40,6 +41,7 @@ ROOT_STANDARD_LIBRARY_PACKAGE(ROOTEve
      inc/ROOT/REveUtil.hxx
      inc/ROOT/REveVector.hxx
      inc/ROOT/REveViewer.hxx
+     inc/ROOT/REveViewContext.hxx
      inc/ROOT/REveVSD.hxx
      inc/ROOT/REveVSDStructs.hxx
   SOURCES
@@ -56,7 +58,6 @@ ROOT_STANDARD_LIBRARY_PACKAGE(ROOTEve
      src/REveChunkManager.cxx
      src/REveCompound.cxx
      src/REveDataClasses.cxx
-     src/REveDataCollectionManager.cxx
      src/REveDataProxyBuilderBase.cxx
      src/REveDataSimpleProxyBuilder.cxx
      src/REveElement.cxx
@@ -83,6 +84,8 @@ ROOT_STANDARD_LIBRARY_PACKAGE(ROOTEve
      src/REveSelection.cxx
      src/REveShape.cxx
      src/REveStraightLineSet.cxx
+     src/REveTableInfo.cxx
+     src/REveTableProxyBuilder.cxx
      src/REveTrack.cxx
      src/REveTrackProjected.cxx
      src/REveTrackPropagator.cxx
