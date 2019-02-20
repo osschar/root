@@ -1,6 +1,6 @@
 #include <ROOT/REveDataProxyBuilderBase.hxx>
 #include <ROOT/REveProjectionManager.hxx>
-#include <ROOT/REveDataCollectionManager.hxx>
+#include <ROOT/REveViewContext.hxx>
 #include <ROOT/REveCompound.hxx>
 
 using namespace ROOT::Experimental;
@@ -19,7 +19,7 @@ REveDataProxyBuilderBase::Product::Product(std::string iViewType, const REveView
 REveDataProxyBuilderBase::REveDataProxyBuilderBase(std::string type):
    m_type(type),
    m_collection(0),
-   m_interactionList(0),
+   //   m_interactionList(0),
    m_haveWindow(false)
 {
 }
@@ -53,15 +53,15 @@ void REveDataProxyBuilderBase::SetCollection(REveDataCollection* c)
 }
 
 //______________________________________________________________________________
-
+/*
 void
-REveDataProxyBuilderBase::SetInteractionList(REveDataInteractionList* l, const std::string& /*purpose*/ )
+REveDataProxyBuilderBase::SetInteractionList(REveDataInteractionList* l, const std::string& purpose )
 {
    // Called if willHandleInteraction() returns false. Purpose ignored by default.
 
    m_interactionList = l;
 }
-
+*/
 
 //______________________________________________________________________________
 void REveDataProxyBuilderBase::Build()
@@ -135,7 +135,7 @@ void REveDataProxyBuilderBase::Build()
                }
             }
 
-
+            /*
             if (m_interactionList && itemSize > oldSize)
             {
                REveElement::List_i elIt = elms->BeginChildren();
@@ -145,6 +145,7 @@ void REveDataProxyBuilderBase::Build()
                        m_interactionList->Added(*elIt, cnt);
                }
             }
+            */
          }
       }
       catch (const std::runtime_error& iException)

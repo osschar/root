@@ -5,27 +5,32 @@
 /// \macro_code
 ///
 
-#include <ROOT/REvePointSet.hxx>
-#include <ROOT/REveScene.hxx>
-#include <ROOT/REveJetCone.hxx>
-#include <ROOT/REveGeoShape.hxx>
+
 #include "ROOT/REveDataClasses.hxx"
-#include "ROOT/REveDataCollectionManager.hxx"
-#include "ROOT/REveDataProxyBuilderBase.hxx"
-#include "ROOT/REveDataSimpleProxyBuilder.hxx"
+//#include "ROOT/REveDataProxyBuilderBase.hxx"
+//#include "ROOT/REveDataSimpleProxyBuilder.hxx"
 #include "ROOT/REveDataSimpleProxyBuilderTemplate.hxx"
+#include "ROOT/REveManager.hxx"
+#include "ROOT/REveScalableStraightLineSet.hxx"
+#include "ROOT/REveViewContext.hxx"
+#include <ROOT/REveGeoShape.hxx>
+#include <ROOT/REveJetCone.hxx>
+#include <ROOT/REvePointSet.hxx>
+#include <ROOT/REveProjectionBases.hxx>
+#include <ROOT/REveProjectionManager.hxx>
+#include <ROOT/REveScene.hxx>
+#include <ROOT/REveTableProxyBuilder.hxx>
+#include <ROOT/REveTableInfo.hxx>
 #include <ROOT/REveTrack.hxx>
 #include <ROOT/REveTrackPropagator.hxx>
 #include <ROOT/REveViewer.hxx>
-#include <ROOT/REveProjectionBases.hxx>
-#include <ROOT/REveProjectionManager.hxx>
-#include "ROOT/REveManager.hxx"
-#include "ROOT/REveScalableStraightLineSet.hxx"
+#include <ROOT/REveViewContext.hxx>
 
-#include "TParticle.h"
-#include "TRandom.h"
+
 #include "TGeoTube.h"
 #include "TList.h"
+#include "TParticle.h"
+#include "TRandom.h"
 
 
 namespace REX = ROOT::Experimental;
@@ -134,57 +139,6 @@ public:
 };
 
 //==============================================================================
-//============ TABLE HELPER CLASSES ============================================
-//==============================================================================
-struct TableEntry {
-   std::string    fName;
-   std::string    fExpression;
-   int            fPrecision;
-   REX::REveDataColumn::FieldType_e fType;
-
-   TableEntry() : fName("unknown"), fPrecision(2), fType(REX::REveDataColumn::FT_Double) {}
-   void Print() const {
-      printf("TableEntry\n");
-      printf("name: %s expression: %s\n", fName.c_str(), fExpression.c_str());
-   }
-};
-
-
-class TableHandle
-{
-public:
-   typedef std::vector<TableEntry> TableEntries;
-   typedef std::map<std::string, TableEntries> TableSpecs;
-
-   TableHandle&
-   column(const char *name, int precision, const char *expression)
-   {
-      TableEntry columnEntry;
-      columnEntry.fName = name;
-      columnEntry.fPrecision = precision;
-      columnEntry.fExpression = expression;
-
-      m_specs[m_name].push_back(columnEntry);
-      return *this;
-   }
-
-   TableHandle &column(const char *label, int precision)
-   {
-      return column(label, precision, label);
-   }
-
-   TableHandle(std::string collectionName, TableSpecs &specs)
-      :m_name(collectionName), m_specs(specs)
-   {
-      m_specs[collectionName].clear();
-   }
-
-private:
-   std::string  m_name;
-   TableSpecs  &m_specs;
-};
-
-//==============================================================================
 //============ PROXY BUILDERS  ================================================
 //==============================================================================
 class XYJetProxyBuilder: public REX::REveDataSimpleProxyBuilderTemplate<XYJet>
@@ -262,51 +216,6 @@ class TrackProxyBuilder : public REX::REveDataSimpleProxyBuilderTemplate<TPartic
    }
 };
 
-class TableProxyBuilder : public REX::REveDataProxyBuilderBase
-{
-private:
-   TableHandle::TableEntries m_specs;
-   REX::REveDataTable* m_table;
-   
-public:
-   TableProxyBuilder() : REX::REveDataProxyBuilderBase("Table"), m_table(0) {}
-   virtual bool WillHandleInteraction() const { return true; }
-
-   using REX::REveDataProxyBuilderBase::ModelChanges;
-   virtual void ModelChanges(const REX::REveDataCollection::Ids_t&, REX::REveDataProxyBuilderBase::Product* p)
-   {
-      m_table->StampObjProps();
-   }
-
-   using REX::REveDataProxyBuilderBase::Build;
-   virtual void Build(const REX::REveDataCollection* collection, REX::REveElement* product, const REX::REveViewContext* context)
-   {
-      if (!GetHaveAWindow())
-         return;
-
-      auto table = new REX::REveDataTable("testTable");
-      table->SetCollection(collection);
-      product->AddElement(table);
-
-      for (const TableEntry& spec : m_specs) {
-         auto c = new REX::REveDataColumn(spec.fName.c_str());
-         table->AddElement(c);
-         std::string exp  = "i." + spec.fExpression + "()";
-         c->SetExpressionAndType(exp.c_str(), spec.fType);
-         c->SetPrecision(spec.fPrecision);
-      }
-
-      m_table = table;
-   }
-
-   void SetTableEntries(TableHandle::TableEntries& iSpecs)
-   {
-       for (TableEntry& spec : iSpecs) {
-          m_specs.push_back(spec);
-       }
-
-   }
-};
 
 //==============================================================================
 //==============================================================================
@@ -326,8 +235,6 @@ private:
    std::vector<REX::REveDataProxyBuilderBase*> m_builders;
    REX::REveScene* m_collections;
 
-   TableHandle::TableSpecs  m_tableFormats;
-
 public:
    XYManager(Event* event): m_event(event), m_viewContext(0), m_mngRhoZ(0), m_collections(0)
    {
@@ -342,22 +249,25 @@ public:
       prop->IncRefCount();
       
       m_viewContext = new REX::REveViewContext();
-      m_viewContext->SetBarrel(r, z);
+       m_viewContext->SetBarrel(r, z);
       m_viewContext->SetTrackPropagator(prop);
       
       createScenesAndViews();
 
       // table specs
-      table("XYTracks").
+      auto tableInfo = new REX::REveTableViewInfo();
+      tableInfo->table("XYTracks").
          column("pt", 1, "Pt").
          column("eta", 3, "Eta").
          column("phi", 3, "Phi");
 
-      table("XYJets").
+      tableInfo->table("XYJets").
          column("eta", 1, "Eta").
          column("phi", 1, "Phi").
          column("etasize", 2, "GetEtaSize").
          column("phisize", 2, "GetPhiSize");
+
+      m_viewContext->SetTableViewInfo(tableInfo);
    }
 
    void createScenesAndViews()
@@ -473,10 +383,10 @@ public:
       if (1) {
          // Table view types      {
          bool showTable = !m_collections->HasChildren();
-         auto tableBuilder = new TableProxyBuilder();
+         auto tableBuilder = new REX::REveTableProxyBuilder();
          tableBuilder->SetCollection(collection);
          tableBuilder->SetHaveAWindow(showTable);
-         tableBuilder->SetTableEntries(m_tableFormats[collection->GetName()]);
+         //   tableBuilder->SetTableEntries(m_tableFormats[collection->GetName()]);
 
          REX::REveElement* tablep = tableBuilder->CreateProduct("table-type", m_viewContext);
          for (REX::REveScene* scene : m_scenes) {
@@ -493,12 +403,6 @@ public:
       collection->SetHandlerFunc([&] (REX::REveDataCollection* collection) { this->CollectionChanged( collection ); });
       collection->SetHandlerFuncIds([&] (REX::REveDataCollection* collection, const REX::REveDataCollection::Ids_t& ids) { this->ModelChanged( collection, ids ); });
    }
-
-   TableHandle table(const char *collectionName){
-      TableHandle handle(collectionName, m_tableFormats);
-      return handle;
-   }
-
 
    void CollectionChanged(REX::REveDataCollection* collection) {
       printf("collection changes not implemented %s!\n", collection->GetCName());
