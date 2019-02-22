@@ -223,3 +223,6 @@
 #pragma link C++ class ROOT::Experimental::REveGeomVisisble+;
 #pragma link C++ class ROOT::Experimental::REveShapeRenderInfo+;
 #pragma link C++ class ROOT::Experimental::REveGeomDescription+;
+
+// Tables
+#pragma link C++ class ROOT::Experimental::REveTableViewInfo;

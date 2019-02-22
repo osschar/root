@@ -68,6 +68,7 @@ void REveDataProxyBuilderBase::Build()
 {
    if (m_collection)
    {
+      printf("Base %p %s %s\n", m_collection, m_collection->GetCName(), m_type.c_str());
       try
       {
          size_t itemSize = (size_t)m_collection->GetNItems(); //cashed

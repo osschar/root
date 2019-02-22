@@ -25,6 +25,7 @@ public:
    using REveDataProxyBuilderBase::Build;
    virtual void Build(const REveDataCollection* collection, REveElement* product, const REveViewContext* context);
 
+   void DisplayedCollectionChanged(ElementId_t);
 };
 }
 }

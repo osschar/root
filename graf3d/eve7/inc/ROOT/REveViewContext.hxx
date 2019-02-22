@@ -26,7 +26,7 @@ public:
    float GetMaxR() const {return m_R;}
    float GetMaxZ() const {return m_Z;}
    REveTrackPropagator* GetPropagator() const {return m_trackPropagator;}
-   REveTableViewInfo* GetTableInfo() const {return fTableInfo;}
+   REveTableViewInfo* GetTableViewInfo() const {return fTableInfo;}
 
    ClassDef(REveViewContext, 0);
 };

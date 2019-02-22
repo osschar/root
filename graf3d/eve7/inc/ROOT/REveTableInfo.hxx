@@ -59,19 +59,22 @@ protected:
    Specs_t&  fSpecs;
 };
 
+//==============================================================================
+//==============================================================================
 
-class REveTableViewInfo : REveElement
+class REveTableViewInfo : public REveElement
 {
 public:
-   REveTableViewInfo(const std::string& name="", const std::string& title=""){ fName=name; fTitle=title; }
+   REveTableViewInfo(const std::string& name="TableViewManager", const std::string& title=""){ fName=name; fTitle=title; }
 
-   typedef std::function<void (REveTableViewInfo*)> Delegate_t;
-   std::function<void (REveTableViewInfo*)> _handler_func;
+   typedef std::function<void (ElementId_t)> Delegate_t;
 
-   void SetDisplayedCollection(std::string collectionName);
-   std::string GetDisplayedCollection() const  { return fDisplayedCollection; }
+   void SetDisplayedCollection(ElementId_t);
+   ElementId_t GetDisplayedCollection() const  { return fDisplayedCollection; }
 
    void AddDelegate(Delegate_t d) { fDelegates.push_back(d); }
+
+   Int_t WriteCoreJson(nlohmann::json &j, Int_t rnr_offset); // override;
 
    // read
    REveTableHandle::Entries_t& RefTableEntries(std::string cname) { return fSpecs[cname]; }
@@ -83,9 +86,11 @@ public:
    }
 
 private:
-   std::string fDisplayedCollection;
+   int fDisplayedCollection;
    std::vector<Delegate_t> fDelegates;
    REveTableHandle::Specs_t  fSpecs;
+
+   ClassDef(REveTableViewInfo, 0); // Short description.
 };
 
 
