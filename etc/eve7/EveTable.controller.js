@@ -15,7 +15,7 @@ sap.ui.define([
       onInit : function() {
 
          var data = this.getView().getViewData();
-         console.log("VIEW DATA", data);
+         // console.log("VIEW DATA", data);
 
          var id = this.getView().getId();
          console.log("eve.GL.onInit id = ", id );
@@ -24,7 +24,7 @@ sap.ui.define([
          this._load_scripts = true;
          this._render_html = false;
 
-         console.log("TABLE VIEW CREATED");
+         // console.log("TABLE VIEW CREATED");
 
          this.mgr = data.mgr;
          this.elementid = data.elementid;
@@ -34,10 +34,7 @@ sap.ui.define([
          // loop over scene and add dependency
          for (var k=0;k<element.childs.length;++k) {
             var scene = element.childs[k];
-            console.log("FOUND scene", scene.fSceneId);
-
             this.mgr.RegisterSceneReceiver(scene.fSceneId, this);
-
             this.setEveData();
          }
 
@@ -45,13 +42,15 @@ sap.ui.define([
       },
 
       findTable: function(holder) {
-         console.log("find table in ", holder);
-         if ( holder.fRnrSelf && holder._typename == "ROOT::Experimental::REveDataTable" )
-            return holder;
-
-         for (var i = 0; i < holder.childs.length; ++i)
+         // presume table view manger is first child of table scene
+         var mng = holder.childs[0];
+         this.collectionMng = mng;
+         this.collection = this.mgr.GetElement(mng.fDisplayedCollection);
+         for (var i = 1; i < holder.childs.length; i++ )
          {
-            return this.findTable(holder.childs[i]);
+            var product = holder.childs[i];
+            if (product.childs.length)
+               return product.childs[0];
          }
 
       },
@@ -92,10 +91,10 @@ sap.ui.define([
             if ( !collection.childs[i].fFiltered) pass++;
          }
 
-         console.log("collection ",collection );
-         console.log("rowData ", rowData );
+         // console.log("collection ",collection );
+         // console.log("rowData ", rowData );
+         // console.log("columnData", columnData);
 
-         console.log("columnData", columnData);
          var oModel = new sap.ui.model.json.JSONModel();
          oModel.setData({
             rows: rowData,
@@ -119,32 +118,56 @@ sap.ui.define([
          });
 
          oTable.bindRows("/rows");
+
+
+         //______________________________________________________________________________
+         // get list of collections
+
+         var oModel = new sap.ui.model.json.JSONModel();
+         var clist = this.mgr.GetElement(this.collection.fMotherId);
+         console.log("collection list ", clist);
+
+	 var mData = {
+	    "itemx": [
+	    ]};
+
+         for (var i = 0; i < clist.childs.length; i++)
+         {
+            mData.itemx.push({"text" :clist.childs[i].fName, "key": clist.childs[i].fName, "elementId":clist.childs[i].fElementId });
+         }
+         oModel.setData(mData);
+         this.getView().setModel(oModel, "collections");
+
+
+         var combo = this.getView().byId("ccombo");
+         combo.setSelectedKey("XYTracks");
+         combo.data("controller", this);
+
       },
 
       onLoadScripts: function() {
          this._load_scripts = true;
          this.checkScenes();
       },
-      acm:function()
+
+      acm: function()
       {
          alert("Custom Menu");
       },
+
       // function called from GuiPanelController
       onExit : function() {
          if (this.mgr) this.mgr.Unregister(this);
       },
 
       onSceneCreate: function(element, id) {
-         console.log("!!!CHANGED", id);
-
+         console.log("EveTable onSceneChanged", id);
          this.setEveData();
       },
 
       UpdateMgr : function(mgr) {
          var elem = mgr.map[this.elementid];
          var scene = mgr.map[ elem.fMotherId];
-         console.log("Table update mgr", this, elem);
-         console.log("Table ", scene);
          this.mgr = mgr;
       },
 
@@ -168,12 +191,6 @@ sap.ui.define([
 
          var header = this.getView().byId("header");
          if (!this.editor) {
-            /*
-              var data = {"gedcol": { "expression":"dd", "title":"Title", "precision":1}};
-              var colModel = new JSONModel(data);
-              colModel.setData(data);
-              this.getView().setModel( colModel, "abc");
-            */
             this.editor = new sap.ui.layout.VerticalLayout("tableEdit", {"width":"100%"});
 
             header.addContent(this.editor);
@@ -285,8 +302,8 @@ sap.ui.define([
          console.log("table element id ", pthis.tableEveElement.fElementId);
 
          var obj = {"mir" : mir, "fElementId" : pthis.tableEveElement.fElementId, "class" : pthis.tableEveElement._typename};
-         pthis.mgr.handle.Send(JSON.stringify(obj));
          console.log("MIR obj ", obj);
+         pthis.mgr.handle.Send(JSON.stringify(obj));
 
 
       },
@@ -307,7 +324,20 @@ sap.ui.define([
       beginChanges : function() {
       },
 */
+      collectionChanged: function(oEvent) {
+         console.log("collectionChanged ", oEvent.getSource());
+         console.log("xxx ", this);
+       //  var pthis = this.data("controller");
+         var model = oEvent.oSource.getSelectedItem().getBindingContext("collections");
+         var path = model.getPath();
+         var entry = model.getProperty(path);
+         var coll = entry.elementId;
+         var mng = this.collectionMng;
+         var mir = {"elementid" : mng.fElementId, "elementclass":mng._typename};
+         mir.func = "SetDisplayedCollection(" + coll + ")";
 
+         this.mgr.executeCommand(mir);
+      },
 
       sceneElementChange : function(msg)
       {
@@ -316,7 +346,7 @@ sap.ui.define([
         // this[msg.tag](el);
       },
 
-      endChanges : function() {
+      endChanges : function(oEvent) {
          console.log("table controller endchanges ",this.tableEveElement );
          this.setEveData();
       },
@@ -326,7 +356,7 @@ sap.ui.define([
 
       var el = this.mgr.GetElement(elId);
          console.log("EveTable element remobedf ", el);
-         
+
       }
    });
 });

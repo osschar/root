@@ -251,8 +251,6 @@ public:
       m_viewContext = new REX::REveViewContext();
        m_viewContext->SetBarrel(r, z);
       m_viewContext->SetTrackPropagator(prop);
-      
-      createScenesAndViews();
 
       // table specs
       auto tableInfo = new REX::REveTableViewInfo();
@@ -268,6 +266,8 @@ public:
          column("phisize", 2, "GetPhiSize");
 
       m_viewContext->SetTableViewInfo(tableInfo);
+
+      createScenesAndViews();
    }
 
    void createScenesAndViews()
@@ -305,6 +305,7 @@ public:
          auto tableScene  = REX::gEve->SpawnNewScene("Tables", "Tables");
          auto tableView = REX::gEve->SpawnNewViewer("Table", "Table View");
          tableView->AddScene(tableScene);
+         tableScene->AddElement(m_viewContext->GetTableViewInfo());
          m_scenes.push_back(tableScene);
       }
 
@@ -382,13 +383,13 @@ public:
 
       if (1) {
          // Table view types      {
-         bool showTable = !m_collections->HasChildren();
          auto tableBuilder = new REX::REveTableProxyBuilder();
          tableBuilder->SetCollection(collection);
-         tableBuilder->SetHaveAWindow(showTable);
-         //   tableBuilder->SetTableEntries(m_tableFormats[collection->GetName()]);
-
          REX::REveElement* tablep = tableBuilder->CreateProduct("table-type", m_viewContext);
+
+         auto tableMng =  m_viewContext->GetTableViewInfo();
+         tableMng->AddDelegate([=](REX::ElementId_t elId) { tableBuilder->DisplayedCollectionChanged(elId); });
+
          for (REX::REveScene* scene : m_scenes) {
             if (strncmp(scene->GetCTitle(), "Table", 5) == 0) {
                scene->AddElement(tablep);
@@ -402,6 +403,17 @@ public:
       m_collections->AddElement(collection);
       collection->SetHandlerFunc([&] (REX::REveDataCollection* collection) { this->CollectionChanged( collection ); });
       collection->SetHandlerFuncIds([&] (REX::REveDataCollection* collection, const REX::REveDataCollection::Ids_t& ids) { this->ModelChanged( collection, ids ); });
+   }
+
+   void finishViewCreate() {
+      auto mngTable = m_viewContext->GetTableViewInfo();
+      if (mngTable) {
+         for (auto it = m_collections->BeginChildren(); it !=  m_collections->EndChildren(); it++)
+         {
+            if ((*it)->GetName() == "XYTracks")
+               mngTable->SetDisplayedCollection((*it)->GetElementId());
+         }
+      }
    }
 
    void CollectionChanged(REX::REveDataCollection* collection) {
@@ -476,7 +488,7 @@ void collection_proxies(bool proj=true)
       jetCollection->SetMainColor(kYellow);
       xyManager->addCollection(jetCollection);
    }
-
+   xyManager->finishViewCreate();
    
    auto eventMng = new EventManager(event, xyManager);
    eventMng->SetName("EventManager");
