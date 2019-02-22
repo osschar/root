@@ -428,7 +428,7 @@
                parent.childs = [];
             parent.childs.push(em);
 
-            this.ParseUpdateTriggersAndProcessPostStream(elem);
+            this.ParseUpdateTriggersAndProcessPostStream(em);
 
             em.tag = "elementAdded";
             this.callSceneReceivers(scene, "sceneElementChange", em);
