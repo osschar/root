@@ -9,6 +9,7 @@ THREE.OutlinePass = function ( resolution, scene, camera, selectedObjects ) {
 	this.renderScene = scene;
 	this.renderCamera = camera;
 	this.selectedObjects = selectedObjects !== undefined ? selectedObjects : [];
+	this.id2obj_map = {};
 	this.visibleEdgeColor = new THREE.Color( 1, 1, 1 );
 	this.hiddenEdgeColor = new THREE.Color( 0.1, 0.04, 0.02 );
 	this.edgeGlow = 0.0;
@@ -408,6 +409,10 @@ THREE.OutlinePass.prototype = Object.assign( Object.create( THREE.Pass.prototype
 	},
 
 	render: function ( renderer, writeBuffer, readBuffer, deltaTime, maskActive ) {
+		let meshes = Object.values(this.id2obj_map);
+		console.log(meshes);
+		if(meshes.length > 0) this.selectedObjects = meshes;
+
 		if ( this.selectedObjects.length > 0 ) {
 			this.oldClearColor.copy( renderer.getClearColor() );
 			this.oldClearAlpha = renderer.getClearAlpha();

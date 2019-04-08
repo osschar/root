@@ -329,24 +329,22 @@ sap.ui.define([
          let width = this.geo_painter._scene_width;
          let height = this.geo_painter._scene_height;
 
-         var outlinePass = new THREE.OutlinePass( new THREE.Vector2( width, height ), this.geo_painter._scene, this.geo_painter._camera  );
-         outlinePass.edgeStrength = 7.5;
-         outlinePass.edgeGlow = 0.5;
-         outlinePass.edgeThickness = 1.0;
-         outlinePass.usePatternTexture = false;
-         outlinePass.downSampleRatio = 2;
-         outlinePass.visibleEdgeColor.set('#dd1111');
-         outlinePass.hiddenEdgeColor.set('#1111dd');
-         composer.addPass( outlinePass );
+         this.outlinePass = new THREE.OutlinePass( new THREE.Vector2( width, height ), this.geo_painter._scene, this.geo_painter._camera  );
+         this.outlinePass.edgeStrength = 7.5;
+         this.outlinePass.edgeGlow = 0.5;
+         this.outlinePass.edgeThickness = 1.0;
+         this.outlinePass.usePatternTexture = false;
+         this.outlinePass.downSampleRatio = 2;
+         this.outlinePass.visibleEdgeColor.set('#dd1111');
+         this.outlinePass.hiddenEdgeColor.set('#1111dd');
+         composer.addPass( this.outlinePass );
 
-         var effectFXAA = new THREE.ShaderPass( THREE.FXAAShader );
-         effectFXAA.uniforms[ 'resolution' ].value.set( 1 / width, 1 / height );
-         effectFXAA.renderToScreen = true;
-         composer.addPass( effectFXAA );
+         this.effectFXAA = new THREE.ShaderPass( THREE.FXAAShader );
+         this.effectFXAA.uniforms[ 'resolution' ].value.set( 1 / width, 1 / height );
+         this.effectFXAA.renderToScreen = true;
+         composer.addPass( this.effectFXAA );
 
          this.composer = composer;
-         this.outlinePass = outlinePass;
-         this.effectFXAA = effectFXAA;
 
          // create only when geo painter is ready
          this.createScenes();
@@ -366,10 +364,10 @@ sap.ui.define([
 
          // TODO: should be specified somehow in XML file
          this.getView().$().css("overflow", "hidden").css("width", "100%").css("height", "100%");
-         if (this.geo_painter)
+         if (this.geo_painter){
             this.geo_painter.CheckResize();
-
-         this.effectFXAA.uniforms[ 'resolution' ].value.set( 1 / window.innerWidth, 1 / window.innerHeight );
+            this.effectFXAA.uniforms[ 'resolution' ].value.set( 1 / this.geo_painter._scene_width, 1 / this.geo_painter._scene_height );
+         }
       }
 
    });
