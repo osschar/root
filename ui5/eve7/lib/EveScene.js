@@ -332,6 +332,14 @@ sap.ui.define([
 
       this.setElementSelected(id, sel.col, sel.indx, true);
 
+      let sandbox = this;
+      this.viewer.outlinePass.selectedObjects = Object.keys(this.selected).map(function(id) {
+         let mesh = sandbox.getObj3D( id );
+         if(mesh)
+            return mesh;
+      });
+      // console.log(this.viewer.outlinePass.selectedObjects);
+
       this.mgr.invokeInOtherScenes(this, "setElementSelected", id, sel.col, sel.indx);
 
       // when true returns, controller will not try to render itself

@@ -43,7 +43,7 @@ sap.ui.define([
          var pthis = this;
          
          // one only can load EveScene after geometry painter 
-         sap.ui.define(['rootui5/eve7/lib/EveScene'], function (_EveScene) {
+         sap.ui.define(['rootui5/eve7/lib/EveScene', 'rootui5/eve7/lib/OutlinePass', 'rootui5/eve7/lib/FXAAShader'], function (_EveScene) {
             EveScene = _EveScene;
             pthis._load_scripts = true;
             pthis.checkViewReady();
@@ -325,6 +325,29 @@ sap.ui.define([
          // this.geo_painter._highlight_handlers = [ this ]; // register ourself for highlight handling
          this.last_highlight = null;
 
+         var composer = this.geo_painter._effectComposer;
+         let width = this.geo_painter._scene_width;
+         let height = this.geo_painter._scene_height;
+
+         var outlinePass = new THREE.OutlinePass( new THREE.Vector2( width, height ), this.geo_painter._scene, this.geo_painter._camera  );
+         outlinePass.edgeStrength = 7.5;
+         outlinePass.edgeGlow = 0.5;
+         outlinePass.edgeThickness = 1.0;
+         outlinePass.usePatternTexture = false;
+         outlinePass.downSampleRatio = 2;
+         outlinePass.visibleEdgeColor.set('#dd1111');
+         outlinePass.hiddenEdgeColor.set('#1111dd');
+         composer.addPass( outlinePass );
+
+         var effectFXAA = new THREE.ShaderPass( THREE.FXAAShader );
+         effectFXAA.uniforms[ 'resolution' ].value.set( 1 / width, 1 / height );
+         effectFXAA.renderToScreen = true;
+         composer.addPass( effectFXAA );
+
+         this.composer = composer;
+         this.outlinePass = outlinePass;
+         this.effectFXAA = effectFXAA;
+
          // create only when geo painter is ready
          this.createScenes();
          this.redrawScenes();
@@ -341,10 +364,14 @@ sap.ui.define([
       onResizeTimeout: function() {
          delete this.resize_tmout;
 
+         this.composer.setSize( this.geo_painter._scene_width, this.geo_painter._scene_height );
+
          // TODO: should be specified somehow in XML file
          this.getView().$().css("overflow", "hidden").css("width", "100%").css("height", "100%");
          if (this.geo_painter)
             this.geo_painter.CheckResize();
+
+         this.effectFXAA.uniforms[ 'resolution' ].value.set( 1 / window.innerWidth, 1 / window.innerHeight );
       }
 
    });
