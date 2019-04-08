@@ -330,8 +330,6 @@ sap.ui.define([
          }
       }
 
-      this.viewer.outlinePass.selectedObjects = [];
-
       this.setElementSelected(id, sel.col, sel.indx, true);
 
       this.mgr.invokeInOtherScenes(this, "setElementSelected", id, sel.col, sel.indx);
@@ -374,16 +372,6 @@ sap.ui.define([
    {
       if ( ! from_interactive)
          this.selected[mstrid] = { id: mstrid, col: col, indx: indx };
-     
-      if(this.viewer.kind === "3D"){
-         let sandbox = this;
-         Array.prototype.push.apply(sandbox.viewer.outlinePass.selectedObjects, Object.keys(sandbox.selected).map(function(id) {
-               return sandbox.getObj3D( id );
-            }).filter(function( element ) {
-               return element !== undefined;
-            })
-         );
-      }
 
       this.drawSpecial(mstrid);
    }
@@ -430,8 +418,20 @@ sap.ui.define([
          did_change = ctrl.drawSpecial(h ? h.col : null, h ? h.indx : undefined);
       }
 
-      if (did_change && this.viewer)
+      this.viewer.outlinePass.selectedObjects = [];
+
+      if (did_change && this.viewer){
          this.viewer.render();
+
+         if(this.viewer.kind === "3D"){
+            let ids = Object.keys(this.selected);
+            for(let i = 0; i < ids.length; ++i){
+               var obj3d = this.getObj3D( ids[i] );
+               if ( ! obj3d ) continue;
+               this.viewer.outlinePass.selectedObjects.push( obj3d );
+            }
+         }
+      }
 
       return did_change;
    }
