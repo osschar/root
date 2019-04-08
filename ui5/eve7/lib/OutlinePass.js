@@ -410,7 +410,6 @@ THREE.OutlinePass.prototype = Object.assign( Object.create( THREE.Pass.prototype
 
 	render: function ( renderer, writeBuffer, readBuffer, deltaTime, maskActive ) {
 		let meshes = Object.values(this.id2obj_map);
-		console.log(meshes);
 		if(meshes.length > 0) this.selectedObjects = meshes;
 
 		if ( this.selectedObjects.length > 0 ) {
