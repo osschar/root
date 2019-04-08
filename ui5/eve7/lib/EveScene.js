@@ -330,15 +330,9 @@ sap.ui.define([
          }
       }
 
-      this.setElementSelected(id, sel.col, sel.indx, true);
+      this.viewer.outlinePass.selectedObjects = [];
 
-      let sandbox = this;
-      this.viewer.outlinePass.selectedObjects = Object.keys(this.selected).map(function(id) {
-         let mesh = sandbox.getObj3D( id );
-         if(mesh)
-            return mesh;
-      });
-      // console.log(this.viewer.outlinePass.selectedObjects);
+      this.setElementSelected(id, sel.col, sel.indx, true);
 
       this.mgr.invokeInOtherScenes(this, "setElementSelected", id, sel.col, sel.indx);
 
@@ -380,6 +374,16 @@ sap.ui.define([
    {
       if ( ! from_interactive)
          this.selected[mstrid] = { id: mstrid, col: col, indx: indx };
+     
+      if(this.viewer.kind === "3D"){
+         let sandbox = this;
+         Array.prototype.push.apply(sandbox.viewer.outlinePass.selectedObjects, Object.keys(sandbox.selected).map(function(id) {
+               return sandbox.getObj3D( id );
+            }).filter(function( element ) {
+               return element !== undefined;
+            })
+         );
+      }
 
       this.drawSpecial(mstrid);
    }
