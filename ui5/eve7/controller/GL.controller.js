@@ -364,8 +364,6 @@ sap.ui.define([
       onResizeTimeout: function() {
          delete this.resize_tmout;
 
-         this.composer.setSize( this.geo_painter._scene_width, this.geo_painter._scene_height );
-
          // TODO: should be specified somehow in XML file
          this.getView().$().css("overflow", "hidden").css("width", "100%").css("height", "100%");
          if (this.geo_painter)
