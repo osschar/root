@@ -148,6 +148,45 @@ THREE.OutlinePass.prototype = Object.assign( Object.create( THREE.Pass.prototype
 				++this.atts.total;
 			}
 		}
+
+		let groups = [[]];
+		for (let i = 0; i < this.selectedObjects.length; ++i){
+			const object = this.selectedObjects[i];
+
+			if(object.type === "Points"){
+
+				let found = false;
+				// loop over groups
+				for (let z = 1; z < groups.length; ++z){
+					// loop over all the elements of a group
+					for (let w = 0; w < z.length; ++w){
+						// if the objects have the same attributes
+						if(
+							this.selectedObjects[z][w].type			 === this.selectedObjects[i].type 		   &&
+							this.selectedObjects[z][w].material.size === this.selectedObjects[i].material.size &&
+							this.selectedObjects[z][w]["vertShader"] === this.selectedObjects[i]["vertShader"] &&
+							this.selectedObjects[z][w]["fragShader"] === this.selectedObjects[i]["fragShader"]
+						){
+							groups[z] = groups[z] || [];
+							groups[z].push(this.selectedObjects[i]);
+							found = true;
+							break; 
+						}
+					}
+					if(found)
+						break;
+				}
+
+				if(!found){
+					groups[i+1] = groups[i+1] || [];
+					groups[i+1].push(this.selectedObjects[i]);
+				}
+			} else {
+				groups[0].push(this.selectedObjects[i]);
+			}
+		}
+		this.groups = groups.filter(Array);
+		console.log(groups);
 	},
 
 	dispose: function () {
@@ -279,10 +318,10 @@ THREE.OutlinePass.prototype = Object.assign( Object.create( THREE.Pass.prototype
 	draw: function(renderer, writeBuffer, readBuffer, maskActive, group, index){	
 		this.changeVisibilityOfSelectedObjects(true, group);	
 		
-		if(index !== -1){
-			this.prepareMaskMaterial.uniforms[ "pointSize" ].value = this.atts["pointSize"][index];
-			if(this.atts["vertShader"][index]) this.prepareMaskMaterial.vertexShader = this.atts["vertShader"][index];
-			if(this.atts["fragShader"][index]) this.prepareMaskMaterial.fragmentShader = this.atts["fragShader"][index];
+		if(group[0].type === "Points"){
+			this.prepareMaskMaterial.uniforms[ "pointSize" ].value = group[0].material.size || 20.0;
+			if(group[0]["vertShader"]) this.prepareMaskMaterial.vertexShader = group[0]["vertShader"];
+			if(group[0]["fragShader"]) this.prepareMaskMaterial.fragmentShader = group[0]["fragShader"];
 		}
 		renderer.render( this.renderScene, this.renderCamera );
 
@@ -331,24 +370,28 @@ THREE.OutlinePass.prototype = Object.assign( Object.create( THREE.Pass.prototype
 
 			this.checkForCustomAtts();
 			
-			if(this.atts.total > 0){
-				let group = [];
-
-				for(let i = 0; i < this.selectedObjects.length; ++i){
-					let p = this.atts["index"].indexOf(i);
-					if(p !== -1){
-						this.draw(renderer, writeBuffer, readBuffer, maskActive, this.selectedObjects[i], p);
-					} else {
-						group.push(this.selectedObjects[i]);
-					}
-				}
-
-				if(group.length > 0){
-					this.draw(renderer, writeBuffer, readBuffer, maskActive, group, -1);
-				}
-			} else {
-				this.draw(renderer, writeBuffer, readBuffer, maskActive, this.selectedObjects, -1);
+			for(const group of this.groups){
+				this.draw(renderer, writeBuffer, readBuffer, maskActive, group);
 			}
+
+			// if(this.atts.total > 0){
+			// 	let group = [];
+
+			// 	for(let i = 0; i < this.selectedObjects.length; ++i){
+			// 		let p = this.atts["index"].indexOf(i);
+			// 		if(p !== -1){
+			// 			this.draw(renderer, writeBuffer, readBuffer, maskActive, this.selectedObjects[i], p);
+			// 		} else {
+			// 			group.push(this.selectedObjects[i]);
+			// 		}
+			// 	}
+
+			// 	if(group.length > 0){
+
+			// 	}
+			// } else {
+			// 	this.draw(renderer, writeBuffer, readBuffer, maskActive, this.selectedObjects, -1);
+			// }
 
 			// enable back all selected elements
 			this.changeVisibilityOfSelectedObjects(true);
