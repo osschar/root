@@ -325,7 +325,7 @@ sap.ui.define([
          // this.geo_painter._highlight_handlers = [ this ]; // register ourself for highlight handling
          this.last_highlight = null;
 
-         var composer = this.geo_painter._effectComposer;
+         this.composer = this.geo_painter._effectComposer;
          let width = this.geo_painter._scene_width;
          let height = this.geo_painter._scene_height;
 
@@ -337,14 +337,12 @@ sap.ui.define([
          this.outlinePass.downSampleRatio = 2;
          this.outlinePass.visibleEdgeColor.set('#dd1111');
          this.outlinePass.hiddenEdgeColor.set('#1111dd');
-         composer.addPass( this.outlinePass );
+         this.composer.addPass( this.outlinePass );
 
          this.effectFXAA = new THREE.ShaderPass( THREE.FXAAShader );
          this.effectFXAA.uniforms[ 'resolution' ].value.set( 1 / width, 1 / height );
          this.effectFXAA.renderToScreen = true;
-         composer.addPass( this.effectFXAA );
-
-         this.composer = composer;
+         this.composer.addPass( this.effectFXAA );
 
          // create only when geo painter is ready
          this.createScenes();

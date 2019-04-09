@@ -2,13 +2,13 @@
  * @author spidersharma / http://eduperiment.com/
  */
 
-THREE.OutlinePass = function ( resolution, scene, camera, selectedObjects ) {
+THREE.OutlinePass = function ( resolution, scene, camera ) {
 
 	// [{ "index": number, "isPoints": boolean, "pointSize": number, "vertShader": string, "fragShader":string },......]
 	this.atts = {};
 	this.renderScene = scene;
 	this.renderCamera = camera;
-	this.selectedObjects = selectedObjects !== undefined ? selectedObjects : [];
+	this.selectedObjects = [];
 	this.id2obj_map = {};
 	this.visibleEdgeColor = new THREE.Color( 1, 1, 1 );
 	this.hiddenEdgeColor = new THREE.Color( 0.1, 0.04, 0.02 );
@@ -147,26 +147,6 @@ THREE.OutlinePass.prototype = Object.assign( Object.create( THREE.Pass.prototype
 				this.atts["fragShader"].push(object["fragShader"]);
 				++this.atts.total;
 			}
-
-			// let keys = Object.keys(object);
-			// let values = Object.values(object);
-
-			// let h_atts = false;
-			// for (const att of ["isPoints", "pointSize", "vertShader", "fragShader"]){
-			// 	let pos = keys.indexOf(att);
-			// 	// console.log(keys, pos, att);
-			// 	if(pos !== -1){
-			// 		c_atts[att] = values[pos];
-			// 		h_atts = true;
-			// 	}
-			// }
-
-			// if(h_atts) {
-			// 	c_atts["index"] = i;
-			// 	// c_atts["isPoints"] = object.isPoints;
-				
-			// 	this.atts.push(c_atts);
-			// }
 		}
 	},
 
@@ -409,8 +389,7 @@ THREE.OutlinePass.prototype = Object.assign( Object.create( THREE.Pass.prototype
 	},
 
 	render: function ( renderer, writeBuffer, readBuffer, deltaTime, maskActive ) {
-		let meshes = Object.values(this.id2obj_map);
-		if(meshes.length > 0) this.selectedObjects = meshes;
+		this.selectedObjects = Object.values(this.id2obj_map);
 
 		if ( this.selectedObjects.length > 0 ) {
 			this.oldClearColor.copy( renderer.getClearColor() );

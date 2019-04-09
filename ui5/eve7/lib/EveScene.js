@@ -421,11 +421,9 @@ sap.ui.define([
          did_change = ctrl.drawSpecial(h ? h.col : null, h ? h.indx : undefined);
       }
 
-      this.viewer.outlinePass.selectedObjects = [];
-
       if (did_change && this.viewer){
          this.viewer.render();
-         if(onclick && this.viewer.kind === "3D")
+         if(onclick)
             this.viewer.outlinePass.id2obj_map[mstrid] = obj3d;
       }
 
