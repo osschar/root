@@ -186,7 +186,7 @@ THREE.OutlinePass.prototype = Object.assign( Object.create( THREE.Pass.prototype
 			}
 		}
 		this.groups = groups.filter(Array);
-		console.log(groups);
+		// console.log(groups);
 	},
 
 	dispose: function () {
