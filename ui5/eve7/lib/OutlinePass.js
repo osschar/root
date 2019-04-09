@@ -130,6 +130,7 @@ THREE.OutlinePass.prototype = Object.assign( Object.create( THREE.Pass.prototype
 	constructor: THREE.OutlinePass,
 
 	checkForCustomAtts: function(){
+		/*
 		this.atts = {
 			"index": [],
 			"pointSize": [],
@@ -148,6 +149,7 @@ THREE.OutlinePass.prototype = Object.assign( Object.create( THREE.Pass.prototype
 				++this.atts.total;
 			}
 		}
+		*/
 
 		let groups = [[]];
 		for (let i = 0; i < this.selectedObjects.length; ++i){
