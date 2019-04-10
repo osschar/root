@@ -154,6 +154,7 @@ THREE.OutlinePass.prototype = Object.assign( Object.create( THREE.Pass.prototype
 		for (let i = 0; i < this.selectedObjects.length; ++i){
 			const object = this.selectedObjects[i];
 
+			// treat Mesh and LineSegments as the same
 			if(object.type === "Mesh" || object.type === "LineSegments" )
 			{
 				groups[0] = groups[0] || [];
@@ -195,7 +196,7 @@ THREE.OutlinePass.prototype = Object.assign( Object.create( THREE.Pass.prototype
 				groups[0].push(object);
 			}
 		}
-		this.groups = groups.filter(Array);
+		this.groups = groups/*.filter(Array)*/;
 		// console.log(groups);
 	},
 

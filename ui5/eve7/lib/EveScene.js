@@ -423,14 +423,18 @@ sap.ui.define([
          this.viewer.render();
          if(!prefer_highlight){
             if(!this.selected[mstrid]){
+               // delete if its not selected anymore?
                delete this.viewer.outlinePass.id2obj_map[mstrid];
             } else {
+               // is secondary selection
                let sec_sel = this.selected[mstrid].indx;
 
+               // if its not secondary selection pass the object
                if(!sec_sel)
                   this.viewer.outlinePass.id2obj_map[mstrid] = obj3d;
+               // if its secondary selection pass all the new objects returned by 'drawSpecial'
                else {
-                  this.viewer.outlinePass.id2obj_map[mstrid] = [];
+                  this.viewer.outlinePass.id2obj_map[mstrid] = []; // reset
                   if(false){
                      if(obj3d.sl_special) this.viewer.outlinePass.id2obj_map[mstrid].push(obj3d.sl_special);
                      if(obj3d.sm_special) this.viewer.outlinePass.id2obj_map[mstrid].push(obj3d.sm_special);
@@ -440,9 +444,10 @@ sap.ui.define([
                            this.viewer.outlinePass.id2obj_map[mstrid].push(child);
                      }
                   }
+                  // print the new elements
+                  console.log(this.viewer.outlinePass.id2obj_map[mstrid]);
                }
             }
-            console.log(this.viewer.outlinePass.id2obj_map[mstrid]);
          }
       }
 
