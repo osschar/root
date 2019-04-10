@@ -20,7 +20,7 @@ endfunction()
 function(ROOT_APPLY_OPTIONS)
   foreach(opt ${root_build_options})
      option(${opt} "${${opt}_description}" ${${opt}_defvalue})
-  endforeach()  
+  endforeach()
 endfunction()
 
 #---------------------------------------------------------------------------------------------------
@@ -229,7 +229,6 @@ if(all)
  set(r_defvalue ON)
  set(roofit_defvalue ON)
  set(root7_defvalue ON)
- set(webui_defvalue ON)
  set(shadowpw_defvalue ON)
  set(table_defvalue ON)
  set(unuran_defvalue ON)
@@ -265,6 +264,9 @@ if(builtin_all)
   set(builtin_zlib_defvalue ON)
 endif()
 
+#---webui always build together with root7----------------------------------------------------
+set(webui_defvalue ${root7})
+
 #---Vc supports only x86_64 architecture-------------------------------------------------------
 if (NOT CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
   message(STATUS "Vc does not support ${CMAKE_SYSTEM_PROCESSOR}. Support for Vc disabled.")
@@ -273,7 +275,7 @@ endif()
 
 #---Options depending of CMake Generator-------------------------------------------------------
 if( CMAKE_GENERATOR STREQUAL Ninja)
-   set(fortran_defvalue OFF) 
+   set(fortran_defvalue OFF)
 endif()
 
 #---Apply minimal or gminimal------------------------------------------------------------------
@@ -290,7 +292,6 @@ endforeach()
 #---ROOT 7 requires C++14 standard or higher---------------------------------------------------
 if(NOT CMAKE_CXX_STANDARD GREATER 11)
   set(root7_defvalue OFF)
-  set(webui_defvalue OFF)
 endif()
 
 #---roottest option implies testing
@@ -300,6 +301,15 @@ endif()
 
 #---Define at moment the options with the selected default values-----------------------------
 ROOT_APPLY_OPTIONS()
+
+if(root7)
+  if(NOT CMAKE_CXX_STANDARD)
+      set(CMAKE_CXX_STANDARD 14 CACHE STRING "C++14 standard used with root7")
+      message(STATUS "Enabling C++14 for compilation of root7 components")
+  elseif(NOT CMAKE_CXX_STANDARD GREATER 11)
+      message(FATAL_ERROR ">>> At least C++14 standard required with root7")
+   endif()
+endif()
 
 #---check if webui can be build-------------------------------
 if(webui)

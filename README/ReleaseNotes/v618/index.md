@@ -13,6 +13,7 @@ For more information, see:
 The following people have contributed to this new version:
 
  Bertrand Bellenot, CERN/SFT,\
+ Brian Bockelman, Nebraska,\
  Rene Brun, CERN/SFT,\
  Philippe Canal, FNAL,\
  Javier Cervantes Villanueva, CERN/SFT \
@@ -28,10 +29,14 @@ The following people have contributed to this new version:
  Axel Naumann, CERN/SFT,\
  Danilo Piparo, CERN/SFT,\
  Fons Rademakers, CERN/SFT,\
+ Oksana Shadura, Nebraska,\
  Enric Tejedor Saavedra, CERN/SFT,\
  Matevz Tadel, UCSD/CMS,\
  Vassil Vassilev, Princeton/CMS,\
- Wouter Verkerke, NIKHEF/Atlas,
+ Wouter Verkerke, NIKHEF/Atlas,\
+ Zhe Zhang, Nebraska, \
+ Stefan Wunsch, CERN/SFT
+
 
 ## Deprecation and Removal
 
@@ -58,7 +63,7 @@ The methods could be replaced by equivalent methods with other signature:
 
 
 ## Core Libraries
-
+  - Prevent usage of non integer class id in `ClassDef(Inline)` macros with an error prompted at dictionary generation or compile time.
 
 ## I/O Libraries
 
@@ -107,7 +112,28 @@ Added necessary changes to allow [XRootD local redirection](https://github.com/x
       }
 ~~~
 
+### Bulk I/O
+  - The new `TBulkBranchRead` class (inside the `ROOT::Experimental::Internal` namespace) provides
+    a mechanism for reading, in a single library call, many events' worth of simple data (primitive types,
+    arrays of primitives, split structures) stored in a `TTree`.  This allows for extremely fast delivery
+    of event data to the process.  This is meant as an internal interface that allows the ROOT team to
+    implement faster high-level interface.
+  - The `TTreeReaderFast ` class (inside the `ROOT::Experimental::Internal` namespace) provides a simple
+    mechanism for reading ntuples with the bulk IO interface.
+
 ## Histogram Libraries
+
+### TH1
+  - Add a search range to the `TH1::FindFirstBinAbove(..)` and `TH1::FindLastBinAvove(..)` functions 
+
+### TH2Poly
+  - Add implementation of SetBinError and fix a bug in GetBinError in case of weighted events.
+
+### TF1
+  - The implementation of TF1::GetX has been improved. In case of the presence of multiple roots, the function will return the root with the lower x value. In case of no-roots a NaN will be returned instead of returning a random incorrect value.
+
+### TKDE
+  - Add support for I/O
 
 
 ## Math Libraries
@@ -118,6 +144,21 @@ Added necessary changes to allow [XRootD local redirection](https://github.com/x
   - Add the `DeltaR2` and `DeltaR` helpers for RVec.
   - Add the `Max`, `Min`, `ArgMax`, and `ArgMin` helpers for RVec.
   - Add the `Construct` helper to build an `RVec<T>` starting from N `RVec<P_i>`, where a constructor `T::T(P_0, P_1, ..., P_Nm1)` exists.
+
+### [Clad](https://github.com/vgvassilev/clad)
+  - Upgrade Clad to 0.5 The new release includes some improvements in both
+    Forward and Reverse mode:
+    * Extend the way to specify a dependent variables. Consider function,
+      `double f(double x, double y, double z) {...}`, `clad::differentiate(f, "z")`
+      is equivalent to `clad::differentiate(f, 2)`. `clad::gradient(f, "x, y")`
+      differentiates with respect to `x` and `y` but not `z`. The gradient results
+      are stored in a `_result` parameter in the same order as `x` and `y` were
+      specified. Namely, the result of `x` is stored in `_result[0]` and the result
+      of `y` in `_result[1]`. If we invert the arguments specified in the string to
+      `clad::gradient(f, "y, x")` the results will be stored inversely.
+    * Enable recursive differentiation.
+    * Support single- and multi-dimensional arrays -- works for arrays with constant
+      size like `double A[] = {1, 2, 3};`, `double A[3];` or `double A[1][2][3][4];`
 
 ## RooFit Libraries
 ### HistFactory
@@ -151,7 +192,7 @@ The old RooFit collections could be modified while iterating. The STL-like itera
 - **But not** inserting/deleting before/at the current iterator position. With a debug build (with assertions), the legacy iterators will check that the collection is not mutated. In a release build, elements might be skipped or be iterated twice.
 
 #### Moving away from the slower iterators
-The legacy iterators have been flagged with a special deprecation macro that can be used help the user use the recommended ROOT interface. Defining `R__SUGGEST_NEW_INTERFACE`, (either in a single translation unit or in the build system), all uses of the legacy iterators will trigger a compiler warning like:
+The legacy iterators have been flagged with a special deprecation macro that can be used help the user use the recommended ROOT interface. Defining `R__SUGGEST_ALTERNATIVE`, (either in a single translation unit or in the build system), creating a legacy iterator will trigger a compiler warning such as:
 ```
 <path>/RooChebychev.cxx:66:34: warning: 'createIterator' is deprecated: There is a superior alternative: begin(), end() and range-based for loops. [-Wdeprecated-declarations]
   TIterator* coefIter = coefList.createIterator() ;
@@ -160,7 +201,25 @@ The legacy iterators have been flagged with a special deprecation macro that can
 ```
 
 
+## TMVA
 
+This release provoids a consolidation and several fixes of the new machine leanring tools provided in TMVA such as the Deep Learning module.
+The method `TMVA::Types::kDL` should be used now for building Deep Learning architecture in TMVA, while `TMVA::Types::kDNN` is now deprecated. `TMVA::Types::kDL` provides all the functionality of `TMVA::Types::kDNN`, i.e building fully connected dense layer, but in addition supports building convolutional and recurrent neural network architectures.
+These release contains improvements in the `MethodDL` such as:
+  - fix droput support for dense layer
+  - add protection to avoid returning NaN in the cross-entropy loss function
+
+In addition we have :
+
+  - New `TMVA::Executor` class to control the multi-thread running of TMVA. By default now MT running will be enabled only when `ROOT::EnabledImplicitMT()` is called. But we can take the control of the threads by using `TMVA::gConfig().EnableMT(...)` and `TMVA::gConfig().DisableMT()`
+
+
+### PyMVA 
+  - add support when using the Tensorflow backend in Keras to control the number of threads
+  - add possibility to control options for configuring GPU running. FOr example we can now set the mode to allocate memory only as needed. This is required when using the new RTX gaming cards from NVIDIA
+
+
+  
 
 ## 2D Graphics Libraries
 
