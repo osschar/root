@@ -373,10 +373,7 @@ sap.ui.define([
       if ( ! from_interactive)
          this.selected[mstrid] = { id: mstrid, col: col, indx: indx };
 
-      if ( ! col)
-         delete this.viewer.outlinePass.id2obj_map[mstrid];
-
-      this.drawSpecial(mstrid, false, true);
+      this.drawSpecial(mstrid);
    }
 
    /** Called when processing changes from server or from interactive handler */
@@ -396,7 +393,7 @@ sap.ui.define([
       this.drawSpecial(mstrid, true);
    }
 
-   EveScene.prototype.drawSpecial = function(mstrid, prefer_highlight, onclick)
+   EveScene.prototype.drawSpecial = function(mstrid, prefer_highlight)
    {
       var obj3d = this.getObj3D( mstrid, true );
       if ( ! obj3d || ! obj3d.get_ctrl) obj3d = this.getObj3D( mstrid );
@@ -411,6 +408,7 @@ sap.ui.define([
       if (ctrl.separateDraw)
       {
          var p2 = "s", p1 = "h";
+         // swap h1-h2
          if (!prefer_highlight) { var h = h1; h1 = h2; h2 = h; p2 = "h"; p1 = "s"; }
          if (ctrl.drawSpecial(h2 ? h2.col : null, h2 ? h2.indx : undefined, p2)) did_change = true;
          if (ctrl.drawSpecial(h1 ? h1.col : null, h1 ? h1.indx : undefined, p1)) did_change = true;
@@ -423,8 +421,29 @@ sap.ui.define([
 
       if (did_change && this.viewer){
          this.viewer.render();
-         if(onclick)
-            this.viewer.outlinePass.id2obj_map[mstrid] = obj3d;
+         if(!prefer_highlight){
+            if(!this.selected[mstrid]){
+               delete this.viewer.outlinePass.id2obj_map[mstrid];
+            } else {
+               let sec_sel = this.selected[mstrid].indx;
+
+               if(!sec_sel)
+                  this.viewer.outlinePass.id2obj_map[mstrid] = obj3d;
+               else {
+                  this.viewer.outlinePass.id2obj_map[mstrid] = [];
+                  if(false){
+                     if(obj3d.sl_special) this.viewer.outlinePass.id2obj_map[mstrid].push(obj3d.sl_special);
+                     if(obj3d.sm_special) this.viewer.outlinePass.id2obj_map[mstrid].push(obj3d.sm_special);
+                  } else {
+                     for(const child of obj3d.children){
+                        if(child.jsroot_special)
+                           this.viewer.outlinePass.id2obj_map[mstrid].push(child);
+                     }
+                  }
+               }
+            }
+            console.log(this.viewer.outlinePass.id2obj_map[mstrid]);
+         }
       }
 
       return did_change;

@@ -5,7 +5,6 @@
 THREE.OutlinePass = function ( resolution, scene, camera ) {
 
 	// [{ "index": number, "isPoints": boolean, "pointSize": number, "vertShader": string, "fragShader":string },......]
-	this.atts = {};
 	this.renderScene = scene;
 	this.renderCamera = camera;
 	this.selectedObjects = [];
@@ -151,12 +150,17 @@ THREE.OutlinePass.prototype = Object.assign( Object.create( THREE.Pass.prototype
 		}
 		*/
 
-		let groups = [[]];
+		let groups = [];
 		for (let i = 0; i < this.selectedObjects.length; ++i){
 			const object = this.selectedObjects[i];
 
-			if(object.type === "Points"){
-
+			if(object.type === "Mesh" || object.type === "LineSegments" )
+			{
+				groups[0] = groups[0] || [];
+				groups[0].push(object);
+			}
+			else if(object.type === "Points")
+			{
 				let found = false;
 				// loop over groups
 				for (let z = 1; z < groups.length; ++z){
@@ -164,13 +168,13 @@ THREE.OutlinePass.prototype = Object.assign( Object.create( THREE.Pass.prototype
 					for (let w = 0; w < z.length; ++w){
 						// if the objects have the same attributes
 						if(
-							this.selectedObjects[z][w].type			 === this.selectedObjects[i].type 		   &&
-							this.selectedObjects[z][w].material.size === this.selectedObjects[i].material.size &&
-							this.selectedObjects[z][w]["vertShader"] === this.selectedObjects[i]["vertShader"] &&
-							this.selectedObjects[z][w]["fragShader"] === this.selectedObjects[i]["fragShader"]
+							this.selectedObjects[z][w].type			 === object.type			&&
+							this.selectedObjects[z][w].material.size === object.material.size	&&
+							this.selectedObjects[z][w]["vertShader"] === object["vertShader"]	&&
+							this.selectedObjects[z][w]["fragShader"] === object["fragShader"]
 						){
 							groups[z] = groups[z] || [];
-							groups[z].push(this.selectedObjects[i]);
+							groups[z].push(object);
 							found = true;
 							break; 
 						}
@@ -181,10 +185,14 @@ THREE.OutlinePass.prototype = Object.assign( Object.create( THREE.Pass.prototype
 
 				if(!found){
 					groups[i+1] = groups[i+1] || [];
-					groups[i+1].push(this.selectedObjects[i]);
+					groups[i+1].push(object);
 				}
-			} else {
-				groups[0].push(this.selectedObjects[i]);
+			} 
+			else 
+			{
+				console.error("unknown type of geometry! fallback to 0");
+				groups[0] = groups[0] || [];
+				groups[0].push(object);
 			}
 		}
 		this.groups = groups.filter(Array);
@@ -331,7 +339,9 @@ THREE.OutlinePass.prototype = Object.assign( Object.create( THREE.Pass.prototype
 	},
 
 	render: function ( renderer, writeBuffer, readBuffer, deltaTime, maskActive ) {
-		this.selectedObjects = Object.values(this.id2obj_map);
+		this.selectedObjects = Object.values(this.id2obj_map).flat();
+		// console.log(this.selectedObjects);
+		// debugger;
 
 		if ( this.selectedObjects.length > 0 ) {
 			this.oldClearColor.copy( renderer.getClearColor() );
@@ -373,7 +383,8 @@ THREE.OutlinePass.prototype = Object.assign( Object.create( THREE.Pass.prototype
 			this.checkForCustomAtts();
 			
 			for(const group of this.groups){
-				this.draw(renderer, writeBuffer, readBuffer, maskActive, group);
+				if(group.length > 0)
+					this.draw(renderer, writeBuffer, readBuffer, maskActive, group);
 			}
 
 			// if(this.atts.total > 0){
