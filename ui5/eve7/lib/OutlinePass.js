@@ -7,16 +7,19 @@ THREE.OutlinePass = function ( resolution, scene, camera ) {
 	// [{ "index": number, "isPoints": boolean, "pointSize": number, "vertShader": string, "fragShader":string },......]
 	this.renderScene = scene;
 	this.renderCamera = camera;
-	this.selectedObjects = [];
+
+	// [fElementId][elementId] -> { "sel_type": THREE.OutlinePass.selection_enum, "sec_sel": boolean, "geom": Primitive<> }
 	this.id2obj_map = {};
-	this.visibleEdgeColor = new THREE.Color( 1, 1, 1 );
-	this.hiddenEdgeColor = new THREE.Color( 0.1, 0.04, 0.02 );
+	// R: Primitives
+	this._selectedObjects = [];
+	// [C1]: Selection Types - [C2]: Attributes(color, size, etc...) - [R2]: Primitives
+	this._groups = Array.from(Array(THREE.OutlinePass.selection_enum.total), () => []); // ES6 (could be replaced with vanilla Js)
+
 	this.edgeGlow = 0.0;
 	this.usePatternTexture = false;
 	this.edgeThickness = 1.0;
 	this.edgeStrength = 3.0;
 	this.downSampleRatio = 2;
-	this.pulsePeriod = 0;
 
 	THREE.Pass.call( this );
 
@@ -29,9 +32,20 @@ THREE.OutlinePass = function ( resolution, scene, camera ) {
 
 	this.maskBufferMaterial = new THREE.MeshBasicMaterial( { color: 0xffffff } );
 	this.maskBufferMaterial.side = THREE.DoubleSide;
-	this.renderTargetMaskBuffer = new THREE.WebGLRenderTarget( this.resolution.x, this.resolution.y, pars );
-	this.renderTargetMaskBuffer.texture.name = "OutlinePass.mask";
-	this.renderTargetMaskBuffer.texture.generateMipmaps = false;
+
+	this.renderTargetMaskBuffer = [];
+	// +1 extra for the "accumulated" result
+	for(let i = 0; i < THREE.OutlinePass.selection_enum.total; ++i){
+		let maskBuffer = new THREE.WebGLRenderTarget( this.resolution.x, this.resolution.y, pars )
+		maskBuffer.texture.name = "OutlinePass.submask"+i;
+		maskBuffer.texture.generateMipmaps = false;
+		
+		this.renderTargetMaskBuffer.push(maskBuffer);
+	}
+
+	this.renderTargetMaskBufferMain = new THREE.WebGLRenderTarget( this.resolution.x, this.resolution.y, pars );
+	this.renderTargetMaskBufferMain.texture.name = "OutlinePass.mask";
+	this.renderTargetMaskBufferMain.texture.generateMipmaps = false;
 
 	this.depthMaterial = new THREE.MeshDepthMaterial();
 	this.depthMaterial.side = THREE.DoubleSide;
@@ -65,8 +79,8 @@ THREE.OutlinePass = function ( resolution, scene, camera ) {
 	this.renderTargetEdgeBuffer2.texture.name = "OutlinePass.edge2";
 	this.renderTargetEdgeBuffer2.texture.generateMipmaps = false;
 
-	var MAX_EDGE_THICKNESS = 4;
-	var MAX_EDGE_GLOW = 4;
+	const MAX_EDGE_THICKNESS = 4;
+	const MAX_EDGE_GLOW = 4;
 
 	this.separableBlurMaterial1 = this.getSeperableBlurMaterial( MAX_EDGE_THICKNESS );
 	this.separableBlurMaterial1.uniforms[ "texSize" ].value = new THREE.Vector2( resx, resy );
@@ -128,6 +142,39 @@ THREE.OutlinePass.prototype = Object.assign( Object.create( THREE.Pass.prototype
 
 	constructor: THREE.OutlinePass,
 
+	parseAtts: function(object, groups){
+		let found = false;
+		// loop over groups
+		for (let z = 0; z < groups.length; ++z){
+			// loop over all the elements of a group
+			//for (let w = 0; w < groups[z].length; ++w)
+
+			const w = 0; // check only the first element of the group!
+			{
+				let pass = (object.type === "Points") ? (groups[z][w].material.size === object.material.size) : true;
+				
+				if( pass ){
+					// final check
+					if( groups[z][w]["vertShader"] === object["vertShader"]	&&
+						groups[z][w]["fragShader"] === object["fragShader"] &&
+						groups[z][w].visibleEdgeColor === object.visibleEdgeColor &&
+						groups[z][w].hiddenEdgeColor === object.hiddenEdgeColor
+					) { 
+						groups[z].push(object);
+						found = true;
+						break; 
+					}
+				}
+			}
+			if(found)
+				break;
+		}
+
+		if(!found){
+			groups.push([object]);
+		}
+	},
+
 	checkForCustomAtts: function(){
 		/*
 		this.atts = {
@@ -149,60 +196,75 @@ THREE.OutlinePass.prototype = Object.assign( Object.create( THREE.Pass.prototype
 			}
 		}
 		*/
+		
+		// one array for each selection type
+		this._groups = Array.from(Array(THREE.OutlinePass.selection_enum.total), () => []);
 
-		let groups = [];
-		for (let i = 0; i < this.selectedObjects.length; ++i){
-			const object = this.selectedObjects[i];
-
-			// treat Mesh and LineSegments as the same
-			if(object.type === "Mesh" || object.type === "LineSegments" )
-			{
-				groups[0] = groups[0] || [];
-				groups[0].push(object);
-			}
-			else if(object.type === "Points")
-			{
-				let found = false;
-				// loop over groups
-				for (let z = 1; z < groups.length; ++z){
-					// loop over all the elements of a group
-					for (let w = 0; w < z.length; ++w){
-						// if the objects have the same attributes
-						if(
-							this.selectedObjects[z][w].type			 === object.type			&&
-							this.selectedObjects[z][w].material.size === object.material.size	&&
-							this.selectedObjects[z][w]["vertShader"] === object["vertShader"]	&&
-							this.selectedObjects[z][w]["fragShader"] === object["fragShader"]
-						){
-							groups[z] = groups[z] || [];
-							groups[z].push(object);
-							found = true;
-							break; 
-						}
-					}
-					if(found)
-						break;
-				}
-
-				if(!found){
-					groups[i+1] = groups[i+1] || [];
-					groups[i+1].push(object);
-				}
-			} 
-			else 
-			{
-				console.error("unknown type of geometry! fallback to 0");
-				groups[0] = groups[0] || [];
-				groups[0].push(object);
+		// fill in "this._groups"
+		for (const obj of this._selectedObjects){
+			for(const geom of obj.geom){
+				this.parseAtts(geom, this._groups[obj.sel_type]);
 			}
 		}
-		this.groups = groups/*.filter(Array)*/;
-		// console.log(groups);
+
+		// for (let i = 0; i < this.selectedObjects.length; ++i){
+		// 	const object = this.selectedObjects[i];
+
+		// 	// treat Mesh and LineSegments as the same
+		// 	if(object.type === "Mesh" || object.type === "LineSegments" )
+		// 	{
+		// 		groups[0] = groups[0] || [];
+		// 		groups[0].push(object);
+		// 	}
+		// 	else if(object.type === "Points")
+		// 	{
+		// 		let found = false;
+		// 		// loop over groups
+		// 		for (let z = 1; z < groups.length; ++z){
+		// 			// loop over all the elements of a group
+		// 			for (let w = 0; w < z.length; ++w){
+		// 				// if the objects have the same attributes
+		// 				if(
+		// 					this.selectedObjects[z][w].type			 === object.type			&&
+		// 					this.selectedObjects[z][w].material.size === object.material.size	&&
+		// 					this.selectedObjects[z][w]["vertShader"] === object["vertShader"]	&&
+		// 					this.selectedObjects[z][w]["fragShader"] === object["fragShader"]
+		// 				){
+		// 					groups[z].push(object);
+		// 					found = true;
+		// 					break; 
+		// 				}
+		// 			}
+		// 			if(found)
+		// 				break;
+		// 		}
+
+		// 		if(!found){
+		// 			groups.push([object]);
+		// 		}
+		// 	}
+		// 	else if(object.type === "Group")
+		// 	{
+		// 		for (const child of object.children){
+					
+		// 		}
+		// 	}
+		// 	else 
+		// 	{
+		// 		console.error("unknown type of geometry! fallback to 0");
+		// 		groups[0] = groups[0] || [];
+		// 		groups[0].push(object);
+		// 	}
+		// }
+		// this._groups = groups.filter(Array);
 	},
 
 	dispose: function () {
 
-		this.renderTargetMaskBuffer.dispose();
+		this.renderTargetMaskBufferMain.dispose();
+		for(const fbo of this.renderTargetMaskBuffer)
+			fbo.dispose();
+
 		this.renderTargetDepthBuffer.dispose();
 		this.renderTargetMaskDownSampleBuffer.dispose();
 		this.renderTargetBlurBuffer1.dispose();
@@ -214,7 +276,9 @@ THREE.OutlinePass.prototype = Object.assign( Object.create( THREE.Pass.prototype
 
 	setSize: function ( width, height ) {
 
-		this.renderTargetMaskBuffer.setSize( width, height );
+		this.renderTargetMaskBufferMain.setSize( width, height );
+		for(const fbo of this.renderTargetMaskBuffer)
+			fbo.setSize( width, height );
 
 		var resx = Math.round( width / this.downSampleRatio );
 		var resy = Math.round( height / this.downSampleRatio );
@@ -255,8 +319,13 @@ THREE.OutlinePass.prototype = Object.assign( Object.create( THREE.Pass.prototype
 
 		}
 
-		for(const obj of ((Array.isArray(object) ? object : (object && [object])) || this.selectedObjects)){
-			obj.traverse( gatherSelectedMeshesCallBack );
+		for(const obj of (object || this._selectedObjects)){
+			if(obj.geom){
+				for(const geom of obj.geom)
+					geom.traverse( gatherSelectedMeshesCallBack );
+			} else {
+				obj.traverse( gatherSelectedMeshesCallBack );
+			}
 		}
 
 	},
@@ -271,11 +340,9 @@ THREE.OutlinePass.prototype = Object.assign( Object.create( THREE.Pass.prototype
 
 		}
 
-		for ( var i = 0; i < this.selectedObjects.length; i ++ ) {
-
-			var selectedObject = this.selectedObjects[ i ];
-			selectedObject.traverse( gatherSelectedMeshesCallBack );
-
+		for(const obj of this._selectedObjects){
+			for(const geom of obj.geom)
+				geom.traverse( gatherSelectedMeshesCallBack );
 		}
 
 		function VisibilityChangeCallBack( object ) {
@@ -326,7 +393,7 @@ THREE.OutlinePass.prototype = Object.assign( Object.create( THREE.Pass.prototype
 
 	},
 
-	draw: function(renderer, writeBuffer, readBuffer, maskActive, group, index){	
+	draw: function(renderer, group, selection_type){	
 		this.changeVisibilityOfSelectedObjects(true, group);	
 		
 		if(group[0].type === "Points"){
@@ -334,17 +401,33 @@ THREE.OutlinePass.prototype = Object.assign( Object.create( THREE.Pass.prototype
 			if(group[0]["vertShader"]) this.prepareMaskMaterial.vertexShader = group[0]["vertShader"];
 			if(group[0]["fragShader"]) this.prepareMaskMaterial.fragmentShader = group[0]["fragShader"];
 		}
+		renderer.setRenderTarget( this.renderTargetMaskBufferMain );
+		renderer.render( this.renderScene, this.renderCamera );
+
+		renderer.setRenderTarget( this.renderTargetMaskBuffer[selection_type] );
+		renderer.clear();
 		renderer.render( this.renderScene, this.renderCamera );
 
 		this.changeVisibilityOfSelectedObjects(false, group);	
 	},
 
 	render: function ( renderer, writeBuffer, readBuffer, deltaTime, maskActive ) {
-	        this.selectedObjects = Object.values(this.id2obj_map).flat();
-	        console.log(this.selectedObjects);
+		this._selectedObjects = Object.values(this.id2obj_map).flat();
+		// console.log(this.selectedObjects);
 		// debugger;
 
-		if ( this.selectedObjects.length > 0 ) {
+		if ( this._selectedObjects.length > 0 ) {
+			// fetch objects that were created after secondary selection
+			let sec_sel = this._selectedObjects.map(function(v){ 
+				if(v.sec_sel) return v.geom;
+			});
+			sec_sel = sec_sel.flat();
+			// debugger;
+
+			// add sec_sel elements in renderScene
+			for(const obj of sec_sel)
+				if(obj) this.renderScene.add(obj);
+
 			this.oldClearColor.copy( renderer.getClearColor() );
 			this.oldClearAlpha = renderer.getClearAlpha();
 			var oldAutoClear = renderer.autoClear;
@@ -378,14 +461,16 @@ THREE.OutlinePass.prototype = Object.assign( Object.create( THREE.Pass.prototype
 			this.prepareMaskMaterial.uniforms[ "depthTexture" ].value = this.renderTargetDepthBuffer.texture;
 			this.prepareMaskMaterial.uniforms[ "textureMatrix" ].value = this.textureMatrix;
 
-			renderer.setRenderTarget( this.renderTargetMaskBuffer );
+			renderer.setRenderTarget( this.renderTargetMaskBufferMain );
 			renderer.clear();
 
 			this.checkForCustomAtts();
+			//console.log(this._groups);
 			
-			for(const group of this.groups){
-				if(group.length > 0)
-					this.draw(renderer, writeBuffer, readBuffer, maskActive, group);
+			for(let i = 0; i < THREE.OutlinePass.selection_enum.total; ++i){
+				for(const group of this._groups[i])
+					if(group.length > 0)
+						this.draw(renderer, group, i);
 			}
 
 			// if(this.atts.total > 0){
@@ -407,41 +492,68 @@ THREE.OutlinePass.prototype = Object.assign( Object.create( THREE.Pass.prototype
 			// 	this.draw(renderer, writeBuffer, readBuffer, maskActive, this.selectedObjects, -1);
 			// }
 
-			// enable back all selected elements
-			this.changeVisibilityOfSelectedObjects(true);
-
 			this.renderScene.overrideMaterial = null;
-			this.changeVisibilityOfNonSelectedObjects( true );
-	
+			
+			// enable all elements
+			this.changeVisibilityOfSelectedObjects(true);
+			this.changeVisibilityOfNonSelectedObjects(true);
+
 			this.renderScene.background = currentBackground;
 	
 			// 2. Downsample to Half resolution
-			this.quad.material = this.materialCopy;
-			this.copyUniforms[ "tDiffuse" ].value = this.renderTargetMaskBuffer.texture;
-			renderer.setRenderTarget( this.renderTargetMaskDownSampleBuffer );
-			renderer.clear();
-			renderer.render( this.scene, this.camera );
-	
-			this.tempPulseColor1.copy( this.visibleEdgeColor );
-			this.tempPulseColor2.copy( this.hiddenEdgeColor );
-	
-			if ( this.pulsePeriod > 0 ) {
-	
-				var scalar = ( 1 + 0.25 ) / 2 + Math.cos( performance.now() * 0.01 / this.pulsePeriod ) * ( 1.0 - 0.25 ) / 2;
-				this.tempPulseColor1.multiplyScalar( scalar );
-				this.tempPulseColor2.multiplyScalar( scalar );
-	
-			}
-	
-			// 3. Apply Edge Detection Pass
-			this.quad.material = this.edgeDetectionMaterial;
-			this.edgeDetectionMaterial.uniforms[ "maskTexture" ].value = this.renderTargetMaskDownSampleBuffer.texture;
-			this.edgeDetectionMaterial.uniforms[ "texSize" ].value = new THREE.Vector2( this.renderTargetMaskDownSampleBuffer.width, this.renderTargetMaskDownSampleBuffer.height );
-			this.edgeDetectionMaterial.uniforms[ "visibleEdgeColor" ].value = this.tempPulseColor1;
-			this.edgeDetectionMaterial.uniforms[ "hiddenEdgeColor" ].value = this.tempPulseColor2;
+
+			// clear stuff
 			renderer.setRenderTarget( this.renderTargetEdgeBuffer1 );
 			renderer.clear();
-			renderer.render( this.scene, this.camera );
+
+			for(let i = 0; i < THREE.OutlinePass.selection_enum.total; ++i){
+				let group = this._groups[i];
+				if(group.length > 0){
+					this.quad.material = this.materialCopy;
+					this.copyUniforms[ "tDiffuse" ].value = this.renderTargetMaskBuffer[i].texture;
+					renderer.setRenderTarget( this.renderTargetMaskDownSampleBuffer );
+					renderer.clear();
+					renderer.render( this.scene, this.camera );
+	
+					// this.changeVisibilityOfSelectedObjects(false);
+
+					// this.changeVisibilityOfSelectedObjects(true, group);
+
+					// 3. Apply Edge Detection Pass
+					this.quad.material = this.edgeDetectionMaterial;
+					this.edgeDetectionMaterial.uniforms[ "maskTexture" ].value = this.renderTargetMaskDownSampleBuffer.texture;
+					this.edgeDetectionMaterial.uniforms[ "texSize" ].value = new THREE.Vector2( this.renderTargetMaskDownSampleBuffer.width, this.renderTargetMaskDownSampleBuffer.height );
+					renderer.setRenderTarget( this.renderTargetEdgeBuffer1 );
+	
+					const att = THREE.OutlinePass.selection_atts[i];
+					this.edgeDetectionMaterial.uniforms[ "visibleEdgeColor" ].value = att.visibleEdgeColor;
+					this.edgeDetectionMaterial.uniforms[ "hiddenEdgeColor" ].value = att.hiddenEdgeColor;
+					renderer.render( this.scene, this.camera );
+
+					// this.changeVisibilityOfSelectedObjects(false, group);
+				}
+
+				// this.changeVisibilityOfSelectedObjects(true);
+			}
+
+
+
+			//>-----------------
+			// for(let i = 0; i < THREE.OutlinePass.selection_enum.total; ++i){
+			// 	const sel = this.sel[i];
+			// 	if(sel.length > 0){
+			// 		this.changeVisibilityOfSelectedObjects(true, sel);
+
+			// 		// 3. Apply Edge Detection Pass
+			// 		const att = THREE.OutlinePass.selection_atts[i];
+			// 		this.edgeDetectionMaterial.uniforms[ "visibleEdgeColor" ].value = att.visibleEdgeColor;
+			// 		this.edgeDetectionMaterial.uniforms[ "hiddenEdgeColor" ].value = att.hiddenEdgeColor;
+			// 		renderer.render( this.scene, this.camera );
+
+			// 		this.changeVisibilityOfSelectedObjects(false, sel);
+			// 	}
+			// }
+			// this.changeVisibilityOfSelectedObjects(true);
 	
 			// 4. Apply Blur on Half res
 			this.quad.material = this.separableBlurMaterial1;
@@ -472,7 +584,7 @@ THREE.OutlinePass.prototype = Object.assign( Object.create( THREE.Pass.prototype
 	
 			// Blend it additively over the input texture
 			this.quad.material = this.overlayMaterial;
-			this.overlayMaterial.uniforms[ "maskTexture" ].value = this.renderTargetMaskBuffer.texture;
+			this.overlayMaterial.uniforms[ "maskTexture" ].value = this.renderTargetMaskBufferMain.texture;
 			this.overlayMaterial.uniforms[ "edgeTexture1" ].value = this.renderTargetEdgeBuffer1.texture;
 			this.overlayMaterial.uniforms[ "edgeTexture2" ].value = this.renderTargetEdgeBuffer2.texture;
 			this.overlayMaterial.uniforms[ "patternTexture" ].value = this.patternTexture;
@@ -489,6 +601,10 @@ THREE.OutlinePass.prototype = Object.assign( Object.create( THREE.Pass.prototype
 
 			renderer.setClearColor( this.oldClearColor, this.oldClearAlpha );
 			renderer.autoClear = oldAutoClear;
+			
+			// remove sec_sel elements from renderScene
+			for(const obj of sec_sel)
+				if(obj) this.renderScene.remove(obj);
 		} else {
 			this.quad.material = this.materialCopy;
 			this.copyUniforms[ "tDiffuse" ].value = readBuffer.texture;
@@ -718,3 +834,30 @@ if(false){
 
 THREE.OutlinePass.BlurDirectionX = new THREE.Vector2( 1.0, 0.0 );
 THREE.OutlinePass.BlurDirectionY = new THREE.Vector2( 0.0, 1.0 );
+
+THREE.OutlinePass.selection_enum = {
+	"select": 0,
+	"highlight": 1,
+	"total": 2 
+};
+
+THREE.OutlinePass.selection_atts = [
+	{
+		visibleEdgeColor: new THREE.Color( 1, 0, 0 ),
+		hiddenEdgeColor: new THREE.Color( 1, 0, 0.5 )
+		// hiddenEdgeColoe: new THREE.Color( 0.1, 0.04, 0.02 )
+		// edgeGlow: 0.0,
+		// usePatternTexture: false,
+		// edgeThickness: 1.0,
+		// edgeStrength: 3.0,
+	},
+	{
+		visibleEdgeColor: new THREE.Color( 0, 1, 0 ),
+		hiddenEdgeColor: new THREE.Color( 0, 1, 0.5 )
+		// hiddenEdgeColor: new THREE.Color( 0.1, 0.04, 0.02 )
+		// edgeGlow: 0.0,
+		// usePatternTexture: false,
+		// edgeThickness: 1.0,
+		// edgeStrength: 3.0,
+	}
+];

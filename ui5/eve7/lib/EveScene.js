@@ -252,7 +252,6 @@ sap.ui.define([
    EveScene.prototype.processElementSelected = function(obj3d, col, indx, evnt)
    {
       // MT BEGIN
-
       console.log("EveScene.prototype.processElementSelected", obj3d, col, indx, evnt);
 
       var is_multi  = evnt && evnt.ctrlKey;
@@ -344,17 +343,47 @@ sap.ui.define([
    /** interactive handler */
    EveScene.prototype.processElementHighlighted = function(obj3d, col, indx, evnt)
    {
-      var id = obj3d.mstrId;
-      // id = obj3d.eveId;
+      // Need check for duplicates before call server, else server will un-higlight highlighted element
+      // console.log("EveScene.prototype.processElementHighlighted", obj3d, col, indx, evnt);
+      var is_multi  = false;
+      var is_secsel = indx !== undefined;
 
-      // MT XXXX
-    //  console.log("EveScene.prototype.processElementHighlighted", obj3d, col, indx, evnt);
+      var so = this.mgr.GetElement(this.mgr.global_highlight_id);
+      var a = so.prev_sel_list;
+      
+      // AMT presume there is no multiple highlight and multiple secondary selections
+      // if that is the case in the futre write data in set and comapre sets
+      
+      // console.log("EveScene.prototype.processElementHighlighted compare Reveselection ", a[0], "incoming ", obj3d.eveId,indx);
+      if (a.length == 1 ) {
+         var h = a[0];
+         if (h.primary == obj3d.eveId || h.primary == obj3d.mstrId ) {
+            if (indx) {
+               if (h.sec_idcs && h.sec_idcs[0] == indx) {
+                  // console.log("EveScene.prototype.processElementHighlighted processElementHighlighted same index ");
+                  return true;
+               }
+            }
+            if (!indx && !h.sec_idcs.length) {
+               // console.log("processElementHighlighted primARY SElection not changed ");
+               return true;
+            }
+         }
+      }
+      
+      var fcall = "NewElementPicked(" + obj3d.eveId + `, ${is_multi}, ${is_secsel}`;
+      if (is_secsel)
+      {
+         fcall += ", { " + (Array.isArray(indx) ? indx.join(", ") : indx) + " }";
+      }
+      fcall += ")";
 
-      this.setElementHighlighted(id, col, indx, true);
 
-      this.mgr.invokeInOtherScenes(this, "setElementHighlighted", id, col, indx);
+      this.mgr.SendMIR({ "mir":        fcall,
+                         "fElementId": this.mgr.global_highlight_id,
+                         "class":      "REX::REveSelection"
+                       });
 
-      // when true returns, controller will not try to render itself
       return true;
    }
 
@@ -459,10 +488,18 @@ sap.ui.define([
 
    EveScene.prototype.SelectElement = function(selection_obj, element_id, sec_idcs)
    {
+      var stype = selection_obj.fName.endsWith("Selection") ? "select" : "highlight";
+      var estype = THREE.OutlinePass.selection_enum[stype];
+      
+      let res = { 
+         "sel_type": estype,
+         "sec_sel": false,
+         "geom": []
+      };
       var obj3d = this.getObj3D( element_id );
 
       if ( ! (selection_obj.fElementId in this.viewer.outlinePass.id2obj_map))
-	 this.viewer.outlinePass.id2obj_map[selection_obj.fElementId] = [];
+	      this.viewer.outlinePass.id2obj_map[selection_obj.fElementId] = [];
 
       var dest  = this.viewer.outlinePass.id2obj_map[selection_obj.fElementId];
 
@@ -470,21 +507,15 @@ sap.ui.define([
 
       if(sec_idcs === undefined || sec_idcs.length == 0)
       {
-         dest[element_id] = obj3d;
+         res.geom.push(obj3d);
       }
       else
       {
          var ctrl = obj3d.get_ctrl();
-	 // AMT todo check for memory leaks
-	 var x = new THREE.Object3D();
-         ctrl.DrawForSelection(sec_idcs, x);
-	 console.log("draw for selection exit ", x);
-	 // AMT for debugging purposes take only first child
-	 var fe  = x.children[0];
-         dest[element_id] = fe;
+         ctrl.DrawForSelection(sec_idcs, res.geom);
+         res.sec_sel = true;
       }
-
-      this.viewer.render();
+      dest[element_id] = res;
    }
 
    EveScene.prototype.UnselectElement = function(selection_obj, element_id)
@@ -492,8 +523,6 @@ sap.ui.define([
       if (selection_obj.fElementId in this.viewer.outlinePass.id2obj_map)
       {
 	 delete this.viewer.outlinePass.id2obj_map[selection_obj.fElementId][element_id];
-
-	 this.viewer.render();
       }
    }
 

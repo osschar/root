@@ -295,7 +295,8 @@ sap.ui.define([
 
 
          var options = "";
-         if (this.kind != "3D") options = "ortho_camera";
+         // options += " black, ";
+         if (this.kind != "3D") options += "ortho_camera";
 
 
          // TODO: should be specified somehow in XML file
@@ -321,28 +322,55 @@ sap.ui.define([
             this.geo_painter._camera.bottom = -this.getView().$().height();
             this.geo_painter._camera.updateProjectionMatrix();
          }
+         painter._controls.ProcessMouseMove = function(intersects) {
+            var active_mesh = null, tooltip = null, resolve = null, names = [], geo_object, geo_index;
+
+            // try to find mesh from intersections
+            for (var k=0;k<intersects.length;++k) {
+               var obj = intersects[k].object, info = null;
+               if (!obj) continue;
+               if (obj.geo_object) info = obj.geo_name; else
+                  if (obj.stack) info = painter.GetStackFullName(obj.stack);
+               if (info===null) continue;
+
+               if (info.indexOf("<prnt>")==0)
+                  info = painter.GetItemName() + info.substr(6);
+
+               names.push(info);
+
+               if (!active_mesh) {
+                  active_mesh = obj;
+                  tooltip = info;
+                  geo_object = obj.geo_object;
+                  if (obj.get_ctrl) {
+                     geo_index = obj.get_ctrl().extractIndex(intersects[k]);
+                     if ((geo_index !== undefined) && (typeof tooltip == "string")) tooltip += " indx:" + JSON.stringify(geo_index);
+                  }
+                  if (active_mesh.stack) resolve = painter.ResolveStack(active_mesh.stack);
+               }
+            }
+
+            //painter.HighlightMesh(active_mesh, undefined, geo_object, geo_index); AMT override
+            if (active_mesh && active_mesh.get_ctrl()) active_mesh.get_ctrl().setHighlight( 0xffaa33, geo_index);
+            
+            if (painter.options.update_browser) {
+               if (painter.options.highlight && tooltip) names = [ tooltip ];
+               painter.ActivateInBrowser(names);
+            }
+
+            if (!resolve || !resolve.obj) return tooltip;
+
+            var lines = JSROOT.GEO.provideInfo(resolve.obj);
+            lines.unshift(tooltip);
+
+            return { name: resolve.obj.fName, title: resolve.obj.fTitle || resolve.obj._typename, lines: lines };
+         }
 
          // this.geo_painter._highlight_handlers = [ this ]; // register ourself for highlight handling
          this.last_highlight = null;
 
-         this.composer = this.geo_painter._effectComposer;
-         let width = this.geo_painter._scene_width;
-         let height = this.geo_painter._scene_height;
-
-         this.outlinePass = new THREE.OutlinePass( new THREE.Vector2( width, height ), this.geo_painter._scene, this.geo_painter._camera  );
-         this.outlinePass.edgeStrength = 7.5;
-         this.outlinePass.edgeGlow = 0.5;
-         this.outlinePass.edgeThickness = 1.0;
-         this.outlinePass.usePatternTexture = false;
-         this.outlinePass.downSampleRatio = 2;
-         this.outlinePass.visibleEdgeColor.set('#dd1111');
-         this.outlinePass.hiddenEdgeColor.set('#1111dd');
-         this.composer.addPass( this.outlinePass );
-
-         this.effectFXAA = new THREE.ShaderPass( THREE.FXAAShader );
-         this.effectFXAA.uniforms[ 'resolution' ].value.set( 1 / width, 1 / height );
-         this.effectFXAA.renderToScreen = true;
-         this.composer.addPass( this.effectFXAA );
+         // outlinePass passthrough
+         this.outlinePass = this.geo_painter._outlinePass;
 
          // create only when geo painter is ready
          this.createScenes();
@@ -364,7 +392,6 @@ sap.ui.define([
          this.getView().$().css("overflow", "hidden").css("width", "100%").css("height", "100%");
          if (this.geo_painter){
             this.geo_painter.CheckResize();
-            this.effectFXAA.uniforms[ 'resolution' ].value.set( 1 / this.geo_painter._scene_width, 1 / this.geo_painter._scene_height );
          }
       }
 
