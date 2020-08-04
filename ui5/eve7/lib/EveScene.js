@@ -42,9 +42,6 @@ sap.ui.define([
 
       if (obj3d)
       {
-         // MT ??? why?, it can really be anything, even just container Object3D
-         obj3d._typename = "THREE.Mesh";
-
          // add reference to a streamed eve element to obj3d
          obj3d.eve_el = elem;
 
