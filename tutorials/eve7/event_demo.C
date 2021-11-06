@@ -140,7 +140,7 @@ void addJets()
       jet->AddEllipticCone(r.Uniform(-3.5, 3.5), r.Uniform(0, TMath::TwoPi()),
                            r.Uniform(0.02, 0.2), r.Uniform(0.02, 0.3));
       jet->SetFillColor(kPink - 8);
-      jet->SetLineColor(kViolet - 7);
+      jet->SetLineColor(kBlack);
 
       jetHolder->AddElement(jet);
    }
@@ -199,7 +199,9 @@ void projectScenes(bool geomp, bool eventp)
    {
       for (auto &ie : eveMng->GetGlobalScene()->RefChildren())
       {
+         mngRhoPhi->SetCurrentDepth(0);
          mngRhoPhi->ImportElements(ie, rPhiGeomScene);
+         mngRhoZ  ->SetCurrentDepth(0);
          mngRhoZ  ->ImportElements(ie, rhoZGeomScene);
       }
    }
@@ -207,7 +209,9 @@ void projectScenes(bool geomp, bool eventp)
    {
       for (auto &ie : eveMng->GetEventScene()->RefChildren())
       {
+         mngRhoPhi->SetCurrentDepth(10);
          mngRhoPhi->ImportElements(ie, rPhiEventScene);
+         mngRhoZ  ->SetCurrentDepth(10);
          mngRhoZ  ->ImportElements(ie, rhoZEventScene);
       }
    }
