@@ -9,8 +9,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
    // EveElemControl
    //==============================================================================
 
-   class EveElemControl {
-
+   class EveElemControl
+   {
 
       constructor(o3d)
       {
@@ -47,10 +47,6 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
    } // class EveElemControl
 
-   /// is it necessary?
-   EveElemControl.prototype.separateDraw = false;
-
-
 
    //==============================================================================
    // EveElements
@@ -66,8 +62,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
    //------------------------------------------------------------------------------
 
-   class EveElements {
-
+   class EveElements
+   {
       constructor(rc) {
          console.log("EveElements -- RCore");
 
@@ -75,6 +71,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
          this.POINT_SIZE_FAC = 1;
          this.LINE_WIDTH_FAC = 1;
+         this.ColorWhite = new RC.Color(0xFFFFFF);
+         this.ColorBlack = new RC.Color(0x000000);
       }
 
       SetupPointLineFacs(pf, lf)
@@ -104,12 +102,34 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          return mat;
       }
 
+      RcFlatMaterial(color, opacity, props)
+      {
+         let mat = new RC.MeshBasicMaterial;
+         mat._color = color;
+         mat._emissive = color; // mat.emissive.offsetHSL(0, 0.1, 0);
+
+         if (opacity !== undefined && opacity < 1.0)
+         {
+            mat._opacity = opacity;
+            mat._transparent = true;
+            mat._depthWrite = false;
+         }
+         if (props !== undefined)
+         {
+            mat.update(props);
+         }
+         return mat;
+      }
+
       RcFancyMaterial(color, opacity, props)
       {
          let mat = new RC.MeshPhongMaterial;
          // let mat = new RC.MeshBasicMaterial;
 
          mat._color = color;
+         mat._specular = new RC.Color(0xFFFFFF); // mat._specular.offsetHSL(0, 0, 0.4);
+         mat._shininess = 32;
+   
          if (opacity !== undefined && opacity < 1.0)
          {
             mat._opacity = opacity;
@@ -127,7 +147,10 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
       {
          if (el.fPickable) {
             obj3d.get_ctrl = function() { return new ctrl_class(obj3d); }
-            obj3d.colorID = el.fElementId;
+            obj3d.pickable = true;
+            for (let i = 0; i < obj3d.children.length; ++i)
+               obj3d.children[i].pickable = true;
+            // using auto-id now obj3d.colorID = el.fElementId;
             // console.log("YES Pickable for", el.fElementId, el.fName)
             return true;
          } else {
@@ -174,9 +197,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          pm.usePoints = true;
          pm.drawCircles = true;
 
-         // mesh.get_ctrl = function() { return new EveElemControl(this); }
-
          this.RcPickable(hit, pnts);
+         pnts.dispose = function() { delete this; } // ????
          return pnts;
       }
 
@@ -254,6 +276,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          //line.hightlightWidthScale = 2;
 
          this.RcPickable(track, line);
+         line.dispose = function() { /*delete this.geometry; delete this.material;*/ };
          return line;
       }
 
@@ -310,9 +333,13 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
          mesh.add(line1);
          mesh.add(line2);
-
-         // mesh.get_ctrl = function () { return new EveElemControl(this); }
          this.RcPickable(jet, mesh);
+
+         mesh.dispose = function() {
+            //this.children.forEach(c => { delete c.geometry; delete c.material; });
+            //delete this.geometry; delete this.material;
+         };
+
          return mesh;
       }
 
@@ -354,7 +381,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          // console.log("cols", fcol, lcol);
 
          // double-side material required for correct tracing of colors - otherwise points sequence should be changed
-         let mesh = new RC.Mesh(geo_body, this.RcFancyMaterial(fcol, 0.5));
+         let mesh = new RC.Mesh(geo_body, this.RcFlatMaterial(fcol, 0.5));
 
          let line1 = new RC.Line(geo_rim, this.RcLineMaterial(lcol, 0.8, 2));
 
@@ -363,9 +390,13 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
          mesh.add(line1);
          mesh.add(line2);
-
-         // mesh.get_ctrl = function () { return new EveElemControl(this); }
          this.RcPickable(jet, mesh);
+
+         mesh.dispose = function() {
+            //this.children.forEach(c => { delete c.geometry; delete c.material; });
+            //delete this.geometry; delete this.material;
+         };
+   
          return mesh;
       }
 
@@ -430,10 +461,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
          let fcol = RcCol(psp.fMainColor);
 
-         let material = this.RcFancyMaterial(fcol, 0.4);
+         let material = this.RcFlatMaterial(fcol, 0.4);
          material.side = RC.FRONT_AND_BACK_SIDE;
-         material.specular = new RC.Color(1, 1, 1);
-         material.shininess = 50;
 
          let line_mat = this.RcLineMaterial(fcol);
 
@@ -473,6 +502,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
             }
 
          }
+         this.RcPickable(psp, psp_ro);
 
          return psp_ro;
       }
@@ -551,9 +581,5 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
       }
 
    } // class EveElements
-
-   //==============================================================================
-
-   return EveElements;
 
 });
