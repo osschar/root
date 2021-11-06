@@ -45,23 +45,11 @@ sap.ui.define([
          // // console.log(window.location.pathname); // where are we loading from?
          // import("https://desire.physics.ucsd.edu/matevz/alja.github.io/rootui5/eve7/rnr_core/RenderCore.js").then((module) => {
 
-         import("../../eve7/rnr_core/RenderCore.js").then((module) => {
+         import("../../eve7/lib/REveRenderCore.js").then((module) => {
             console.log("GlViewerRCore.onInit - RenderCore.js loaded");
 
             RC = module;
-            if (this.UseRenderQueue)
-            {
-               import("../../eve7/lib/RendeQuTor.js").then((module) => {
-                  console.log("GlViewerRCore.onInit - RenderPassesRCore.js loaded");
-
-                  RP = module;
-                  RendeQuTor = RP.RendeQuTor;
-
-                  pthis.bootstrap();
-               });
-            } else {
-               pthis.bootstrap();
-            }
+            pthis.bootstrap();
          });
       }
 
@@ -70,10 +58,12 @@ sap.ui.define([
          this.creator = new EveElements(RC);
          // this.creator.useIndexAsIs = EVE.JSR.decodeUrl().has('useindx');
 
+         RC.Object3D.sDefaultPickable = false;
+
          this.createRCoreRenderer();
          this.controller.createScenes();
          this.controller.redrawScenes();
-         this.setupRCoreDomAndEventHandlers();
+         this.setupEventHandlers();
 
          this.controller.glViewerInitDone();
 
@@ -110,16 +100,17 @@ sap.ui.define([
          this.canvas.id     = "rcore-canvas";
          this.canvas.width  = w;
          this.canvas.height = h;
+         this.get_view().getDomRef().appendChild(this.canvas);
 
-         // Enable EXT_color_buffer_float for picking depth extraction
-         // let gl = this.canvas.getContext("webgl2");
-         // let ex = gl.getExtension("EXT_color_buffer_float");
-         // console.log("Create RCore, gl, float_color_buff:", gl, ex);
+         this.canvas.canvasDOM = this.canvas; // RCore wants this in GLManager ctor ?
+
+         let gl = this.canvas.getContext("webgl2");
 
          this.renderer = new RC.MeshRenderer(this.canvas, RC.WEBGL2, {antialias: false, stencil: true});
          this.renderer.clearColor = "#FFFFFFFF";
-         this.renderer.addShaderLoaderUrls("rootui5sys/eve7/rnr_core/shaders");
+         this.renderer.addShaderLoaderUrls("rootui5sys/eve7/lib/RC/shaders");
          this.renderer.addShaderLoaderUrls("rootui5sys/eve7/shaders");
+         this.renderer.pickObject3D = true;
          this.renderer.pickDoNotRender = true;
 
          this.scene = new RC.Scene();
@@ -135,7 +126,7 @@ sap.ui.define([
 
          if (this.controller.isEveCameraPerspective())
          {
-            this.camera = new RC.PerspectiveCamera(75, w / h, 1, 5000);
+            this.camera = new RC.PerspectiveCamera(75, w / h, 20, 4000);
             this.camera.position = new RC.Vector3(-500, 0, 0);
             this.camera.lookAt(new RC.Vector3(0, 0, 0), new RC.Vector3(0, 1, 0));
             this.camera.isPerspectiveCamera = true;
@@ -148,39 +139,41 @@ sap.ui.define([
 
             // Lights are positioned in resetRenderer.
 
-            for (let i = 1; i <= 4; ++i)
-            {
-               let l = this.lights.children[i];
-               l.add( new RC.IcoSphere(1, 1, 10.0, l.color.clone().multiplyScalar(0.5), false) );
-            }
+            // Markers on light positions (screws up bounding box / camera reset calculations)
+            // for (let i = 1; i <= 4; ++i)
+            // {
+            //    let l = this.lights.children[i];
+            //    l.add( new RC.IcoSphere(1, 1, 10.0, l.color.clone().multiplyScalar(0.5), false) );
+            // }
          }
          else
          {
-            this.camera = new RC.OrthographicCamera(-w/2, w/2, -h/2, h/2, 0, 2000);
-            this.camera.position = new RC.Vector3(0, 0, 500);
+            this.camera = new RC.OrthographicCamera(-w/2, w/2, -h/2, h/2, 20, 2000);
+            this.camera.position = new RC.Vector3(0, 0, 50);
             this.camera.lookAt(new RC.Vector3(0, 0, 0), new RC.Vector3(0, 1, 0));
             this.camera.isOrthographicCamera = true;
 
-            this.lights.add(new light_class_2d( 0xffffff, 1 )); // white front
-            this.lights.add(new light_class_2d( 0xffffff, 1 )); // white back
+            let l_int = 0.85;
+            this.lights.add(new light_class_2d( 0xffffff, l_int )); // white front
+            this.lights.add(new light_class_2d( 0xffffff, l_int )); // white back
 
             // Lights are positioned in resetRenderer.
          }
 
          // Test objects
-         if (this.controller.kind === "3D")
+         if (this.controller.isEveCameraPerspective())
          {
-            /*
-            let c = new RC.Cube(100, new RC.Color(1,.6,.2));
+            let c = new RC.Cube(40, new RC.Color(0.2,.4,.8));
             c.material = new RC.MeshPhongMaterial();
             c.material.transparent = true;
-            c.material.opacity = 0.5;
+            c.material.opacity = 0.8;
             c.material.depthWrite  = false;
             this.scene.add(c);
-            */
-            let ss = new RC.Stripe([0,0,0, 100,50,50, 100,200,200]);
+
+            let ss = new RC.Stripe([0,0,0, 100,50,50, 100,200,200, 300,300,300]);
             ss.material.lineWidth = 20.0;
             ss.material.color     = new RC.Color(0xff0000);
+            ss.material.emissive  = new RC.Color(0x008080);
             this.scene.add(ss);
          }
 
@@ -188,7 +181,7 @@ sap.ui.define([
 
          if (this.UseRenderQueue)
          {
-            this.rqt = new RendeQuTor(this.renderer, this.scene, this.camera);
+            this.rqt = new RC.RendeQuTor(this.renderer, this.scene, this.camera);
             if (this.RQ_Mode == "Direct")
             {
                this.rqt.initDirectToScreen();
@@ -207,10 +200,9 @@ sap.ui.define([
          }
       }
 
-      setupRCoreDomAndEventHandlers()
+      setupEventHandlers()
       {
          let dome = this.get_view().getDomRef();
-         dome.appendChild(this.canvas);
 
          // Setup tooltip
          this.ttip = document.createElement('div');
@@ -277,7 +269,6 @@ sap.ui.define([
          // Key-handlers go on window ...
 
          window.addEventListener('keydown', function(event) {
-
             // console.log("GLC::keydown", event.key, event.code, event);
 
             let handled = true;
@@ -359,7 +350,7 @@ sap.ui.define([
 
          console.log("GlViewerRenderCore.resetRenderer", sbbox, posV, negV, extV, extR);
 
-         if (this.controller.kind === "3D") // (this.camera.isPerspectiveCamera)
+         if (this.camera.isPerspectiveCamera)
          {
             let posC = new RC.Vector3(-0.7 * extR, 0.5 * extR, -0.7 * extR);
 
@@ -374,7 +365,7 @@ sap.ui.define([
             lc[3].position.set( extR, extR,  extR); lc[3].decay = 4 * extR;
             lc[4].position.set(-extR, extR, -extR); lc[4].decay = 4 * extR;
 
-            // console.log("resetThreejsRenderer 3D scene bbox ", sbbox, ", camera_pos ", posC, ", look_at ", this.rot_center);
+            // console.log("resetRenderer 3D scene bbox ", sbbox, ", camera_pos ", posC, ", look_at ", this.rot_center);
          }
          else
          {
@@ -400,7 +391,7 @@ sap.ui.define([
             lc[1].position.set( 0, 0,  extR);
             lc[2].position.set( 0, 0, -extR);
 
-            // console.log("resetThreejsRenderer 2D scene bbox ex ey", sbbox, ex, ey, ", camera_pos ", posC, ", look_at ", this.rot_center);
+            // console.log("resetRenderer 2D scene bbox ex ey", sbbox, ex, ey, ", camera_pos ", posC, ", look_at ", this.rot_center);
          }
          this.controls.target.copy( this.rot_center );
 
@@ -415,6 +406,8 @@ sap.ui.define([
       {
          // console.log("RENDER", this.scene, this.camera, this.canvas, this.renderer);
 
+         if (this.canvas.width <= 0 || this.canvas.height <= 0) return;
+
          if (this.UseRenderQueue)
             this.rqt.render();
          else
@@ -427,13 +420,15 @@ sap.ui.define([
       render_for_picking(x, y)
       {
          console.log("RENDER FOR PICKING", this.scene, this.camera, this.canvas, this.renderer);
-         let o3d;
 
-         this.renderer.pick(x, y, function(id) { o3d = id; } );
+         if (this.canvas.width <= 0 || this.canvas.height <= 0) return;
+
+         this.renderer.pick(x, y);
          this.rqt.pick(this.scene, this.camera);
 
+         let o3d = this.renderer.pickedObject3D;
          // Render to FBO or texture would work.
-         // let d   = pthis.renderer.pickedDepth;
+         // let d   = this.renderer.pickedDepth;
          console.log("pick result", o3d /* , d */);
          return o3d;
       }
@@ -444,6 +439,11 @@ sap.ui.define([
       {
          let w = this.get_width();
          let h = this.get_height();
+
+         if ( ! this.canvas) {
+            console.log("GlViewerRCore onResizeTimeout", w, h, "canvas IS NOT SET, STOP CALLING ME!");
+            return;
+         }
 
          //console.log("GlViewerRCore onResizeTimeout", w, h, "canvas=", this.canvas, this.canvas.width, this.canvas.height);
 
@@ -495,37 +495,17 @@ sap.ui.define([
          console.log("GLC::onMouseMoveTimeout", x, y);
 
          let o3d = this.render_for_picking(x, y);
-         if (o3d)
-         {
+         if (!o3d) return null;
+         if (!o3d.get_ctrl) o3d = o3d.parent;
+         if (o3d.get_ctrl) {
+            if (!o3d.get_ctrl) o3d = o3d.parent;
             let w = this.get_width();
             let h = this.get_height();
             let mouse = new RC.Vector2( ((x + 0.5) / w) * 2 - 1, -((y + 0.5) / h) * 2 + 1 );
             return { object: o3d, mouse: mouse, w: w, h: h };
          }
-         else
-            return null;
-
-         /*
-         let mouse = new RC.Vector2( ((x + 0.5) / w) * 2 - 1, -((y + 0.5) / h) * 2 + 1 );
-
-         this.raycaster.setFromCamera(mouse, this.camera);
-
-         let intersects = this.raycaster.intersectObjects(this.scene.children, true);
-
-         let o = null, c = null;
-
-         for (let i = 0; i < intersects.length; ++i)
-         {
-            if (intersects[i].object.get_ctrl)
-            {
-               intersects[i].mouse = mouse;
-               intersects[i].w = w;
-               intersects[i].h = h;
-               return intersects[i];
-            }
-         }
-         */
-      }
+         return null;
+      },
 
       onMouseMoveTimeout(x, y)
       {
