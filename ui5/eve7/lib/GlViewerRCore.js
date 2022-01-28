@@ -118,7 +118,7 @@ sap.ui.define([
          this.lights = this.make_object("Light container");
          this.scene.add(this.lights);
 
-         let a_light = new RC.AmbientLight(new RC.Color(0xffffff), 0.1);
+         let a_light = new RC.AmbientLight(new RC.Color(0xffffff), 0.05);
          this.lights.add(a_light);
 
          let light_class_3d = RC.PointLight; // RC.DirectionalLight; // RC.PointLight;
@@ -131,7 +131,7 @@ sap.ui.define([
             this.camera.lookAt(new RC.Vector3(0, 0, 0), new RC.Vector3(0, 1, 0));
             this.camera.isPerspectiveCamera = true;
 
-            let l_int = 0.85;
+            let l_int = 1.4;
             this.lights.add(new light_class_3d(0xaa8888, l_int )); // R
             this.lights.add(new light_class_3d(0x88aa88, l_int )); // G
             this.lights.add(new light_class_3d(0x8888aa, l_int )); // B
@@ -155,7 +155,7 @@ sap.ui.define([
 
             let l_int = 0.85;
             this.lights.add(new light_class_2d( 0xffffff, l_int )); // white front
-            this.lights.add(new light_class_2d( 0xffffff, l_int )); // white back
+            // this.lights.add(new light_class_2d( 0xffffff, l_int )); // white back
 
             // Lights are positioned in resetRenderer.
          }
@@ -360,10 +360,10 @@ sap.ui.define([
             this.controls.screenSpacePanning = true;
 
             let lc = this.lights.children;
-            lc[1].position.set( extR, extR, -extR); lc[1].decay = 4 * extR;
-            lc[2].position.set(-extR, extR,  extR); lc[2].decay = 4 * extR;
-            lc[3].position.set( extR, extR,  extR); lc[3].decay = 4 * extR;
-            lc[4].position.set(-extR, extR, -extR); lc[4].decay = 4 * extR;
+            lc[1].position.set( extR, extR, -extR); lc[1].decay = 0.5 * extR; lc[1].distance = 3 * extR;
+            lc[2].position.set(-extR, extR,  extR); lc[2].decay = 0.5 * extR; lc[2].distance = 3 * extR;
+            lc[3].position.set( extR, extR,  extR); lc[3].decay = 0.5 * extR; lc[3].distance = 3 * extR;
+            lc[4].position.set(-extR, extR, -extR); lc[4].decay = 0.5 * extR; lc[4].distance = 3 * extR;
 
             // console.log("resetRenderer 3D scene bbox ", sbbox, ", camera_pos ", posC, ", look_at ", this.rot_center);
          }
@@ -389,7 +389,7 @@ sap.ui.define([
 
             let lc = this.lights.children;
             lc[1].position.set( 0, 0,  extR);
-            lc[2].position.set( 0, 0, -extR);
+            // lc[2].position.set( 0, 0, -extR);
 
             // console.log("resetRenderer 2D scene bbox ex ey", sbbox, ex, ey, ", camera_pos ", posC, ", look_at ", this.rot_center);
          }
