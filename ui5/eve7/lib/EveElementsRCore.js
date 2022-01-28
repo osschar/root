@@ -81,23 +81,37 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
       this.LINE_WIDTH_FAC = lf;
    }
 
-   EveElements.prototype.RcLineMaterial = function (color, opacity, line_width, props)
+   EveElements.prototype.RcPointMaterial = function (color, opacity, point_size, props)
    {
-      let mat = new RC.MeshBasicMaterial; // StripeBasicMaterial
-      mat._color = color;
+      let mat = new RC.PointBasicMaterial;
+      mat._color = this.ColorBlack; // color;
       mat._emissive = color;
-      if (opacity !== undefined && opacity < 1.0)
-      {
+      if (opacity !== undefined && opacity < 1.0) {
          mat._opacity = opacity;
          mat._transparent = true;
          mat._depthWrite = false;
       }
-      if (line_width !== undefined)
-      {
-         mat._lineWidth = this.LINE_WIDTH_FAC * line_width;
+      mat._pointSize = this.POINT_SIZE_FAC;
+      if (point_size !== undefined) mat._pointSize *= point_size;
+      if (props !== undefined) {
+         mat.update(props);
       }
-      if (props !== undefined)
-      {
+      return mat;
+   }
+
+   EveElements.prototype.RcLineMaterial = function (color, opacity, line_width, props)
+   {
+      let mat = new RC.MeshBasicMaterial; // StripeBasicMaterial
+      mat._color = this.ColorBlack;
+      mat._emissive = color;
+      if (opacity !== undefined && opacity < 1.0) {
+         mat._opacity = opacity;
+         mat._transparent = true;
+         mat._depthWrite = false;
+      }
+      mat._lineWidth = this.LINE_WIDTH_FAC;
+      if (line_width !== undefined) mat._lineWidth *= line_width;
+      if (props !== undefined) {
          mat.update(props);
       }
       return mat;
@@ -107,17 +121,19 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
    {
      let mat = new RC.MeshBasicMaterial;
 
-      mat._color = color;
-      mat._emissive = color; // mat.emissive.offsetHSL(0, 0.1, 0);
+      mat._color = this.ColorBlack; // color;
+      mat._emissive = color;
+      // Something is strange here. Tried also white (no change) / black (no fill -- ?).
+      // mat._emissive = new RC.Color(color);
+      // mat.emissive.multiplyScalar(0.1);
+      // offsetHSL(0, -0.5, -0.5);
 
-      if (opacity !== undefined && opacity < 1.0)
-      {
+      if (opacity !== undefined && opacity < 1.0) {
          mat._opacity = opacity;
          mat._transparent = true;
          mat._depthWrite = false;
       }
-      if (props !== undefined)
-      {
+      if (props !== undefined) {
          mat.update(props);
       }
       return mat;
@@ -129,17 +145,15 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
       // let mat = new RC.MeshBasicMaterial;
 
       mat._color = color;
-      mat._specular = new RC.Color(0xFFFFFF); // mat._specular.offsetHSL(0, 0, 0.4);
+      mat._specular = this.ColorWhite;
       mat._shininess = 32;
 
-      if (opacity !== undefined && opacity < 1.0)
-      {
+      if (opacity !== undefined && opacity < 1.0) {
          mat._opacity = opacity;
          mat._transparent = true;
          mat._depthWrite = false;
       }
-      if (props !== undefined)
-      {
+      if (props !== undefined) {
          mat.update(props);
       }
       return mat;
@@ -183,19 +197,17 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
       let geo = new RC.Geometry();
       geo.vertices = new RC.BufferAttribute(rnr_data.vtxBuff, 3);
 
-      let size = 2 * this.POINT_SIZE_FAC * hit.fMarkerSize; // scaled by distance down to half size (basic_template.vert)
+      // see vert-shader in old bitbucket -- scaled by distance down to half size (basic_template.vert)
       let col = RcCol(hit.fMarkerColor);
+      console.log("COLOR", hit.fMarkerColor, JSROOT.Painter.getColor(hit.fMarkerColor), col);
 
-      let mat = new RC.MeshBasicMaterial;
-      mat.color = col;
-      mat.pointSize = size;
-      mat.usePoints = true;
+      let mat = this.RcPointMaterial(col, 1, hit.fMarkerSize);
       mat.drawCircles = true;
 
-      let pnts = new RC.Point(geo, mat);
+      let pnts = new RC.Point( {geometry: geo, material: mat} );
 
       let pm = pnts.pickingMaterial;
-      pm.pointSize = size;
+      pm.pointSize = mat.pointSize;
       pm.usePoints = true;
       pm.drawCircles = true;
 
@@ -517,7 +529,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
       let obj3d = new RC.Group();
 
-      let fcol = RcCol(el.fMainColor);
+      let fcol = this.RcCol(el.fMainColor);
 
       let buf = new Float32Array(el.fLinePlexSize * 6);
       for (let i = 0; i < el.fLinePlexSize * 6; ++i)
@@ -525,7 +537,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          buf[i] = rnr_data.vtxBuff[i];
       }
 
-      let line_mat = new this.RcLineMaterial(fcol);
+      let line_mat = this.RcLineMaterial(fcol);
 
       let geom = new RC.Geometry();
       geom.vertices = new RC.BufferAttribute(buf, 3);
@@ -552,19 +564,19 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
       let p_geom = new RC.Geometry();
       p_geom.vertices = new RC.BufferAttribute(p_buf, 3);
 
-      let p_mat = new RC.MeshBasicMaterial;
-      p_mat.color = fcol;
-      p_mat.pointSize = 2 * el.fMarkerSize;
-      p_mat.usePoints = true;
-      p_mat.drawCircles = true;
+      let p_mat = new RC.PointBasicMaterial;
+      p_mat._color = this.ColorBlack;
+      p_mat._emissive = fcol;
+      p_mat._pointSize = 16; // 2 * el.fMarkerSize;
+      // p_mat.drawCircles = true;
 
       let marker = new RC.Point(p_geom, p_mat);
-      marker.pickingMaterial.pointSize = 2 * el.fMarkerSize;;
+      marker.pickingMaterial.pointSize = 2 * el.fMarkerSize;
 
       this.RcPickable(el, marker);
       obj3d.add(marker);
 
-      // ????
+      // For secondary selection, see EveElements.js
       obj3d.eve_idx_buf = rnr_data.idxBuff;
 
       /*
