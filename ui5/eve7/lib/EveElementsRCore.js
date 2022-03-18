@@ -99,6 +99,16 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
       return mat;
    }
 
+   EveElements.prototype.UpdatePointPickingMaterial = function (obj)
+   {
+      let m = obj.material;
+      let p = obj.pickingMaterial;
+      p.usePoints = m.usePoints;
+      p.pointSize = m.pointSize;
+      p.pointsScale = m.pointsScale;
+      p.drawCircles = m.drawCircles;
+   }
+
    EveElements.prototype.RcLineMaterial = function (color, opacity, line_width, props)
    {
       let mat = new RC.MeshBasicMaterial; // StripeBasicMaterial
@@ -201,17 +211,13 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
       let col = RcCol(hit.fMarkerColor);
       console.log("COLOR", hit.fMarkerColor, JSROOT.Painter.getColor(hit.fMarkerColor), col);
 
-      let mat = this.RcPointMaterial(col, 1, hit.fMarkerSize);
-      mat.drawCircles = true;
+      let mat = this.RcPointMaterial(col, 1, hit.fMarkerSize,
+                                     { pointsScale: false, drawCircles: true });
 
       let pnts = new RC.Point( {geometry: geo, material: mat} );
-
-      let pm = pnts.pickingMaterial;
-      pm.pointSize = mat.pointSize;
-      pm.usePoints = true;
-      pm.drawCircles = true;
-
+      this.UpdatePointPickingMaterial(pnts)
       this.RcPickable(hit, pnts);
+
       pnts.dispose = function() { delete this; } // ????
       return pnts;
    }
@@ -529,15 +535,13 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
       let obj3d = new RC.Group();
 
-      let fcol = this.RcCol(el.fMainColor);
-
       let buf = new Float32Array(el.fLinePlexSize * 6);
       for (let i = 0; i < el.fLinePlexSize * 6; ++i)
       {
          buf[i] = rnr_data.vtxBuff[i];
       }
 
-      let line_mat = this.RcLineMaterial(fcol);
+      let line_mat = this.RcLineMaterial(RcCol(el.fMainColor));
 
       let geom = new RC.Geometry();
       geom.vertices = new RC.BufferAttribute(buf, 3);
@@ -564,15 +568,12 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
       let p_geom = new RC.Geometry();
       p_geom.vertices = new RC.BufferAttribute(p_buf, 3);
 
-      let p_mat = new RC.PointBasicMaterial;
-      p_mat._color = this.ColorBlack;
-      p_mat._emissive = fcol;
-      p_mat._pointSize = 16; // 2 * el.fMarkerSize;
-      // p_mat.drawCircles = true;
+      let p_mat = this.RcPointMaterial(RcCol(el.fMarkerColor), 1, el.fMarkerSize);
+      p_mat.pointsScale = false;
+      p_mat.drawCircles = true;
 
-      let marker = new RC.Point(p_geom, p_mat);
-      marker.pickingMaterial.pointSize = 2 * el.fMarkerSize;
-
+      let marker = new RC.Point({ geometry: p_geom, material: p_mat });
+      this.UpdatePointPickingMaterial(marker);
       this.RcPickable(el, marker);
       obj3d.add(marker);
 
