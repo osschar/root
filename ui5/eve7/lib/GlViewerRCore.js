@@ -15,7 +15,8 @@ sap.ui.define([
 
          const urlParams = new URLSearchParams(window.location.search);
 
-         console.log("XXXX", window.location.search, urlParams.get('UseRenderQueue'), urlParams.get('NoRenderQueue'));
+         console.log("XXXX window.location.search='", window.location.search, "', ",
+           "URL params UseRenderQueue NoRenderQueue = ", urlParams.get('UseRenderQueue'), urlParams.get('NoRenderQueue'));
          this.UseRenderQueue = true;
          if (urlParams.get('UseRenderQueue') != null) this.UseRenderQueue = true;
          if (urlParams.get('NoRenderQueue' ) != null) this.UseRenderQueue = false;
@@ -45,7 +46,7 @@ sap.ui.define([
          // // console.log(window.location.pathname); // where are we loading from?
          // import("https://desire.physics.ucsd.edu/matevz/alja.github.io/rootui5/eve7/rnr_core/RenderCore.js").then((module) => {
 
-         import("../../eve7/lib/REveRenderCore.js").then((module) => {
+         import(window.location.origin + '/rootui5sys/eve7/lib/REveRenderCore.js').then((module) => {
             console.log("GlViewerRCore.onInit - RenderCore.js loaded");
 
             RC = module;
@@ -112,6 +113,7 @@ sap.ui.define([
          this.renderer.addShaderLoaderUrls("rootui5sys/eve7/shaders");
          this.renderer.pickObject3D = true;
          this.renderer.pickDoNotRender = true;
+         RC.PickingShaderMaterial.DEFAULT_PICK_MODE = RC.PickingShaderMaterial.PICK_MODE.UINT;
 
          this.scene = new RC.Scene();
 
@@ -322,8 +324,7 @@ sap.ui.define([
             }
          });
 
-         // Was RC.ReveCameraControls
-         this.controls = new THREE.OrbitControls(this.camera, this.get_view().getDomRef());
+         this.controls = new RC.REveCameraControls(this.camera, this.get_view().getDomRef());
          this.controls.addEventListener('change', this.render.bind(this));
 
          // This will also call render().
@@ -424,7 +425,7 @@ sap.ui.define([
          if (this.canvas.width <= 0 || this.canvas.height <= 0) return;
 
          this.renderer.pick(x, y);
-         this.rqt.pick(this.scene, this.camera);
+         this.rqt.pick();
 
          let o3d = this.renderer.pickedObject3D;
          // Render to FBO or texture would work.

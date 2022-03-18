@@ -147,7 +147,7 @@ export class RendeQuTor
             function (textureMap, additionalData) {},
             RenderPass.TEXTURE,
             null,
-            "depth_picking", //null, // "depth_picking", //
+            "depth_picking",
             [ { id: "color_picking", textureConfig: RenderPass.DEFAULT_R32UI_TEXTURE_CONFIG } ]
         );
         this.PRP_plain.view_setup = function (vport) { this.viewport = vport; };
