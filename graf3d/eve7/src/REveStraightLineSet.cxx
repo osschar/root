@@ -162,8 +162,10 @@ Int_t REveStraightLineSet::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
 
    j["fLinePlexSize"] = fLinePlex.Size();
    j["fMarkerPlexSize"] = fMarkerPlex.Size();
+   // j["fLineColor"] = fLineColor; // streamed as fMainColor
    j["fLineWidth"] = fLineWidth;
    j["fLineStyle"] = fLineStyle;
+   j["fMarkerColor"] = fMarkerColor;
    j["fMarkerSize"] = fMarkerSize;
    j["fMarkerStyle"] = fMarkerStyle;
    j["fSecondarySelect"] = fAlwaysSecSelect;
