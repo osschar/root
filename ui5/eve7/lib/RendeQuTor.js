@@ -1,6 +1,7 @@
 import {RenderQueue} from './RC/renderers/RenderQueue.js';
 import {RenderPass}  from './RC/renderers/RenderPass.js';
 import {CustomShaderMaterial} from './RC/materials/CustomShaderMaterial.js';
+import {PickingShaderMaterial} from './RC/materials/PickingShaderMaterial.js';
 import {Text2D} from './RC/objects/Text2D.js';
 import {IcoSphere} from './RC/objects/IcoSphere.js';
 
@@ -128,6 +129,15 @@ export class RendeQuTor
 
             gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
             gl.deleteFramebuffer(fb);
+        }
+
+        if (this.renderer.pickedObject3D) {
+            console.log("RenderQuTor::pick going for secondary select");
+            this.renderer._pickSecondaryEnabled = true;
+
+            this.renderer.pickedObject3D.pickingMaterial.pickMode = PickingShaderMaterial.PICK_MODE.UINT_PRIM;
+            this.pqueue.render();
+            this.renderer.pickedObject3D.pickingMaterial.pickMode = PickingShaderMaterial.PICK_MODE.UINT;
         }
     }
 

@@ -33,7 +33,7 @@ void points()
    auto eveMng = REX::REveManager::Create();
 
    REX::REveElement *event = eveMng->GetEventScene();
-   auto ps = createPointSet(100);
+   auto ps = createPointSet(100, 300);
    event->AddElement(ps);
 
    eveMng->Show();
