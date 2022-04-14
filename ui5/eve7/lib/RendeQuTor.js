@@ -131,13 +131,19 @@ export class RendeQuTor
             gl.deleteFramebuffer(fb);
         }
 
-        if (this.renderer.pickedObject3D) {
+        // RCRC Proto-proto-secondary-selection. Requires branch:
+        // https://github.com/osschar/RenderCore/tree/secondary-selection-emulate-vert-id-plus-flat-shading
+        if (false && this.renderer.pickedObject3D) {
             console.log("RenderQuTor::pick going for secondary select");
             this.renderer._pickSecondaryEnabled = true;
 
             this.renderer.pickedObject3D.pickingMaterial.pickMode = PickingShaderMaterial.PICK_MODE.UINT_PRIM;
             this.pqueue.render();
             this.renderer.pickedObject3D.pickingMaterial.pickMode = PickingShaderMaterial.PICK_MODE.UINT;
+
+            // Reset pick state - in case shaders needed to be loaded and picking
+            // was not actually done the flag does not get reset.
+            this.renderer._pickSecondaryEnabled = false;
         }
     }
 
