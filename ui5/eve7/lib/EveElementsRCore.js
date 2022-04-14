@@ -206,9 +206,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          let geo = new RC.Geometry();
          geo.vertices = new RC.BufferAttribute(rnr_data.vtxBuff, 3);
 
-         // see vert-shader in old bitbucket -- scaled by distance down to half size (basic_template.vert)
          let col = RcCol(hit.fMarkerColor);
-         console.log("COLOR", hit.fMarkerColor, EVE.JSR.Painter.getColor(hit.fMarkerColor), col);
+         // console.log("COLOR", hit.fMarkerColor, EVE.JSR.getColor(hit.fMarkerColor), col);
 
          let mat = this.RcPointMaterial(col, 1, hit.fMarkerSize,
             { pointsScale: false, drawCircles: true });
@@ -596,4 +595,9 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
    } // class EveElements
 
+   //==============================================================================
+
+   EVE.EveElements = EveElements;
+
+   return EveElements;
 });

@@ -67,12 +67,6 @@ sap.ui.define([
          this.setupEventHandlers();
 
          this.controller.glViewerInitDone();
-
-         // XXXX MT: HACK ... give RCore some time to load shaders.
-         // Would be better to have some onShadersLoaded thing but
-         // this is probably problematic later on,k if we add objects with
-         // custom shaders later on.
-         setTimeout(this.render.bind(this), 500);
       }
 
       //==============================================================================
@@ -414,6 +408,12 @@ sap.ui.define([
          else
             this.renderer.render( this.scene, this.camera );
 
+         if (this.renderer.used == false) {
+            // RCRC Ideally there would be an onShadersLoaded callback.
+            console.log("GlViewerRCore render: not all programs compiled -- setting up render timer");
+            setTimeout(this.render.bind(this), 200);
+         }
+
          // if (this.controller.kind === "3D")
          //    window.requestAnimationFrame(this.render.bind(this));
       }
@@ -506,7 +506,7 @@ sap.ui.define([
             return { object: o3d, mouse: mouse, w: w, h: h };
          }
          return null;
-      },
+      }
 
       onMouseMoveTimeout(x, y)
       {
