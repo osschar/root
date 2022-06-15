@@ -64,16 +64,23 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
    class EveElements
    {
-      constructor(rc) {
+      constructor(rc, viewer) {
          console.log("EveElements -- RCore");
 
          RC = rc;
+         this.viewer = viewer;
+
+         RC.Cache.enabled = true;
+
+         this.tex_cache = new RC.TextureCache;
 
          this.POINT_SIZE_FAC = 1;
          this.LINE_WIDTH_FAC = 1;
          this.ColorWhite = new RC.Color(0xFFFFFF);
          this.ColorBlack = new RC.Color(0x000000);
       }
+
+      GenerateTypeName(obj) { return "RC." + obj.type; }
 
       SetupPointLineFacs(pf, lf)
       {
@@ -194,12 +201,62 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          return true;
       }
 
+      GetLumAlphaTexture(name, callback)
+      {
+         let url = window.location.origin + '/rootui5sys/eve7/textures/' + name;
+
+         this.tex_cache.deliver(url,
+            callback,
+            (image) => {
+               return new RC.Texture
+                  (image, RC.Texture.ClampToEdgeWrapping, RC.Texture.ClampToEdgeWrapping,
+                          RC.Texture.LinearFilter, RC.Texture.LinearFilter,
+                          RC.Texture.LUMINANCE_ALPHA, RC.Texture.LUMINANCE_ALPHA, RC.Texture.UNSIGNED_BYTE,
+                          image.width, image.height);
+            },
+            () => { this.viewer.request_render() }
+         );
+      }
 
       //==============================================================================
       // makeHit
       //==============================================================================
 
       makeHit(hit, rnr_data)
+      {
+         if (this.TestRnr("hit", hit, rnr_data)) return null;
+
+         let   col   = RcCol(hit.fMarkerColor);
+         const msize = this.POINT_SIZE_FAC * hit.fMarkerSize;
+         let sm = new RC.ZSpriteBasicMaterial( {
+            SpriteMode: RC.SPRITE_SPACE_SCREEN, SpriteSize: [msize, msize],
+            color: this.ColorBlack,
+            emissive: col,
+            diffuse: col.clone().multiplyScalar(0.5) } );
+         sm.transparent = true;
+         // sm.depthWrite = false;
+         this.GetLumAlphaTexture("star5-32a.png", (tex) => {
+            sm.addMap(tex);
+         });
+
+         sm.instanceData = new RC.Texture(rnr_data.vtxBuff,
+            RC.Texture.ClampToEdgeWrapping, RC.Texture.ClampToEdgeWrapping,
+            RC.Texture.NearestFilter, RC.Texture.NearestFilter,
+            // RC.Texture.R32F, RC.Texture.R32F, RC.Texture.FLOAT,
+            RC.Texture.RGBA32F, RC.Texture.RGBA, RC.Texture.FLOAT,
+            hit.fTexX, hit.fTexY);
+
+         let s = new RC.ZSprite(null, sm);
+         s.frustumCulled = false; // need a way to speciy bounding box/sphere !!!
+         s.instanced = true;
+         s.instanceCount = hit.fSize;
+
+         s.dispose = () => { delete this; } // ??? RCRC instanceData texture ???
+
+         return s;
+      }
+
+      makeHitOrig(hit, rnr_data)
       {
          if (this.TestRnr("hit", hit, rnr_data)) return null;
 

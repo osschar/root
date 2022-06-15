@@ -150,6 +150,9 @@ REveManager::REveManager()
    fWebWindow->SetUserArgs(Form("{ GLViewer: \"%s\", DblClick: \"%s\", HTimeout: %d, TableRowHeight: %d }", gl_viewer,
                                 gl_dblclick, htimeout, table_row_height));
 
+   if (strcmp(gl_viewer, "RCore") == 0)
+      fIsRCore = true;
+
    // this is call-back, invoked when message received via websocket
    fWebWindow->SetCallBacks([this](unsigned connid) { WindowConnect(connid); },
                             [this](unsigned connid, const std::string &arg) { WindowData(connid, arg); },
