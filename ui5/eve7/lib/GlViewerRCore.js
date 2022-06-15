@@ -15,22 +15,15 @@ sap.ui.define([
 
          const urlParams = new URLSearchParams(window.location.search);
 
-         console.log("XXXX window.location.search='", window.location.search, "', ",
-           "URL params UseRenderQueue NoRenderQueue = ", urlParams.get('UseRenderQueue'), urlParams.get('NoRenderQueue'));
-         this.UseRenderQueue = true;
-         if (urlParams.get('UseRenderQueue') != null) this.UseRenderQueue = true;
-         if (urlParams.get('NoRenderQueue' ) != null) this.UseRenderQueue = false;
+         let mode_mm = /^(?:Direct|Simple|Full)$/.exec(urlParams.get('RQ_Mode'));
+         let ssaa_mm = /^(1|2|4)$/.               exec(urlParams.get('RQ_SSAA'));
 
-         if (this.UseRenderQueue)
-         {
-            let mode_mm = /^(?:Direct|Simple|Full)$/.exec(urlParams.get('RQ_Mode'));
-            let ssaa_mm = /^(1|2|4)$/.               exec(urlParams.get('RQ_SSAA'));
+         this.RQ_Mode = (mode_mm) ? mode_mm[0] : "Simple";
+         this.RQ_SSAA = (ssaa_mm) ? ssaa_mm[0] : 2;
 
-            this.RQ_Mode = (mode_mm) ? mode_mm[0] : "Simple";
-            this.RQ_SSAA = (ssaa_mm) ? ssaa_mm[0] : 2;
-         }
+         console.log("GlViewerRCore RQ_Mode:", this.RQ_Mode, "RQ_SSAA:", this.RQ_SSAA);
 
-         console.log("UseRenderQueue", this.UseRenderQueue, "RQ_Mode", this.RQ_Mode, "RQ_SSAA", this.RQ_SSAA);
+         this._logLevel = 1; // 0 - error, 1 - warning, 2 - info, 3 - debug
       }
 
       init(controller)
@@ -56,7 +49,7 @@ sap.ui.define([
 
       bootstrap()
       {
-         this.creator = new EveElements(RC);
+         this.creator = new EveElements(RC, this);
          // this.creator.useIndexAsIs = EVE.JSR.decodeUrl().has('useindx');
 
          RC.Object3D.sDefaultPickable = false;
@@ -102,6 +95,7 @@ sap.ui.define([
          let gl = this.canvas.getContext("webgl2");
 
          this.renderer = new RC.MeshRenderer(this.canvas, RC.WEBGL2, {antialias: false, stencil: true});
+         this.renderer._logLevel = 0;
          this.renderer.clearColor = "#FFFFFFFF";
          this.renderer.addShaderLoaderUrls("rootui5sys/eve7/lib/RC/shaders");
          this.renderer.addShaderLoaderUrls("rootui5sys/eve7/shaders");
@@ -175,25 +169,22 @@ sap.ui.define([
 
          this.rot_center = new RC.Vector3(0,0,0);
 
-         if (this.UseRenderQueue)
+         this.rqt = new RC.RendeQuTor(this.renderer, this.scene, this.camera);
+         if (this.RQ_Mode == "Direct")
          {
-            this.rqt = new RC.RendeQuTor(this.renderer, this.scene, this.camera);
-            if (this.RQ_Mode == "Direct")
-            {
-               this.rqt.initDirectToScreen();
-            }
-            else if (this.RQ_Mode == "Simple")
-            {
-               this.rqt.initSimple(this.RQ_SSAA);
-               this.creator.SetupPointLineFacs(this.RQ_SSAA, this.RQ_SSAA);
-            }
-            else
-            {
-               this.rqt.initFull(this.RQ_SSAA);
-               this.creator.SetupPointLineFacs(this.RQ_SSAA, this.RQ_SSAA);
-            }
-            this.rqt.updateViewport(w, h);
+            this.rqt.initDirectToScreen();
          }
+         else if (this.RQ_Mode == "Simple")
+         {
+            this.rqt.initSimple(this.RQ_SSAA);
+            this.creator.SetupPointLineFacs(this.RQ_SSAA, this.RQ_SSAA);
+         }
+         else
+         {
+            this.rqt.initFull(this.RQ_SSAA);
+            this.creator.SetupPointLineFacs(this.RQ_SSAA, this.RQ_SSAA);
+         }
+         this.rqt.updateViewport(w, h);
       }
 
       setupEventHandlers()
@@ -397,20 +388,27 @@ sap.ui.define([
 
       //==============================================================================
 
+      request_render()
+      {
+         if (this.render_requested) return;
+         setTimeout(this.render.bind(this), 0);
+         this.render_requested = true;
+      }
+
       render()
       {
          // console.log("RENDER", this.scene, this.camera, this.canvas, this.renderer);
 
+         this.render_requested = false;
+
          if (this.canvas.width <= 0 || this.canvas.height <= 0) return;
 
-         if (this.UseRenderQueue)
-            this.rqt.render();
-         else
-            this.renderer.render( this.scene, this.camera );
+         this.rqt.render();
 
          if (this.renderer.used == false) {
             // RCRC Ideally there would be an onShadersLoaded callback.
-            console.log("GlViewerRCore render: not all programs compiled -- setting up render timer");
+            if (this._logLevel >= 2)
+               console.log("GlViewerRCore render: not all programs compiled -- setting up render timer");
             setTimeout(this.render.bind(this), 200);
          }
 
@@ -455,7 +453,7 @@ sap.ui.define([
 
          this.renderer.updateViewport(w, h);
 
-         if (this.UseRenderQueue) this.rqt.updateViewport(w, h);
+         this.rqt.updateViewport(w, h);
 
          this.controls.update();
          this.render();
