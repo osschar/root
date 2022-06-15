@@ -595,6 +595,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(/*EveManager*/) {
 
       constructor() { }
 
+      GenerateTypename(obj) { return "THREE." + obj.type; }
+
       /** Test if render data has vertex buffer. Make logging if not. Only for debug purposes */
       TestRnr(name, obj, rnrData) {
 

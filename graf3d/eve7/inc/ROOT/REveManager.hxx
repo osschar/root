@@ -156,7 +156,8 @@ protected:
    std::unordered_map<std::string, std::shared_ptr<TMethodCall> > fMethCallMap;
 
    Logger            fLogger;
-   REveServerStatus  fServerStatus; 
+   REveServerStatus  fServerStatus;
+   bool              fIsRCore{false};
 
    void WindowConnect(unsigned connid);
    void WindowData(unsigned connid, const std::string &arg);
@@ -270,6 +271,7 @@ public:
    std::shared_ptr<REveGeomViewer> ShowGeometry(const RWebDisplayArgs &args = "");
 
    void GetServerStatus(REveServerStatus&);
+   bool IsRCore() const { return fIsRCore; }
 };
 
 R__EXTERN REveManager* gEve;

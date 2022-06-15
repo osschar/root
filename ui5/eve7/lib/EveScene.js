@@ -40,8 +40,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
             let obj3d = this.creator[fname](elem, elem.render_data);
 
             if (obj3d) {
-               // MT ??? why?, it can really be anything, even just container Object3D
-               obj3d._typename = "THREE.Mesh";
+               // Used by JSRoot
+               obj3d._typename = this.creator.GenerateTypeName(obj3d);
 
                // add reference to a streamed eve element to obj3d
                obj3d.eve_el = elem;
@@ -252,7 +252,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
             this.id2obj_map.delete(elId);
 
             if (typeof obj3d.dispose !== 'function')
-               console.log("EveScene.elementsRemoved no dispose function for " + this.mgr.GetElement(elId)._typename, ", rnr obj ", obj3d._typename);
+               console.log("EveScene.elementsRemoved no dispose function for " + this.mgr.GetElement(elId)._typename, ", rnr obj ", obj3d._typename, obj3d);
             else
                obj3d.dispose();
          }
