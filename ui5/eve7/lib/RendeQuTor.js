@@ -108,7 +108,7 @@ export class RendeQuTor
             let texref = this.pqueue._textureMap["depthr32f_picking"];
             let tex    = glman.getTexture(texref);
 
-            console.log("Dumper:", glman, gl, texref, tex);
+            // console.log("Dumper:", glman, gl, texref, tex);
 
             const fb = gl.createFramebuffer();
 			gl.bindFramebuffer(gl.FRAMEBUFFER, fb);

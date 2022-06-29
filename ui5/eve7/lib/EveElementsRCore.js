@@ -251,6 +251,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          s.instanced = true;
          s.instanceCount = hit.fSize;
 
+         this.RcPickable(hit, s);
+
          s.dispose = () => { delete this; } // ??? RCRC instanceData texture ???
 
          return s;
