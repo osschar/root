@@ -220,6 +220,7 @@ Int_t REvePointSet::WriteCoreJson(nlohmann::json& j, Int_t rnr_offset)
    }
    j["fMarkerSize"]  = GetMarkerSize();
    j["fMarkerColor"] = GetMarkerColor();
+   j["fSecondarySelect"] = fAlwaysSecSelect;
 
    return ret;
 }
