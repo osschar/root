@@ -15,6 +15,7 @@
 #include <ROOT/REveElement.hxx>
 #include <ROOT/REveProjectionBases.hxx>
 #include <ROOT/REveVector.hxx>
+#include <ROOT/REveSecondarySelectable.hxx>
 
 #include <TAttMarker.h>
 #include <TAttBBox.h>
@@ -34,7 +35,8 @@ namespace Experimental {
 class REvePointSet : public REveElement,
                      public REveProjectable,
                      public TAttMarker,
-                     public TAttBBox
+                     public TAttBBox,
+                     public REveSecondarySelectable
 {
    friend class REvePointSetArray;
 

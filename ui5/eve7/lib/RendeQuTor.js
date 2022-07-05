@@ -97,12 +97,18 @@ export class RendeQuTor
         this.queue.render();
     }
 
-    pick()
+    pick(x, y, detect_depth = false)
     {
-        let foo = this.pqueue.render();
-        console.log("RenderQuTor::pick", this.renderer.pickedObject3D, foo);
+        this.renderer.pick_setup(x, y);
 
-        if (true) {
+        let state = this.pqueue.render();
+        state.x = x;
+        state.y = y;
+        state.depth = -1.0;
+        state.object = this.renderer.pickedObject3D;
+        // console.log("RenderQuTor::pick", state);
+
+        if (detect_depth && this.renderer.pickedObject3D !== null) {
             let glman  = this.renderer.glManager;
             let gl     = this.renderer.gl;
             let texref = this.pqueue._textureMap["depthr32f_picking"];
@@ -129,22 +135,27 @@ export class RendeQuTor
 
             gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
             gl.deleteFramebuffer(fb);
+
+            state.depth = d[4];
         }
 
+        return state;
+    }
+
+    pick_instance(state) {
         // RCRC Proto-proto-secondary-selection. Requires branch:
-        // https://github.com/osschar/RenderCore/tree/secondary-selection-emulate-vert-id-plus-flat-shading
-        if (false && this.renderer.pickedObject3D) {
+        // https://github.com/osschar/RenderCore/tree/img-tex-cache
+        if (state.object !== this.renderer.pickedObject3D || ! state.object.instanced) {
+            console.error("RendeQuTor::pick_instance state mismatch", state, this.renderer.pickedObject3D);
+        } else {
             console.log("RenderQuTor::pick going for secondary select");
+
             this.renderer._pickSecondaryEnabled = true;
-
-            this.renderer.pickedObject3D.pickingMaterial.pickMode = PickingShaderMaterial.PICK_MODE.UINT_PRIM;
             this.pqueue.render();
-            this.renderer.pickedObject3D.pickingMaterial.pickMode = PickingShaderMaterial.PICK_MODE.UINT;
 
-            // Reset pick state - in case shaders needed to be loaded and picking
-            // was not actually done the flag does not get reset.
-            this.renderer._pickSecondaryEnabled = false;
+            state.instance = this.renderer._pickedID;
         }
+        return state;
     }
 
 
@@ -194,6 +205,9 @@ export class RendeQuTor
         this.pqueue.pushRenderPass(this.PRP_depth2r);
     }
 
+
+    //=============================================================================
+    // Regular RenderPasses
     //=============================================================================
 
     make_RP_DirectToScreen()
@@ -222,46 +236,19 @@ export class RendeQuTor
         this.RP_SSAA_Super = new RenderPass(
             // Rendering pass type
             RenderPass.BASIC,
-
             // Initialize function
-            function (textureMap, additionalData) {
-                iterateSceneR(pthis.scene, function(object){
-                    if (object.pickable === false || object instanceof Text2D || object instanceof IcoSphere) {
-                        object.visible = true;
-                        return;
-                    }
-                    // pthis.OriginalMats.push(object.material);
-                });
-            },
-
+            function (textureMap, additionalData) {},
             // Preprocess function
-            function (textureMap, additionalData) {
-                // let m_index = 0;
-
-                iterateSceneR(pthis.scene, function(object) {
-                    if(object.pickable === false || object instanceof Text2D || object instanceof IcoSphere) {
-                        object.visible = true;
-                        return;
-                    }
-                    // object.material = pthis.OriginalMats[m_index];
-                    // m_index++;
-                });
-
-                return { scene: pthis.scene, camera: pthis.camera };
-            },
-
+            function (textureMap, additionalData) { return { scene: pthis.scene, camera: pthis.camera }; },
             // Postprocess
             function (textureMap, additionalData) {},
-
             // Target
             RenderPass.TEXTURE,
-
             // Viewport
             null,
-
             // Bind depth texture to this ID
             "depthDefaultDefaultMaterials",
-
+            // Outputs
             [ { id: "color_ssaa_super", textureConfig: RenderPass.DEFAULT_RGBA_TEXTURE_CONFIG } ]
         );
         this.RP_SSAA_Super.view_setup = function (vport) { this.viewport = { width: vport.width*pthis.SSAA_value, height: vport.height*pthis.SSAA_value }; };
