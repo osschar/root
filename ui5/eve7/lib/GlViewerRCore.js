@@ -100,8 +100,10 @@ sap.ui.define([
          this.renderer.addShaderLoaderUrls("rootui5sys/eve7/lib/RC/shaders");
          this.renderer.addShaderLoaderUrls("rootui5sys/eve7/shaders");
          this.renderer.pickObject3D = true;
-         this.renderer.pickDoNotRender = true;
          RC.PickingShaderMaterial.DEFAULT_PICK_MODE = RC.PickingShaderMaterial.PICK_MODE.UINT;
+
+         this.outline_pass = {};
+         this.outline_pass.id2obj_map = {};
 
          this.scene = new RC.Scene();
 
@@ -226,7 +228,7 @@ sap.ui.define([
          dome.addEventListener('pointerdown', function(event) {
 
             glc.removeMouseMoveTimeout();
-            if (event.buttons != 1 && event.buttons != 2)  glc.clearHighlight();
+            if (event.button != 0 && event.button != 2)  glc.clearHighlight();
             glc.removeMouseupListener();
 
             // console.log("GLC::mousedown", this, glc, event, event.offsetX, event.offsetY);
@@ -235,11 +237,11 @@ sap.ui.define([
             {
                this.removeEventListener('pointerup', glc.mouseup_listener);
 
-               if (event2.buttons == 1) // Selection on mouseup without move
+               if (event2.button == 0) // Selection on mouseup without move
                {
                   glc.handleMouseSelect(event2);
                }
-               else if (event.buttons == 2) // Context menu on delay without move
+               else if (event2.button == 2) // Context menu on delay without move
                {
                   EVE.JSR.createMenu(event2, glc).then(menu => glc.showContextMenu(event2, menu));
                }
@@ -416,20 +418,39 @@ sap.ui.define([
          //    window.requestAnimationFrame(this.render.bind(this));
       }
 
-      render_for_picking(x, y)
+      render_for_picking(x, y, detect_depth)
       {
          console.log("RENDER FOR PICKING", this.scene, this.camera, this.canvas, this.renderer);
 
-         if (this.canvas.width <= 0 || this.canvas.height <= 0) return;
+         if (this.canvas.width <= 0 || this.canvas.height <= 0) return null;
 
-         this.renderer.pick(x, y);
-         this.rqt.pick();
+         let state = this.rqt.pick(x, y, detect_depth);
 
-         let o3d = this.renderer.pickedObject3D;
-         // Render to FBO or texture would work.
-         // let d   = this.renderer.pickedDepth;
-         console.log("pick result", o3d /* , d */);
-         return o3d;
+         if (state.object === null) return null;
+
+         let top_obj = state.object;
+         while (top_obj.eve_el === undefined)
+            top_obj = top_obj.parent;
+
+         state.top_object = top_obj;
+         state.eve_el = top_obj.eve_el;
+
+         if (state.eve_el.fSecondarySelect)
+            this.rqt.pick_instance(state);
+
+         state.w = this.get_width();;
+         state.h = this.get_height();
+         state.mouse = new RC.Vector2( ((x + 0.5) / state.w) * 2 - 1,
+                                      -((y + 0.5) / state.h) * 2 + 1 );
+
+         let ctrl_obj = state.object;
+         while (ctrl_obj.get_ctrl === undefined)
+            ctrl_obj = ctrl_obj.parent;
+
+         state.ctrl = ctrl_obj.get_ctrl(state)
+
+         console.log("pick result", state);
+         return state;
       }
 
       //==============================================================================
@@ -488,61 +509,42 @@ sap.ui.define([
          }
       }
 
-      /** Get three.js intersect object at specified mouse position */
-      getIntersectAt(x, y)
-      {
-         console.log("GLC::onMouseMoveTimeout", x, y);
-
-         let o3d = this.render_for_picking(x, y);
-         if (!o3d) return null;
-         if (!o3d.get_ctrl) o3d = o3d.parent;
-         if (o3d.get_ctrl) {
-            if (!o3d.get_ctrl) o3d = o3d.parent;
-            let w = this.get_width();
-            let h = this.get_height();
-            let mouse = new RC.Vector2( ((x + 0.5) / w) * 2 - 1, -((y + 0.5) / h) * 2 + 1 );
-            return { object: o3d, mouse: mouse, w: w, h: h };
-         }
-         return null;
-      }
-
       onMouseMoveTimeout(x, y)
       {
          delete this.mousemove_timeout;
 
-         let intersect = this.getIntersectAt(x,y);
+         let pstate = this.render_for_picking(x, y, false);
 
-         if ( ! intersect)
+         if ( ! pstate)
             return this.clearHighlight();
 
-         let c = intersect.object.get_ctrl();
+         let c = pstate.ctrl;
 
-         let mouse = intersect.mouse;
+         c.elementHighlighted(c.extractIndex());
 
-         // c.elementHighlighted(c.extractIndex(intersect));
+         this.highlighted_scene = pstate.top_object.scene;
 
-         this.highlighted_scene = c.obj3d.scene;
-
-         if (c.obj3d && c.obj3d.eve_el)
-            this.ttip_text.innerHTML = c.getTooltipText(intersect);
+         if (pstate.object && pstate.eve_el)
+            this.ttip_text.innerHTML = c.getTooltipText();
          else
             this.ttip_text.innerHTML = "";
 
-         let dome = this.controller.getView().getDomRef();
-         let offs = (mouse.x > 0 || mouse.y < 0) ? this.getRelativeOffsets(dome) : null;
+         let dome  = this.controller.getView().getDomRef();
+         let mouse = pstate.mouse;
+         let offs  = (mouse.x > 0 || mouse.y < 0) ? this.getRelativeOffsets(dome) : null;
 
          if (mouse.x <= 0) {
             this.ttip.style.left  = (x + dome.offsetLeft + 10) + "px";
             this.ttip.style.right = null;
          } else {
-            this.ttip.style.right = (intersect.w - x + offs.right + 10) + "px";
+            this.ttip.style.right = (pstate.w - x + offs.right + 10) + "px";
             this.ttip.style.left  = null;
          }
          if (mouse.y >= 0) {
             this.ttip.style.top    = (y + dome.offsetTop + 10) + "px";
             this.ttip.style.bottom = null;
          } else {
-            this.ttip.style.bottom = (intersect.h - y + offs.bottom + 10) + "px";
+            this.ttip.style.bottom = (pstate.h - y + offs.bottom + 10) + "px";
             this.ttip.style.top = null;
          }
 
@@ -591,13 +593,13 @@ sap.ui.define([
 
          // See js/modules/menu/menu.mjs createMenu(), menu.add()
 
-         let intersect = this.getIntersectAt(event.offsetX, event.offsetY);
+         let pstate = this.render_for_picking(event.offsetX, event.offsetY, true);
 
          menu.add("header:Context Menu");
 
-         if (intersect) {
-            if (intersect.object.eve_el)
-            menu.add("Browse to " + (intersect.object.eve_el.fName || "element"), intersect.object.eve_el.fElementId, this.controller.invokeBrowseOf.bind(this.controller));
+         if (pstate) {
+            if (pstate.eve_el)
+            menu.add("Browse to " + (pstate.eve_el.fName || "element"), pstate.eve_el.fElementId, this.controller.invokeBrowseOf.bind(this.controller));
          }
 
          menu.add("Reset camera", this.resetRenderer);
@@ -605,11 +607,11 @@ sap.ui.define([
          menu.add("separator");
 
          let fff = this.defaultContextMenuAction;
-         menu.add("sub:Sub Test");
-         menu.add("Foo",     'foo', fff);
-         menu.add("Bar",     'bar', fff);
-         menu.add("Baz",     'baz', fff);
-         menu.add("endsub:");
+         // menu.add("sub:Sub Test");
+         // menu.add("Foo",     'foo', fff);
+         // menu.add("Bar",     'bar', fff);
+         // menu.add("Baz",     'baz', fff);
+         // menu.add("endsub:");
 
          menu.show(event);
       }
@@ -621,13 +623,13 @@ sap.ui.define([
 
       handleMouseSelect(event)
       {
-         let intersect = this.getIntersectAt(event.offsetX, event.offsetY);
+         let pstate = this.render_for_picking(event.offsetX, event.offsetY, false);
 
-         if (intersect) {
-            let c = intersect.object.get_ctrl();
+         if (pstate) {
+            let c = pstate.ctrl;
             c.event = event;
-            c.elementSelected(c.extractIndex(intersect));
-            this.highlighted_scene = intersect.object.scene;
+            c.elementSelected(c.extractIndex());
+            this.highlighted_scene = pstate.top_object.scene;
          } else {
             // XXXX HACK - handlersMIR senders should really be in the mgr
 

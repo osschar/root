@@ -43,13 +43,12 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
                // Used by JSRoot
                obj3d._typename = this.creator.GenerateTypeName(obj3d);
 
-               // add reference to a streamed eve element to obj3d
-               obj3d.eve_el = elem;
+               obj3d.eve_el = elem; // reference to the EveElement
+               obj3d.scene = this;  // required for change processing, esp. highlight/selection
 
                // SL: this is just identifier for highlight, required to show items on other places, set in creator
                obj3d.geo_object = elem.fMasterId || elem.fElementId;
                obj3d.geo_name = elem.fName; // used for highlight
-               obj3d.scene = this; // required for get changes when highlight/selection is changed
 
                if (elem.render_data.matrix) {
                   obj3d.matrixAutoUpdate = false;
@@ -301,12 +300,12 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
          return undefined;
       }
 
-      sendSelectMIR(sel_id, obj3d, is_multi, indx)
+      sendSelectMIR(sel_id, eve_el, is_multi, indx)
       {
          indx = this.sanitizeIndx(indx);
          let is_secsel = indx !== undefined;
 
-         let fcall = "NewElementPickedStr(" + (obj3d ? obj3d.eve_el.fElementId : 0) + `, ${is_multi}, ${is_secsel}`;
+         let fcall = "NewElementPickedStr(" + (eve_el ? eve_el.fElementId : 0) + `, ${is_multi}, ${is_secsel}`;
          if (is_secsel)
          {
             fcall += ", \"" + indx.join(",") + "\"";
@@ -317,32 +316,32 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
       }
 
       /** interactive handler. Calculates selection state, apply to element and distribute to other scene */
-      processElementSelected(obj3d, indx, event)
+      processElementSelected(eve_el, indx, event)
       {
          // console.log("EveScene.processElementSelected", obj3d, col, indx, evnt);
 
          let is_multi  = event && event.ctrlKey ? true : false;
-         this.sendSelectMIR(this.mgr.global_selection_id, obj3d, is_multi, indx);
+         this.sendSelectMIR(this.mgr.global_selection_id, eve_el, is_multi, indx);
 
          return true;
       }
 
       /** interactive handler */
-      processElementHighlighted(obj3d, indx, evnt)
+      processElementHighlighted(eve_el, indx, event)
       {
-         if (this.mgr.MatchSelection(this.mgr.global_selection_id, obj3d.eve_el, indx))
+         if (this.mgr.MatchSelection(this.mgr.global_selection_id, eve_el, indx))
             return true;
 
          // Need check for duplicates before call server, else server will un-higlight highlighted element
          // console.log("EveScene.processElementHighlighted", obj3d.eve_el.fElementId, indx, evnt);
-         if (this.mgr.MatchSelection(this.mgr.global_highlight_id, obj3d.eve_el, indx))
+         if (this.mgr.MatchSelection(this.mgr.global_highlight_id, eve_el, indx))
             return true;
 
          // when send queue below threshold, ignre highlight
          if (this.mgr.CheckSendThreshold())
             return true;
 
-         this.sendSelectMIR(this.mgr.global_highlight_id, obj3d, false, indx);
+         this.sendSelectMIR(this.mgr.global_highlight_id, eve_el, false, indx);
 
          return true;
       }
@@ -399,6 +398,14 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
       {
          let obj3d = this.getObj3D( element_id );
          if (!obj3d) return;
+
+         // XXXXX To be properly structured and implemented.
+         if (this.glctrl.viewer.constructor.name == "GlViewerRCore") {
+            obj3d._material._color.r = Math.random();
+            obj3d._material._color.g = Math.random();
+            obj3d._material._color.b = Math.random();
+            return;
+         }
 
          let opass = this.glctrl.viewer.outline_pass;
          opass.id2obj_map[element_id] = opass.id2obj_map[element_id] || [];

@@ -12,37 +12,43 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
    class EveElemControl
    {
 
-      constructor(o3d)
+      constructor(pick_state)
       {
-         this.obj3d = o3d;
+         this.state = pick_state;
+         // event property can be set by handlers
       }
 
       invokeSceneMethod(fname, arg)
       {
-         if ( ! this.obj3d) return false;
+         if ( ! this.state.top_object || ! this.state.eve_el) return false;
 
-         let s = this.obj3d.scene;
+         let s = this.state.top_object.scene;
          if (s && (typeof s[fname] == "function"))
-            return s[fname](this.obj3d, arg, this.event);
+            return s[fname](this.state.eve_el, arg, this.event);
          return false;
       }
 
-      getTooltipText(intersect)
+      getTooltipText()
       {
-         let el = this.obj3d.eve_el;
+         let el = this.state.eve_el;
          return el.fTitle || el.fName || "";
+      }
+
+      extractIndex()
+      {
+         return this.state.instance;
       }
 
       elementHighlighted(indx)
       {
          // default is simple selection, we ignore the indx
-         this.invokeSceneMethod("processElementHighlighted"); // , indx);
+         this.invokeSceneMethod("processElementHighlighted", indx);
       }
 
       elementSelected(indx)
       {
          // default is simple selection, we ignore the indx
-         this.invokeSceneMethod("processElementSelected"); //, indx);
+         this.invokeSceneMethod("processElementSelected", indx);
       }
 
    } // class EveElemControl
@@ -61,6 +67,24 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
    }
 
    //------------------------------------------------------------------------------
+   // Builder functions of this class are called by EveScene to create RCore
+   // objects representing an EveElement. They can have children if multiple RCore
+   // objects are required (e.g., mesh + lines + points).
+   //
+   // The top-level object returned by these builder functions will get additional
+   // properties injected by EveScene:
+   // - eve_el
+   // - scene.
+   //
+   // Object picking functions in GlViewerRCore will navigate up the parent hierarchy
+   // until an object with eve_el property is set.
+   // If secondary selection is enabled on the eve_el, instance picking will be called
+   // as well and the returned ID will be used as the index for secondary selection.
+   // This can be overriden by setting get_ctrl property of any RCore object to a function
+   // that takes a reference to the said argument and returns an instance of class
+   // EveElemControl.
+   // If get_ctrl is not found on the upwards traversal to object with eve_el property set
+   // the base EveElemControl is created with the top-level as the argument.
 
    class EveElements
    {
@@ -79,6 +103,10 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          this.ColorWhite = new RC.Color(0xFFFFFF);
          this.ColorBlack = new RC.Color(0x000000);
       }
+
+      //----------------------------------------------------------------------------
+      // Helper functions
+      //----------------------------------------------------------------------------
 
       GenerateTypeName(obj) { return "RC." + obj.type; }
 
@@ -175,13 +203,15 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          return mat;
       }
 
-      RcPickable(el, obj3d, ctrl_class = EveElemControl)
+      RcPickable(el, obj3d, do_children = true, ctrl_class = EveElemControl)
       {
          if (el.fPickable) {
-            obj3d.get_ctrl = function() { return new ctrl_class(obj3d); }
+            obj3d.get_ctrl = function(state) { return new ctrl_class(state); }
             obj3d.pickable = true;
-            for (let i = 0; i < obj3d.children.length; ++i)
-               obj3d.children[i].pickable = true;
+            if (do_children) {
+               for (let i = 0; i < obj3d.children.length; ++i)
+                  obj3d.children[i].pickable = true;
+            }
             // using auto-id now obj3d.colorID = el.fElementId;
             // console.log("YES Pickable for", el.fElementId, el.fName)
             return true;
@@ -217,6 +247,10 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
             () => { this.viewer.request_render() }
          );
       }
+
+      //----------------------------------------------------------------------------
+      // Builder functions
+      //----------------------------------------------------------------------------
 
       //==============================================================================
       // makeHit
@@ -257,28 +291,6 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
          return s;
       }
-
-      makeHitOrig(hit, rnr_data)
-      {
-         if (this.TestRnr("hit", hit, rnr_data)) return null;
-
-         let geo = new RC.Geometry();
-         geo.vertices = new RC.BufferAttribute(rnr_data.vtxBuff, 3);
-
-         let col = RcCol(hit.fMarkerColor);
-         // console.log("COLOR", hit.fMarkerColor, EVE.JSR.getColor(hit.fMarkerColor), col);
-
-         let mat = this.RcPointMaterial(col, 1, hit.fMarkerSize,
-            { pointsScale: false, drawCircles: true });
-
-         let pnts = new RC.Point( {geometry: geo, material: mat} );
-         this.UpdatePointPickingMaterial(pnts)
-         this.RcPickable(hit, pnts);
-   
-         pnts.dispose = function() { delete this; } // ????
-         return pnts;
-      }
-
 
       //==============================================================================
       // makeTrack
@@ -404,6 +416,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          let mesh = new RC.Mesh(geo_body, this.RcFancyMaterial(mcol, 0.5, { side: RC.FRONT_AND_BACK_SIDE }));
 
          let line1 = new RC.Line(geo_rim, this.RcLineMaterial(lcol, 0.8, 4));
+         line1.renderingPrimitive = RC.LINE_LOOP;
 
          let line2 = new RC.Line(geo_rays, this.RcLineMaterial(lcol, 0.8, 1));
          line2.renderingPrimitive = RC.LINES;
