@@ -23,6 +23,8 @@ sap.ui.define([
 
          console.log("GlViewerRCore RQ_Mode:", this.RQ_Mode, "RQ_SSAA:", this.RQ_SSAA);
 
+         this._outline_map = {};
+
          this._logLevel = 1; // 0 - error, 1 - warning, 2 - info, 3 - debug
       }
 
@@ -76,6 +78,8 @@ sap.ui.define([
          return this.scene;
       }
 
+      get outline_map() { return this._outline_map; }
+
       //==============================================================================
 
       createRCoreRenderer()
@@ -95,19 +99,18 @@ sap.ui.define([
          let gl = this.canvas.getContext("webgl2");
 
          this.renderer = new RC.MeshRenderer(this.canvas, RC.WEBGL2, {antialias: false, stencil: true});
-         this.renderer._logLevel = 0;
+         this.renderer._logLevel = 1;
          this.renderer.clearColor = "#FFFFFFFF";
          this.renderer.addShaderLoaderUrls("rootui5sys/eve7/lib/RC/shaders");
          this.renderer.addShaderLoaderUrls("rootui5sys/eve7/shaders");
          this.renderer.pickObject3D = true;
          RC.PickingShaderMaterial.DEFAULT_PICK_MODE = RC.PickingShaderMaterial.PICK_MODE.UINT;
-
-         this.outline_pass = {};
-         this.outline_pass.id2obj_map = {};
+         RC.GLManager.sCheckFrameBuffer = false;
 
          this.scene = new RC.Scene();
 
-         this.lights = this.make_object("Light container");
+         this.lights = new RC.Group;
+         this.lights.name = "Light container";
          this.scene.add(this.lights);
 
          let a_light = new RC.AmbientLight(new RC.Color(0xffffff), 0.05);
@@ -210,11 +213,11 @@ sap.ui.define([
 
             glc.removeMouseupListener();
 
-            if (event.buttons === 0) {
+            if (event.buttons === 0 && event.srcElement === glc.canvas) {
                glc.removeMouseMoveTimeout();
                glc.mousemove_timeout = setTimeout(glc.onMouseMoveTimeout.bind(glc, event.offsetX, event.offsetY), glc.controller.htimeout);
             } else {
-               glc.clearHighlight();
+               // glc.clearHighlight();
             }
          });
 
@@ -392,6 +395,8 @@ sap.ui.define([
 
       request_render()
       {
+         // console.log("REQUEST RENDER");
+
          if (this.render_requested) return;
          setTimeout(this.render.bind(this), 0);
          this.render_requested = true;
@@ -405,7 +410,14 @@ sap.ui.define([
 
          if (this.canvas.width <= 0 || this.canvas.height <= 0) return;
 
+         let omap = this.outline_map;
+         let sel_objs = Object.values(omap).flat();
+         // console.log("WOOF", omap, sel_objs);
+         sel_objs.map(res => this.rqt.RP_GBuffer.obj_list.push(res.geom[0]));
+
          this.rqt.render();
+
+         this.rqt.RP_GBuffer.obj_list = [];
 
          if (this.renderer.used == false) {
             // RCRC Ideally there would be an onShadersLoaded callback.
@@ -447,7 +459,7 @@ sap.ui.define([
          while (ctrl_obj.get_ctrl === undefined)
             ctrl_obj = ctrl_obj.parent;
 
-         state.ctrl = ctrl_obj.get_ctrl(state)
+         state.ctrl = ctrl_obj.get_ctrl(ctrl_obj, top_obj);
 
          console.log("pick result", state);
          return state;
@@ -491,10 +503,10 @@ sap.ui.define([
 
       clearHighlight()
       {
-         if (this.highlighted_scene)
+         if (this.highlighted_top_object)
          {
-            this.highlighted_scene.clearHighlight(); // XXXX should go through manager
-            this.highlighted_scene = 0;
+            this.highlighted_top_object.scene.clearHighlight(); // XXXX should go through manager
+            this.highlighted_top_object = null;
 
             this.ttip.style.display = "none";
          }
@@ -520,14 +532,16 @@ sap.ui.define([
 
          let c = pstate.ctrl;
 
-         c.elementHighlighted(c.extractIndex());
+         c.elementHighlighted(c.extractIndex(pstate.instance), null);
 
-         this.highlighted_scene = pstate.top_object.scene;
-
-         if (pstate.object && pstate.eve_el)
-            this.ttip_text.innerHTML = c.getTooltipText();
-         else
-            this.ttip_text.innerHTML = "";
+         if (this.highlighted_top_object !== pstate.top_object)
+         {
+            if (pstate.object && pstate.eve_el)
+               this.ttip_text.innerHTML = c.getTooltipText();
+            else
+               this.ttip_text.innerHTML = "";
+         }
+         this.highlighted_top_object = pstate.top_object;
 
          let dome  = this.controller.getView().getDomRef();
          let mouse = pstate.mouse;
@@ -549,6 +563,14 @@ sap.ui.define([
          }
 
          this.ttip.style.display= "block";
+      }
+
+      remoteToolTip(msg)
+      {
+         if (this.ttip_text)
+            this.ttip_text.innerHTML = msg;
+         if (this.highlighted_top_object && this.ttip)
+            this.ttip.style.display = "block";
       }
 
       getRelativeOffsets(elem)
@@ -627,9 +649,8 @@ sap.ui.define([
 
          if (pstate) {
             let c = pstate.ctrl;
-            c.event = event;
-            c.elementSelected(c.extractIndex());
-            this.highlighted_scene = pstate.top_object.scene;
+            c.elementSelected(c.extractIndex(pstate.instance), event);
+            // WHY ??? this.highlighted_scene = pstate.top_object.scene;
          } else {
             // XXXX HACK - handlersMIR senders should really be in the mgr
 
