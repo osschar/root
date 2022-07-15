@@ -12,43 +12,48 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
    class EveElemControl
    {
 
-      constructor(pick_state)
+      constructor(iobj, tobj)
       {
-         this.state = pick_state;
-         // event property can be set by handlers
+         this.invoke_obj = iobj;
+         this.top_obj = tobj ? tobj : iobj;
       }
 
-      invokeSceneMethod(fname, arg)
+      invokeSceneMethod(fname, arg, event)
       {
-         if ( ! this.state.top_object || ! this.state.eve_el) return false;
+         if ( ! this.top_obj || ! this.top_obj.eve_el) return false;
 
-         let s = this.state.top_object.scene;
+         let s = this.top_obj.scene;
          if (s && (typeof s[fname] == "function"))
-            return s[fname](this.state.eve_el, arg, this.event);
+            return s[fname](this.top_obj.eve_el, arg, event);
          return false;
       }
 
       getTooltipText()
       {
-         let el = this.state.eve_el;
+         let el = this.top_obj.eve_el;
          return el.fTitle || el.fName || "";
       }
 
-      extractIndex()
+      extractIndex(instance)
       {
-         return this.state.instance;
+         return instance;
       }
 
-      elementHighlighted(indx)
+      elementHighlighted(indx, event)
       {
          // default is simple selection, we ignore the indx
-         this.invokeSceneMethod("processElementHighlighted", indx);
+         return this.invokeSceneMethod("processElementHighlighted", indx, event);
       }
 
-      elementSelected(indx)
+      elementSelected(indx, event)
       {
          // default is simple selection, we ignore the indx
-         this.invokeSceneMethod("processElementSelected", indx);
+         return this.invokeSceneMethod("processElementSelected", indx, event);
+      }
+
+      DrawForSelection(sec_idcs, res)
+      {
+         res.geom.push(this.invoke_obj);
       }
 
    } // class EveElemControl
@@ -83,8 +88,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
    // This can be overriden by setting get_ctrl property of any RCore object to a function
    // that takes a reference to the said argument and returns an instance of class
    // EveElemControl.
-   // If get_ctrl is not found on the upwards traversal to object with eve_el property set
-   // the base EveElemControl is created with the top-level as the argument.
+   // get_ctrl property needs to be set at least at the top-level object.
 
    class EveElements
    {
@@ -212,11 +216,9 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
                for (let i = 0; i < obj3d.children.length; ++i)
                   obj3d.children[i].pickable = true;
             }
-            // using auto-id now obj3d.colorID = el.fElementId;
-            // console.log("YES Pickable for", el.fElementId, el.fName)
+            // using RCore auto-id to get Object3D that got picked.
             return true;
          } else {
-            // console.log("NOT Pickable for", el.fElementId, el.fName)
             return false;
          }
       }
@@ -248,6 +250,13 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          );
       }
 
+      AddMapToAllMaterials(o3d, tex)
+      {
+         if (o3d.material) o3d.material.addMap(tex);
+         if (o3d.pickingMaterial) o3d.pickingMaterial.addMap(tex);
+         if (o3d.outlineMaterial) o3d.outlineMaterial.addMap(tex);
+      }
+
       //----------------------------------------------------------------------------
       // Builder functions
       //----------------------------------------------------------------------------
@@ -269,9 +278,9 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
             diffuse: col.clone().multiplyScalar(0.5) } );
          sm.transparent = true;
          // sm.depthWrite = false;
-         this.GetLumAlphaTexture("star5-32a.png", (tex) => {
-            sm.addMap(tex);
-         });
+         // this.GetLumAlphaTexture("star5-32a.png", (tex) => {
+         //    sm.addMap(tex);
+         // });
 
          sm.instanceData = new RC.Texture(rnr_data.vtxBuff,
             RC.Texture.ClampToEdgeWrapping, RC.Texture.ClampToEdgeWrapping,
@@ -279,11 +288,14 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
             // RC.Texture.R32F, RC.Texture.R32F, RC.Texture.FLOAT,
             RC.Texture.RGBA32F, RC.Texture.RGBA, RC.Texture.FLOAT,
             hit.fTexX, hit.fTexY);
+         sm.instanceData.flipy = false;
 
          let s = new RC.ZSprite(null, sm);
          s.frustumCulled = false; // need a way to speciy bounding box/sphere !!!
          s.instanced = true;
          s.instanceCount = hit.fSize;
+
+         this.GetLumAlphaTexture("star5-32a.png", this.AddMapToAllMaterials.bind(this, s));
 
          this.RcPickable(hit, s);
 

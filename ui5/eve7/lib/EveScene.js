@@ -337,7 +337,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
          if (this.mgr.MatchSelection(this.mgr.global_highlight_id, eve_el, indx))
             return true;
 
-         // when send queue below threshold, ignre highlight
+         // when send queue below threshold, ignore highlight
          if (this.mgr.CheckSendThreshold())
             return true;
 
@@ -399,62 +399,56 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
          let obj3d = this.getObj3D( element_id );
          if (!obj3d) return;
 
-         // XXXXX To be properly structured and implemented.
-         if (this.glctrl.viewer.constructor.name == "GlViewerRCore") {
-            obj3d._material._color.r = Math.random();
-            obj3d._material._color.g = Math.random();
-            obj3d._material._color.b = Math.random();
+         let id2obj_map = this.glctrl.viewer.outline_map;
+         // console.log("EveScene.SelectElement ", selection_obj.fName, element_id, selection_obj.fElementId, id2obj_map);
+
+         id2obj_map[element_id] = id2obj_map[element_id] || [];
+
+         if (id2obj_map[element_id][selection_obj.fElementId] !== undefined) {
             return;
          }
 
-         let opass = this.glctrl.viewer.outline_pass;
-         opass.id2obj_map[element_id] = opass.id2obj_map[element_id] || [];
-
-         if (opass.id2obj_map[element_id][selection_obj.fElementId] !== undefined)
-         {
-            return;
-         }
-
-         let stype  = selection_obj.fName.endsWith("Selection") ? "select" : "highlight";
-         let estype = THREE.OutlinePassEve.selection_enum[stype];
+         const ST_Selection = 0; // Matching THREE.OutlinePassEve.selection_enum
+         const ST_Highlight = 1;
+         let stype  = selection_obj.fName.endsWith("Selection") ? ST_Selection : ST_Highlight;
          let oe = this.mgr.GetElement(element_id);
-         // console.log("EveScene.SelectElement ", selection_obj.fName, oe.fName, selection_obj.fElementId, this.glctrl.viewer.outline_pass.id2obj_map);
 
          let res = {
-            "sel_type" : estype,
-            "sec_sel"  : (oe.fSecondarySelect && sec_idcs.length > 0) ? true: false,
+            "sel_type" : stype,
+            "sec_sel"  : (oe.fSecondarySelect && sec_idcs.length > 0) ? true : false,
             "geom"     : []
          };
 
-         // exit if you try to highlight an object that has already been selected
-         if (estype == THREE.OutlinePassEve.selection_enum["highlight"] &&
-             opass.id2obj_map[element_id][this.mgr.global_selection_id] !== undefined)
+         // Exit if we are trying to highlight an object that has already been selected.
+         if (stype == ST_Highlight &&
+             id2obj_map[element_id][this.mgr.global_selection_id] !== undefined)
          {
             if (!res.sec_sel)
             return;
          }
 
-         if (!res.sec_sel) opass.id2obj_map[element_id] = [];
+         if (!res.sec_sel) id2obj_map[element_id] = [];
 
-         if (obj3d.get_ctrl)
-         {
-            let ctrl = obj3d.get_ctrl();
+         if (obj3d.get_ctrl) {
+            let ctrl = obj3d.get_ctrl(obj3d);
             ctrl.DrawForSelection(sec_idcs, res, extra);
-            opass.id2obj_map[element_id][selection_obj.fElementId] = res;
+         } else {
+            res.geom.push(obj3d);
+         }
+         id2obj_map[element_id][selection_obj.fElementId] = res;
 
-            if (stype == "highlight" && selection_obj.sel_list) {
-               this.glctrl.viewer.remoteToolTip(selection_obj.sel_list[0].tooltip);
-            }
+         if (stype == ST_Highlight && selection_obj.sel_list) {
+            this.glctrl.viewer.remoteToolTip(selection_obj.sel_list[0].tooltip);
          }
       }
 
       UnselectElement(selection_obj, element_id)
       {
-         let opass = this.glctrl.viewer.outline_pass;
-         // console.log("EveScene.UnselectElement ", selection_obj.fName, element_id, selection_obj.fElementId, this.glctrl.viewer.outline_pass.id2obj_map);
-         if (opass.id2obj_map[element_id] !== undefined)
-         {
-            delete opass.id2obj_map[element_id][selection_obj.fElementId];
+         let id2obj_map = this.glctrl.viewer.outline_map;
+         // console.log("EveScene.UnselectElement ", selection_obj.fName, element_id, selection_obj.fElementId, id2obj_map);
+
+         if (id2obj_map[element_id] !== undefined) {
+            delete id2obj_map[element_id][selection_obj.fElementId];
          }
       }
 
