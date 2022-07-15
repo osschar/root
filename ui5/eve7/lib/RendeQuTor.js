@@ -7,6 +7,7 @@ import {IcoSphere} from './RC/objects/IcoSphere.js';
 
 import {FRONT_AND_BACK_SIDE, HIGHPASS_MODE_BRIGHTNESS, HIGHPASS_MODE_DIFFERENCE}
     from './RC/constants.js';
+import { Scene } from './RC/RenderCore.js';
 // import {} from '';
 
 function iterateSceneR(object, callback)
@@ -61,9 +62,16 @@ export class RendeQuTor
         this.SSAA_value = ssaa_val;
 
         this.make_RP_SSAA_Super();
-        //this.make_RP_SSAA_Down();
+        this.make_RP_SSAA_Down();
+
+        this.make_RP_GBuffer();
+        this.make_RP_Outline();
+
         this.make_RP_ToScreen();
-        this.RP_ToScreen.input_texture = "color_ssaa_super";
+        this.RP_ToScreen.input_texture = "color_outline";
+        // this.RP_ToScreen.input_texture = "color_ssaa_super";
+
+        this.RP_GBuffer.obj_list = [];
     }
 
     initFull(ssaa_val)
@@ -170,7 +178,10 @@ export class RendeQuTor
         this.PRP_plain = new RenderPass(
             RenderPass.BASIC,
             function (textureMap, additionalData) {},
-            function (textureMap, additionalData) { return { scene: pthis.scene, camera: pthis.camera }; },
+            function (textureMap, additionalData) {
+                // pthis.renderer._specialRenderFoo = "Choopacabra";
+                return { scene: pthis.scene, camera: pthis.camera };
+            },
             function (textureMap, additionalData) {},
             RenderPass.TEXTURE,
             null,
@@ -247,7 +258,7 @@ export class RendeQuTor
             // Viewport
             null,
             // Bind depth texture to this ID
-            "depthDefaultDefaultMaterials",
+            "depthDefaultSuper",
             // Outputs
             [ { id: "color_ssaa_super", textureConfig: RenderPass.DEFAULT_RGBA_TEXTURE_CONFIG } ]
         );
@@ -260,7 +271,7 @@ export class RendeQuTor
     {
         this.RP_SSAA_Down_mat = new CustomShaderMaterial("copyTexture");
         this.RP_SSAA_Down_mat.lights = false;
-        var pthis = this;
+        let pthis = this;
 
         this.RP_SSAA_Down = new RenderPass(
             // Rendering pass type
@@ -270,7 +281,7 @@ export class RendeQuTor
             function (textureMap, additionalData) {},
             // Preprocess function
             function (textureMap, additionalData) {
-                return { material: pthis.RP_SSAA_Down_mat, textures: [textureMap[pthis.input_texture]] };
+                return { material: pthis.RP_SSAA_Down_mat, textures: [textureMap[this.input_texture]] };
             },
             // Postprocess function
             function (textureMap, additionalData) {},
@@ -298,13 +309,13 @@ export class RendeQuTor
     {
         this.RP_ToScreen_mat = new CustomShaderMaterial("copyTexture");
         this.RP_ToScreen_mat.lights = false;
-        var pthis = this;
+        let pthis = this;
 
         this.RP_ToScreen = new RenderPass(
             RenderPass.POSTPROCESS,
             function (textureMap, additionalData) {},
             function (textureMap, additionalData) {
-                return { material: pthis.RP_ToScreen_mat, textures: [ textureMap[this.input_texture] ] }; // XXXX pthis or this ????
+                return { material: pthis.RP_ToScreen_mat, textures: [ textureMap[this.input_texture] ] };
             },
             function (textureMap, additionalData) {},
             RenderPass.SCREEN,
@@ -399,125 +410,84 @@ export class RendeQuTor
         this.RP_Bloom.view_setup = function (vport) { this.viewport = { width: vport.width*pthis.SSAA_value, height: vport.height*pthis.SSAA_value }; };
         this.queue.pushRenderPass(this.RP_Bloom);
     }
-};
 
+    //=============================================================================
 
-/*
-export const RenderPass_MainMulti = new RenderPass(
-    // Rendering pass type
-    RenderPass.BASIC,
+    make_RP_GBuffer()
+    {
+        this.RP_GBuffer_mat = new CustomShaderMaterial("GBufferMini");
+        this.RP_GBuffer_mat.lights = false;
+        this.RP_GBuffer_mat.side = FRONT_AND_BACK_SIDE;
 
-    // Initialize function
-    function (textureMap, additionalData) {
-        iterateSceneR(scene, function(object){
-            if(object.pickable === false || object instanceof Text2D || object instanceof IcoSphere) {
-                object.visible = false;
-                //GL_INVALID_OPERATION : glDrawElementsInstancedANGLE: buffer format and fragment output variable type incompatible
-                //Program has no frag output at location 1, but destination draw buffer has an attached image.
-                return;
-            }
-            const multi = new CustomShaderMaterial("multi", {near: nearPlane, far: farPlane});
-            multi.side = FRONT_AND_BACK_SIDE; //reather use depth from default materials
-            MultiMats.push(multi);
-        });
-    },
+        let pthis = this;
 
-    // Preprocess function
-    function (textureMap, additionalData) {
-        let m_index = 0;
+        this.RP_GBuffer = new RenderPass(
+            RenderPass.BASIC,
+            function (textureMap, additionalData) {},
+            function (textureMap, additionalData) {
+                pthis.renderer._outlineEnabled = true;
+                pthis.renderer._outlineArray = this.obj_list;
+                pthis.renderer._defaultOutlineMat = pthis.RP_GBuffer_mat;
+                pthis.renderer._fillRequiredPrograms(pthis.RP_GBuffer_mat.requiredProgram(pthis.renderer));
+                for (const o3d of this.obj_list) {
+                    if (o3d.outlineMaterial)
+                        pthis.renderer._fillRequiredPrograms(o3d.outlineMaterial.requiredProgram(pthis.renderer));
+                }
+                return { scene: pthis.scene, camera: pthis.camera };
+            },
+            function (textureMap, additionalData) {
+                pthis.renderer._outlineEnabled = false; // can remain true if not all progs are loaded
+                pthis.renderer._outlineArray = null;
+            },
+            RenderPass.TEXTURE,
+            null,
+            "depthDefault",
+            [
+                {id: "normal",  textureConfig: RenderPass.DEFAULT_RGBA16F_TEXTURE_CONFIG},
+                {id: "viewDir", textureConfig: RenderPass.DEFAULT_RGBA16F_TEXTURE_CONFIG}
+            ]
+        );
+        this.RP_GBuffer.view_setup = function (vport) { this.viewport = vport; };
 
-        iterateSceneR(scene, function(object){
-            if(object.pickable === false || object instanceof Text2D || object instanceof IcoSphere) {
-                object.visible = false;
-                return;
-            }
-            object.material = MultiMats[m_index];
-            m_index++;
-        });
+        // No push, GBuffer/Outline passes are handled separately as there can be more of them.
+        this.queue.pushRenderPass(this.RP_GBuffer);
+        return this.RP_GBuffer;
+    }
 
+    make_RP_Outline()
+    {
+        this.RP_Outline_mat = new CustomShaderMaterial("outline",
+          { scale: 1.5*Math.E, // Math.E,
+            edgeColor: [0.7, 0.1, 0.5, 1.0],
+            _DepthThreshold: 6.0,
+            _NormalThreshold: 0.6, // 0.4,
+            _DepthNormalThreshold: 0.5,
+            _DepthNormalThresholdScale: 7.0 });
+        this.RP_Outline_mat.lights = false;
 
-        return { scene: scene, camera: camera };
-    },
+        let pthis = this;
 
-    // Target
-    RenderPass.TEXTURE,
+        this.RP_Outline = new RenderPass(
+            RenderPass.POSTPROCESS,
+            function (textureMap, additionalData) {},
+            function (textureMap, additionalData) {
+                return { material: pthis.RP_Outline_mat,
+                         textures: [ textureMap["depthDefault"], textureMap["normal"],
+                                     textureMap["viewDir"], textureMap["color_ssaa_down"] ] };
+            },
+            function (textureMap, additionalData) {},
+            RenderPass.TEXTURE,
+            null,
+            null,
+            [
+                {id: "color_outline", textureConfig: RenderPass.DEFAULT_RGBA_TEXTURE_CONFIG}
+            ]
+        );
+        this.RP_Outline.view_setup = function (vport) { this.viewport = vport; };
 
-    // Viewport
-    { width: predef_width*SSAA_value, height: predef_height*SSAA_value },
+        // No push, GBuffer/Outline passes are handled separately as there can be more of them.
+        this.queue.pushRenderPass(this.RP_Outline);
+        return this.RP_GBuffer;
+    }
 
-    // Bind depth texture to this ID
-    "depthDefaultMultiMaterials",
-
-    [
-        {id: "depth", textureConfig: RenderPass.DEFAULT_RGBA_TEXTURE_CONFIG},
-        {id: "normal", textureConfig: RenderPass.DEFAULT_RGB_TEXTURE_CONFIG},
-        {id: "viewDir", textureConfig: RenderPass.DEFAULT_RGB_TEXTURE_CONFIG},
-        {id: "camDist", textureConfig: RenderPass.DEFAULT_RGBA16F_TEXTURE_CONFIG}
-    ]
-    );
-*/
-
-/*
-const outline = new CustomShaderMaterial("outline", {scale: 1.0*SSAA_value, edgeColor: [1.0, 1.0, 1.0, 1.0]});
-outline.lights = false;
-export const RenderPass_Outline = new RenderPass(
-    // Rendering pass type
-    RenderPass.POSTPROCESS,
-
-    // Initialize function
-    function (textureMap, additionalData) {
-    },
-
-    // Preprocess function
-    function (textureMap, additionalData) {
-        return {material: outline, textures: [textureMap["depthDefaultMultiMaterials"], textureMap["normal"], textureMap["viewDir"], textureMap["color_bloom"]]};
-    },
-
-    // Postprocess function
-    function (textureMap, additionalData) {},
-
-    // Target
-    RenderPass.TEXTURE,
-
-    // Viewport
-    { width: predef_width*SSAA_value, height: predef_height*SSAA_value },
-
-    // Bind depth texture to this ID
-    null,
-
-    [
-        {id: "color_outline", textureConfig: RenderPass.DEFAULT_RGBA_TEXTURE_CONFIG}
-    ]
-    );
-
-const fog = new CustomShaderMaterial("fog", {MODE: 1, fogColor: [0.5, 0.4, 0.45, 0.8]});
-fog.lights = false;
-export const RenderPass_Fog = new RenderPass(
-
-    // Rendering pass type
-    RenderPass.POSTPROCESS,
-
-    // Initialize function
-    function (textureMap, additionalData) {
-    },
-
-    // Preprocess function
-    function (textureMap, additionalData) {
-        //return {material: fog, textures: [textureMap["color_outline"], textureMap["depthDefaultDefaultMaterials"]]}; //grid jumps on depth buffer
-        return {material: fog, textures: [textureMap["color_outline"], textureMap["camDist"]]}; //grid has specific shader for extruding geometry, even if implemented, it would jump around
-    },
-
-    // Target
-    RenderPass.TEXTURE,
-
-    // Viewport
-    { width: predef_width*SSAA_value, height: predef_height*SSAA_value },
-
-    // Bind depth texture to this ID
-    null,
-
-    [
-        {id: "color_fog", textureConfig: RenderPass.DEFAULT_RGBA_TEXTURE_CONFIG}
-    ]
-    );
-*/
+}
