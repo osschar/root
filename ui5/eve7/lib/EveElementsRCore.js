@@ -138,12 +138,157 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          res.geom.push(mesh);
       }
 
-
       extractIndex(intersect) {
          let idx = Math.floor(intersect.faceIndex / 12);
          return idx;
       }
-   }// class Calo3DControl
+
+      elementSelectedSendMIR(idx, selectionId)
+      {
+         let boxset = this.obj3d.eve_el;
+         let scene = this.obj3d.scene;
+         let multi = this.event?.ctrlKey ? true : false;
+
+         let boxIdx = idx;
+
+         let fcall = "NewShapePicked(" + boxIdx + ", " + selectionId + ", " + multi + ")"
+         scene.mgr.SendMIR(fcall, boxset.fElementId, "ROOT::Experimental::REveDigitSet");
+         return true;
+      }
+
+      elementSelected(idx)
+      {
+         return this.elementSelectedSendMIR(idx, this.obj3d.scene.mgr.global_selection_id);
+      }
+
+      elementHighlighted(idx)
+      {
+         return this.elementSelectedSendMIR(idx, this.obj3d.scene.mgr.global_highlight_id);
+      }
+
+   } // class Calo3DControl
+
+
+   class Calo2DControl extends EveElemControl {
+
+      DrawForSelection(sec_idcs, res, extra) {
+         let cells;
+         for (let i = 0; i < extra.length; i++) {
+            if (extra[i].caloVizId == this.obj3d.eve_el.fElementId) {
+               cells = extra[i].cells;
+               break;
+            }
+         }
+
+         let ibuff = this.obj3d.eve_el.render_data.idxBuff;
+         let vbuff = this.obj3d.eve_el.render_data.vtxBuff;
+         let nbox = ibuff.length / 2;
+         let nBoxSelected = cells.length;
+         let boxIdcs = [];
+         for (let i = 0; i < cells.length; i++) {
+            let bin = cells[i].b;
+            let slice = cells[i].s;
+            // let fraction =  cells[i].f;
+            for (let r = 0; r < nbox; r++) {
+               if (ibuff[r * 2] == slice) {
+
+                  if (bin > 0 && ibuff[r * 2 + 1] == bin) {
+                     boxIdcs.push(r);
+                     break;
+                  } else if (bin < 0 && ibuff[r * 2 + 1] == Math.abs(bin) && vbuff[r * 12 + 1] < 0) {
+                     boxIdcs.push(r);
+                     break;
+                  }
+               }
+            }
+         }
+         let idxBuff = [];
+         let vtxBuff = new Float32Array(nBoxSelected * 4 * 3);
+         let protoIdcs = [0, 1, 2, 2, 3, 0];
+         let rnr_data = this.obj3d.eve_el.render_data;
+         for (let i = 0; i < nBoxSelected; ++i) {
+            let BoxIdcs = boxIdcs[i];
+            for (let v = 0; v < 4; v++) {
+               let off = i * 12 + v * 3;
+               let pos = BoxIdcs * 12 + v * 3;
+               vtxBuff[off] = rnr_data.vtxBuff[pos];
+               vtxBuff[off + 1] = rnr_data.vtxBuff[pos + 1];
+               vtxBuff[off + 2] = rnr_data.vtxBuff[pos + 2];
+            }
+            {
+               // fix vertex 1
+               let pos = BoxIdcs * 12;
+               let v1x = rnr_data.vtxBuff[pos];
+               let v1y = rnr_data.vtxBuff[pos + 1];
+               pos += 3;
+               let v2x = rnr_data.vtxBuff[pos];
+               let v2y = rnr_data.vtxBuff[pos + 1];
+               let off = i * 12 + 3;
+               vtxBuff[off] = v1x + cells[i].f * (v2x - v1x);
+               vtxBuff[off + 1] = v1y + cells[i].f * (v2y - v1y);
+            }
+
+            {
+               // fix vertex 2
+               let pos = BoxIdcs * 12 + 3 * 3;
+               let v1x = rnr_data.vtxBuff[pos];
+               let v1y = rnr_data.vtxBuff[pos + 1];
+               pos -= 3;
+               let v2x = rnr_data.vtxBuff[pos];
+               let v2y = rnr_data.vtxBuff[pos + 1];
+               let off = i * 12 + 3 * 2;
+               vtxBuff[off] = v1x + cells[i].f * (v2x - v1x);
+               vtxBuff[off + 1] = v1y + cells[i].f * (v2y - v1y);
+            }
+            for (let c = 0; c < 6; c++) {
+               let off = i * 4;
+               idxBuff.push(protoIdcs[c] + off);
+            }
+         }
+
+         let body = new RC.Geometry();
+         body.indices = new RC.BufferAttribute(idxBuff, 1);
+         body.vertices = new RC.BufferAttribute(rnr_data.vtxBuff, 3);
+
+         let mesh = new THREE.Mesh(body);
+         res.geom.push(mesh);
+      }
+
+      extractIndex(intersect)
+      {
+         let idx  = Math.floor(intersect.faceIndex/2);
+         return idx;
+      }
+
+      elementSelectedSendMIR(idx, selectionId)
+      {
+          let calo =  this.obj3d.eve_el;
+          let idxBuff = calo.render_data.idxBuff;
+          let scene = this.obj3d.scene;
+          let multi = this.event?.ctrlKey ? true : false;
+          let bin = idxBuff[idx*2 + 1];
+          let slice =  idxBuff[idx*2];
+          // get sign for the case of RhoZ projection
+          if (calo.render_data.vtxBuff[idx*12 + 1] < 0) bin = -bin ;
+
+          let fcall = "NewBinPicked(" +  bin + ", " +  slice + ", " + selectionId + ", " + multi + ")"
+          scene.mgr.SendMIR(fcall, calo.fElementId, "ROOT::Experimental::REveCalo2D");
+          return true;
+      }
+
+     elementSelected(idx)
+     {
+        return this.elementSelectedSendMIR(idx, this.obj3d.scene.mgr.global_selection_id);
+     }
+
+     elementHighlighted(idx)
+     {
+        return this.elementSelectedSendMIR(idx, this.obj3d.scene.mgr.global_highlight_id);
+     }
+
+   } // class Calo2Control
+
+
 
    //==============================================================================
    // EveElements
@@ -615,7 +760,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
             let ci = rnr_data.idxBuff;
             let off = 0
-            let colBuff = new Float32Array(vBuff.length);
+            let colBuff = new Float32Array(nBox*8*4);
             for (let x = 0; x < nBox; ++x) {
                let slice = ci[x * 2];
                let sliceColor = calo3D.sliceColors[slice];
@@ -640,6 +785,64 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          this.RcPickable(calo3D, mesh);
 
          // mesh.get_ctrl = function () { return new Calo3DControl(mesh); };
+         mesh.dispose = function () { this.geometry.dispose(); this.material.dispose(); };
+
+         return mesh;
+      }
+
+      makeCalo2D(calo2D, rnrData)
+      {
+         let body = new RC.Geometry();
+         if (rnrData.vtxBuff) {
+            let nSquares = rnrData.vtxBuff.length / 12;
+            let nTriang = 2 * nSquares;
+
+            let idxBuff = new Uint32Array(nTriang * 3);
+            for (let s = 0; s < nSquares; ++s) {
+               let boff = s * 6;
+               let ioff = s * 4;
+
+               // first triangle
+               idxBuff[boff] = ioff;
+               idxBuff[boff + 1] = ioff + 1;
+               idxBuff[boff + 2] = ioff + 2;
+
+               // second triangle
+               idxBuff[boff + 3] = ioff + 2;
+               idxBuff[boff + 4] = ioff + 3;
+               idxBuff[boff + 5] = ioff;
+            }
+
+            body.indices = new RC.BufferAttribute(idxBuff, 1);
+            body.vertices = new RC.BufferAttribute(rnrData.vtxBuff, 3);
+            body.computeVertexNormals();
+
+            let ci = rnrData.idxBuff;
+            let colBuff = new Float32Array(nSquares * 4 * 4);
+            let off = 0;
+            for (let x = 0; x < nSquares; ++x) {
+               let slice = ci[x * 2];
+               let sliceColor = calo2D.sliceColors[slice];
+               let tc = new THREE.Color(EVE.JSR.getColor(sliceColor));
+               console.log()
+               for (let i = 0; i < 4; ++i) {
+                  colBuff[off] = tc.r;
+                  colBuff[off + 1] = tc.g;
+                  colBuff[off + 2] = tc.b;
+                  colBuff[off + 3] = 1.0;
+                  off += 4;
+               }
+            }
+            body.vertColor = new RC.BufferAttribute(colBuff, 4);
+         }
+
+
+         let mat = this.RcFlatMaterial(this.ColorBlack,0.5);
+         mat.useVertexColors = true;
+         let mesh = new RC.Mesh(body, mat);
+
+         this.RcPickable(calo2D, mesh);
+         //mesh.get_ctrl = function () { return new Calo2DControl(mesh); };
          mesh.dispose = function () { this.geometry.dispose(); this.material.dispose(); };
 
          return mesh;
