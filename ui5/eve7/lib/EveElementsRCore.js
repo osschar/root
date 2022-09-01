@@ -59,6 +59,92 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
    } // class EveElemControl
 
 
+   class Calo3DControl extends EveElemControl {
+
+      DrawForSelection(sec_idcs, res, extra) {
+         console.log("CALO 3d draw for selection ", extra);
+         // locate REveCaloData cells for this object
+         let cells;
+         for (let i = 0; i < extra.length; i++) {
+            if (extra[i].caloVizId == this.obj3d.eve_el.fElementId) {
+               cells = extra[i].cells;
+               break;
+            }
+         }
+
+         let ibuff = this.obj3d.eve_el.render_data.idxBuff;
+         let nbox = ibuff.length / 2;
+         let nBoxSelected = parseInt(cells.length);
+         let boxIdcs = new Array;
+         for (let i = 0; i < cells.length; i++) {
+            let tower = cells[i].t;
+            let slice = cells[i].s;
+
+            for (let r = 0; r < nbox; r++) {
+               if (ibuff[r * 2] == slice && ibuff[r * 2 + 1] == tower) {
+                  boxIdcs.push(r);
+                  break;
+               }
+            }
+         }
+         let rnr_data = this.obj3d.eve_el.render_data;
+         let protoIdcs = [0, 4, 5, 0, 5, 1, 1, 5, 6, 1, 6, 2, 2, 6, 7, 2, 7, 3, 3, 7, 4, 3, 4, 0, 1, 2, 3, 1, 3, 0, 4, 7, 6, 4, 6, 5];
+         let idxBuff = [];
+         let vtxBuff = new Float32Array(nbox * 8 * 3);
+         for (let i = 0; i < nBoxSelected; ++i) {
+            let BoxIdcs = boxIdcs[i];
+            for (let c = 0; c < 8; c++) {
+               let off = i * 24 + c * 3;
+               let pos = BoxIdcs * 24 + c * 3;
+               vtxBuff[off] = rnr_data.vtxBuff[pos];
+               vtxBuff[off + 1] = rnr_data.vtxBuff[pos + 1];
+               vtxBuff[off + 2] = rnr_data.vtxBuff[pos + 2];
+            }
+
+            // fix top corners, select can be partial
+            for (let c = 0; c < 4; c++) {
+               // fix vertex 1
+               let pos = BoxIdcs * 24 + c * 3;
+               let v1x = rnr_data.vtxBuff[pos];
+               let v1y = rnr_data.vtxBuff[pos + 1];
+               let v1z = rnr_data.vtxBuff[pos + 2];
+               pos += 12;
+               let v2x = rnr_data.vtxBuff[pos];
+               let v2y = rnr_data.vtxBuff[pos + 1];
+               let v2z = rnr_data.vtxBuff[pos + 2];
+
+               let off = i * 24 + 12 + c * 3;
+               vtxBuff[off] = v1x + cells[i].f * (v2x - v1x);
+               vtxBuff[off + 1] = v1y + cells[i].f * (v2y - v1y);
+               vtxBuff[off + 2] = v1z + cells[i].f * (v2z - v1z);
+            }
+
+            for (let c = 0; c < 36; c++) {
+               let off = i * 8;
+               idxBuff.push(protoIdcs[c] + off);
+            }
+         } // loop boxes
+
+         let body = new RC.Geometry();
+
+         body.indices = new RC.BufferAttribute(idxBuff, 1);
+         body.vertices = new RC.BufferAttribute(rnr_data.vtxBuff, 3);
+         body.computeVertexNormals();
+         // ? AMT do we need vertex colors
+         let mat = this.RcFancyMaterial(this.ColorBlack, 1.0, { side: RC.FRONT_SIDE });
+
+         let mesh = new RC.Mesh(body, mat);
+
+         res.geom.push(mesh);
+      }
+
+
+      extractIndex(intersect) {
+         let idx = Math.floor(intersect.faceIndex / 12);
+         return idx;
+      }
+   }// class Calo3DControl
+
    //==============================================================================
    // EveElements
    //==============================================================================
@@ -502,6 +588,62 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          return mesh;
       }
 
+      //==============================================================================
+      // make Calorimeters
+      //==============================================================================
+
+      makeCalo3D(calo3D, rnr_data)
+      {
+         let body = new RC.Geometry();
+         if (rnr_data.vtxBuff) {
+            let vBuff = rnr_data.vtxBuff;
+            let protoSize = 6 * 2 * 3;
+            let protoIdcs = [0, 4, 5, 0, 5, 1, 1, 5, 6, 1, 6, 2, 2, 6, 7, 2, 7, 3, 3, 7, 4, 3, 4, 0, 1, 2, 3, 1, 3, 0, 4, 7, 6, 4, 6, 5];
+            let nBox = vBuff.length / 24;
+            let idxBuff = new Uint32Array(nBox * protoSize);
+            let p = 0;
+            for (let i = 0; i < nBox; ++i) {
+               for (let c = 0; c < protoSize; c++) {
+                  let off = i * 8;
+                  idxBuff[p++] = protoIdcs[c] + off;
+               }
+            }
+
+            body.indices = new RC.BufferAttribute(idxBuff, 1);
+            body.vertices = new RC.BufferAttribute(rnr_data.vtxBuff, 3);
+            body.computeVertexNormals();
+
+            let ci = rnr_data.idxBuff;
+            let off = 0
+            let colBuff = new Float32Array(vBuff.length);
+            for (let x = 0; x < nBox; ++x) {
+               let slice = ci[x * 2];
+               let sliceColor = calo3D.sliceColors[slice];
+               let tc = new RC.Color(EVE.JSR.getColor(sliceColor));
+               for (let i = 0; i < 8; ++i) {
+                  colBuff[off] = tc.r;
+                  colBuff[off + 1] = tc.g;
+                  colBuff[off + 2] = tc.b;
+                  colBuff[off + 3] = 1.0;
+                  off += 4;
+               }
+            }
+            body.vertColor = new RC.BufferAttribute(colBuff, 4);
+         }
+
+         let mat = this.RcFancyMaterial(this.ColorBlack, 1.0, { side: RC.FRONT_SIDE });
+         //let mat = this.RcFlatMaterial(this.ColorBlack, 1.0, { side: RC.FRONT_SIDE });
+
+         mat.useVertexColors = true;
+         let mesh = new RC.Mesh(body, mat);
+
+         this.RcPickable(calo3D, mesh);
+
+         // mesh.get_ctrl = function () { return new Calo3DControl(mesh); };
+         mesh.dispose = function () { this.geometry.dispose(); this.material.dispose(); };
+
+         return mesh;
+      }
 
       //==============================================================================
       // makeEveGeometry / makeEveGeoShape
