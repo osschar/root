@@ -24,6 +24,13 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
          // register ourself for scene events
          this.mgr.RegisterSceneReceiver(scene.fSceneId, this);
 
+         if(this.mgr.is_rcore) {
+            this.SelectElement = this.SelectElementRCore;
+            this.UnselectElement = this.UnselectElementRCore;
+         } else {
+            this.SelectElement = this.SelectElementStd;
+            this.UnselectElement = this.UnselectElementStd;
+         }
          // AMT temporary solution ... resolve with callSceneReceivers in EveManager.js
          scene.eve_scene = this;
       }
@@ -394,17 +401,17 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
          });
       }
 
-      SelectElement(selection_obj, element_id, sec_idcs, extra)
+      SelectElementStd(selection_obj, element_id, sec_idcs, extra)
       {
          let obj3d = this.getObj3D( element_id );
          if (!obj3d) return;
 
-         let id2obj_map = this.glctrl.viewer.outline_map;
-         // console.log("EveScene.SelectElement ", selection_obj.fName, element_id, selection_obj.fElementId, id2obj_map);
+         let outline_map = this.glctrl.viewer.outline_map;
+         // console.log("EveScene.SelectElement ", selection_obj.fName, element_id, selection_obj.fElementId, outline_map);
 
-         id2obj_map[element_id] = id2obj_map[element_id] || [];
+         outline_map[element_id] = outline_map[element_id] || [];
 
-         if (id2obj_map[element_id][selection_obj.fElementId] !== undefined) {
+         if (outline_map[element_id][selection_obj.fElementId] !== undefined) {
             return;
          }
 
@@ -421,13 +428,13 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
 
          // Exit if we are trying to highlight an object that has already been selected.
          if (stype == ST_Highlight &&
-             id2obj_map[element_id][this.mgr.global_selection_id] !== undefined)
+             outline_map[element_id][this.mgr.global_selection_id] !== undefined)
          {
             if (!res.sec_sel)
             return;
          }
 
-         if (!res.sec_sel) id2obj_map[element_id] = [];
+         if (!res.sec_sel) outline_map[element_id] = [];
 
          if (obj3d.get_ctrl) {
             let ctrl = obj3d.get_ctrl(obj3d);
@@ -435,20 +442,66 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
          } else {
             res.geom.push(obj3d);
          }
-         id2obj_map[element_id][selection_obj.fElementId] = res;
+         outline_map[element_id][selection_obj.fElementId] = res;
 
          if (stype == ST_Highlight && selection_obj.sel_list) {
             this.glctrl.viewer.remoteToolTip(selection_obj.sel_list[0].tooltip);
          }
       }
 
-      UnselectElement(selection_obj, element_id)
+      UnselectElementStd(selection_obj, element_id)
       {
-         let id2obj_map = this.glctrl.viewer.outline_map;
-         // console.log("EveScene.UnselectElement ", selection_obj.fName, element_id, selection_obj.fElementId, id2obj_map);
+         let outline_map = this.glctrl.viewer.outline_map;
+         // console.log("EveScene.UnselectElement ", selection_obj.fName, element_id, selection_obj.fElementId, outline_map);
 
-         if (id2obj_map[element_id] !== undefined) {
-            delete id2obj_map[element_id][selection_obj.fElementId];
+         if (outline_map[element_id] !== undefined) {
+            delete outline_map[element_id][selection_obj.fElementId];
+         }
+      }
+
+      SelectElementRCore(selection_obj, element_id, sec_idcs, extra)
+      {
+         let obj3d = this.getObj3D( element_id );
+         if (!obj3d) return;
+
+         let eve_el = this.mgr.GetElement(element_id);
+
+         let sid = selection_obj.fElementId;
+         let smap = this.glctrl.viewer.selection_map;
+         if (smap[sid] === undefined) {
+            smap[sid] = {};
+         }
+
+         let res = {
+            "sec_sel"  : (eve_el.fSecondarySelect && sec_idcs.length > 0) ? true : false,
+            "geom"     : []
+         };
+
+         if (obj3d.get_ctrl) {
+            let ctrl = obj3d.get_ctrl(obj3d);
+            ctrl.DrawForSelection(sec_idcs, res, extra);
+         } else {
+            res.geom.push(obj3d);
+         }
+         smap[sid][element_id] = res;
+         this.glctrl.viewer.make_selection_last_in_list(sid);
+
+         // Display tooltip.
+         // XXXX Should check if highlight request came from this viewer.
+         if (selection_obj.fIsHighlight && selection_obj.sel_list) {
+            this.glctrl.viewer.remoteToolTip(selection_obj.sel_list[0].tooltip);
+         }
+      }
+
+      UnselectElementRCore(selection_obj, element_id)
+      {
+         let sid = selection_obj.fElementId;
+         let smap = this.glctrl.viewer.selection_map;
+         if (smap[sid] !== undefined) {
+            delete smap[sid][element_id];
+            if (Object.keys(smap[sid]).length == 0) {
+               this.glctrl.viewer.remove_selection_from_list(sid);
+            }
          }
       }
 

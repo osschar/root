@@ -107,10 +107,12 @@ REveManager::REveManager()
    fSelectionList->IncDenyDestroy();
    fWorld->AddElement(fSelectionList);
    fSelection = new REveSelection("Global Selection", "", kRed, kViolet);
+   fSelection->SetIsMaster(true);
    fSelection->IncDenyDestroy();
    fSelectionList->AddElement(fSelection);
    fHighlight = new REveSelection("Global Highlight", "", kGreen, kCyan);
-   fHighlight->SetHighlightMode();
+   fHighlight->SetIsMaster(true);
+   fHighlight->SetIsHighlight(true);
    fHighlight->IncDenyDestroy();
    fSelectionList->AddElement(fHighlight);
 

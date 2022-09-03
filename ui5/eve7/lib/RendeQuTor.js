@@ -449,7 +449,7 @@ export class RendeQuTor
         );
         this.RP_GBuffer.view_setup = function (vport) { this.viewport = vport; };
 
-        // No push, GBuffer/Outline passes are handled separately as there can be more of them.
+        // TODO: No push, GBuffer/Outline passes should be handled separately as there can be more of them.
         this.queue.pushRenderPass(this.RP_GBuffer);
         return this.RP_GBuffer;
     }
@@ -485,9 +485,9 @@ export class RendeQuTor
         );
         this.RP_Outline.view_setup = function (vport) { this.viewport = vport; };
 
-        // No push, GBuffer/Outline passes are handled separately as there can be more of them.
+        // TODO: No push, GBuffer/Outline passes should be handled separately as there can be more of them.
         this.queue.pushRenderPass(this.RP_Outline);
-        return this.RP_GBuffer;
+        return this.RP_Outline;
     }
 
 }

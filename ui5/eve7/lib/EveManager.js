@@ -56,6 +56,7 @@ sap.ui.define([], function() {
       UseConnection(handle)
       {
          this.handle = handle;
+         this.is_rcore = (handle.getUserArgs("GLViewer") == "RCore");
 
          handle.setReceiver(this);
          handle.connect();
