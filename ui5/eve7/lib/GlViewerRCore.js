@@ -23,7 +23,8 @@ sap.ui.define([
 
          console.log("GlViewerRCore RQ_Mode:", this.RQ_Mode, "RQ_SSAA:", this.RQ_SSAA);
 
-         this._outline_map = {};
+         this._selection_map = {};
+         this._selection_list = [];
 
          this._logLevel = 1; // 0 - error, 1 - warning, 2 - info, 3 - debug
       }
@@ -77,8 +78,6 @@ sap.ui.define([
       {
          return this.scene;
       }
-
-      get outline_map() { return this._outline_map; }
 
       //==============================================================================
 
@@ -410,10 +409,27 @@ sap.ui.define([
 
          if (this.canvas.width <= 0 || this.canvas.height <= 0) return;
 
-         let omap = this.outline_map;
-         let sel_objs = Object.values(omap).flat();
-         // console.log("WOOF", omap, sel_objs);
-         sel_objs.map(res => this.rqt.RP_GBuffer.obj_list.push(res.geom[0]));
+         for (let sel_id of this._selection_list)
+         {
+            let sel_entry = this._selection_map[ sel_id ];
+
+            // Extract edge color (note, root colors), width from selection object.
+            // let sel_object = this.get_manager().GetElement(sel_id);
+            // console.log("selection", sel_object.fVisibleEdgeColor, sel_object.fHiddenEdgeColor);
+
+            for (let el_idx in sel_entry)
+            {
+               let el_entry = sel_entry[ el_idx ];
+               // take all geometry objects, then we have to treat them differently, depending on type.
+               // and update world-matrix / check visibility
+               // or setup secondary indices for sub-instance drawing
+
+               for (let geo of el_entry.geom)
+               {
+                  this.rqt.RP_GBuffer.obj_list.push(geo);
+               }
+            }
+         }
 
          this.rqt.render();
 
@@ -463,6 +479,23 @@ sap.ui.define([
 
          console.log("pick result", state);
          return state;
+      }
+
+      //==============================================================================
+
+      get selection_map() { return this._selection_map; }
+
+      remove_selection_from_list(sid)
+      {
+         let idx = this._selection_list.indexOf(sid);
+         if (idx >= 0)
+            this._selection_list.splice(idx);
+      }
+
+      make_selection_last_in_list(sid)
+      {
+         this.remove_selection_from_list(sid);
+         this._selection_list.push(sid);
       }
 
       //==============================================================================
