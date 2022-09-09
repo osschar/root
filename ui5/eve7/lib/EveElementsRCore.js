@@ -53,6 +53,15 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
       DrawForSelection(sec_idcs, res)
       {
+         if (this.invoke_obj.eve_el.fSecondarySelect) {
+            if (sec_idcs.length > 0) {
+               res.instance_object = this.invoke_obj;
+               res.instance_sec_idcs = sec_idcs;
+               // this.invoke_obj.outlineMaterial.outline_instances_setup(sec_idcs);
+            } else {
+               // this.invoke_obj.outlineMaterial.outline_instances_reset();
+            }
+         }
          res.geom.push(this.invoke_obj);
       }
 
@@ -61,6 +70,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
    // ===================================================================================
    // Digit sets control classes
    // ===================================================================================
+
    class BoxSetControl extends EveElemControl {
 
       DrawForSelection(atom_idcs, res, extra)

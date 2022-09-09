@@ -67,6 +67,8 @@ REvePointSet::REvePointSet(const REvePointSet& e) :
    TAttMarker(e),
    TAttBBox(e)
 {
+   fAlwaysSecSelect = e.GetAlwaysSecSelect();
+   ClonePoints(e);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -561,6 +563,8 @@ void REvePointSetProjected::UpdateProjection()
    REveProjection &proj = * fManager->GetProjection();
    REvePointSet   &ps   = * dynamic_cast<REvePointSet*>(fProjectable);
    REveTrans      *tr   =   ps.PtrMainTrans(kFALSE);
+
+   fAlwaysSecSelect = ps.GetAlwaysSecSelect();
 
    // XXXX rewrite
 

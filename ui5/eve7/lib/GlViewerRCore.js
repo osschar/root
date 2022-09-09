@@ -409,6 +409,9 @@ sap.ui.define([
 
          if (this.canvas.width <= 0 || this.canvas.height <= 0) return;
 
+         // Workaround to merge secondary-indices from multiple selections. See comments below.
+         let insta_map = new Map(); // Keep track of instanced-based secondary-seectables
+
          for (let sel_id of this._selection_list)
          {
             let sel_entry = this._selection_map[ sel_id ];
@@ -417,6 +420,14 @@ sap.ui.define([
             // let sel_object = this.get_manager().GetElement(sel_id);
             // console.log("selection", sel_object.fVisibleEdgeColor, sel_object.fHiddenEdgeColor);
 
+            // TODO: for now we do single outline pass, merging all objects together into
+            // a single list. This needs to be split into actuall separate outline passes.
+            // Problem: an object that uses instanced rendering and secondary selection can
+            // be in several selections. And we use the same object with the same
+            // outlineMaterial (where indicies are defined as vertex-atttrib with divisor 1) for
+            // all of them. So the buffer needs to be set for every pass (if needed).
+            // In this case, we have to merge the lists (not caring if certain index appears multiple times).
+
             for (let el_idx in sel_entry)
             {
                let el_entry = sel_entry[ el_idx ];
@@ -424,14 +435,39 @@ sap.ui.define([
                // and update world-matrix / check visibility
                // or setup secondary indices for sub-instance drawing
 
-               for (let geo of el_entry.geom)
-               {
-                  this.rqt.RP_GBuffer.obj_list.push(geo);
+               if (el_entry.instance_object) {
+                  if (insta_map.has(el_entry.instance_object))
+                  {
+                     insta_map.get(el_entry.instance_object).push(...el_entry.instance_sec_idcs);
+                  }
+                  else
+                  {
+                     let arr = [];
+                     arr.push(...el_entry.instance_sec_idcs);
+                     insta_map.set(el_entry.instance_object, arr);
+
+                     this.rqt.RP_GBuffer.obj_list.push(el_entry.instance_object);
+                  }
+                  console.log("AAA", el_entry.instance_object, insta_map.get(el_entry.instance_object));
+               } else {
+                  for (let geo of el_entry.geom)
+                  {
+                     this.rqt.RP_GBuffer.obj_list.push(geo);
+                  }
                }
             }
          }
 
+         // This would then be done per outline pass, if needed. Same for loop below render call.
+         for (const [obj, arr] of insta_map) {
+            obj.outlineMaterial.outline_instances_setup(arr);
+         }
+
          this.rqt.render();
+
+         for (const [obj, arr] of insta_map) {
+            obj.outlineMaterial.outline_instances_reset();
+         }
 
          this.rqt.RP_GBuffer.obj_list = [];
 
