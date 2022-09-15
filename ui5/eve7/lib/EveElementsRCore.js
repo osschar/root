@@ -53,43 +53,51 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
       DrawForSelection(sec_idcs, res)
       {
-         if (this.invoke_obj.eve_el.fSecondarySelect) {
+         if (this.top_obj.eve_el.fSecondarySelect) {
             if (sec_idcs.length > 0) {
-               res.instance_object = this.invoke_obj;
+               res.instance_object = this.top_obj;
                res.instance_sec_idcs = sec_idcs;
                // this.invoke_obj.outlineMaterial.outline_instances_setup(sec_idcs);
             } else {
                // this.invoke_obj.outlineMaterial.outline_instances_reset();
             }
          }
-         res.geom.push(this.invoke_obj);
+         else
+         {
+            res.geom.push(this.top_obj);
+         }
       }
 
    } // class EveElemControl
+
 
    // ===================================================================================
    // Digit sets control classes
    // ===================================================================================
 
-   class BoxSetControl extends EveElemControl {
-
-      DrawForSelection(atom_idcs, res, extra)
+   class BoxSetControl extends EveElemControl
+   {
+      DrawForSelection(xsec_idcs, res, extra)
       {
-         let sec_idcs = extra.shape_idcs;
-         let geobox = new RC.Geometry();
-         geobox.setAttribute( 'position', this.obj3d.geometry.getAttribute("position") ); /// AMT will this work with RenderCore ??
+         let sec_idcs = extra.shape_idcs; // XXXX MT we have sec_idcs argument here
+
+         console.log(xsec_idcs, res, extra);
+
+         let body = new RC.Geometry();
+         body._vertices = this.top_obj.geometry._vertices;
 
          let protoIdcs = [0, 4, 5, 0, 5, 1, 1, 5, 6, 1, 6, 2, 2, 6, 7, 2, 7, 3, 3, 7, 4, 3, 4, 0, 1, 2, 3, 1, 3, 0, 4, 7, 6, 4, 6, 5];
-         let idxBuff = new Uint16Array(sec_idcs.length * protoIdcs.length);
+         let idxBuff = [];
 
-         let N = this.obj3d.eve_el.render_data.idxBuff.length / 2;
+         let eve_el = this.top_obj.eve_el;
+         let N = eve_el.render_data.idxBuff.length / 2;
          for (let b = 0; b < sec_idcs.length; ++b) {
-            let idx = sec_idcs[b]
-            if (this.obj3d.eve_el.fDetIdsAsSecondaryIndices) {
+            let idx = sec_idcs[b];
+            if (eve_el.fDetIdsAsSecondaryIndices) {
                for (let x = 0; x < N; ++x) {
-                  if (this.obj3d.eve_el.render_data.idxBuff[x + N] === idx)
+                  if (eve_el.render_data.idxBuff[x + N] === idx)
                   {
-                     idx=x;
+                     idx = x;
                      break;
                   }
                }
@@ -99,24 +107,26 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
                idxBuff.push(idxOff + protoIdcs[i]);
          }
 
-         body.indices = new RC.BufferAttribute(idxBuff, 1);
-         let mat = this.RcFancyMaterial(this.ColorBlack, 1.0, { side: RC.FRONT_SIDE });
-         let mesh = new RC.Mesh(body, mat);
+         body.indices = RC.Uint32Attribute(idxBuff, 1);
+         body.computeVertexNormals();
+
+         let mesh = new RC.Mesh(body, null);
+         mesh._modelViewMatrix = this.invoke_obj._modelViewMatrix;
+         mesh._normalMatrix    = this.invoke_obj._normalMatrix;
 
          res.geom.push(mesh);
       }
 
-      extractIndex(intersect)
+      extractIndex(instance)
       {
-         let idx  = Math.floor(intersect.faceIndex/12);
-         return idx;
+         return Math.floor(instance / 8);
       }
 
-      elementSelectedSendMIR(idx, selectionId)
+      elementSelectedSendMIR(idx, selectionId, event)
       {
-         let boxset = this.obj3d.eve_el;
-         let scene = this.obj3d.scene;
-         let multi = this.event?.ctrlKey ? true : false;
+         let boxset = this.top_obj.eve_el;
+         let scene = this.top_obj.scene;
+         let multi = event?.ctrlKey ? true : false;
 
          let boxIdx = idx;
 
@@ -125,47 +135,51 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          return true;
       }
 
-      elementSelected(idx)
+      elementSelected(idx, event)
       {
-         return this.elementSelectedSendMIR(idx, this.obj3d.scene.mgr.global_selection_id);
+         return this.elementSelectedSendMIR(idx, this.top_obj.scene.mgr.global_selection_id, event);
       }
 
-      elementHighlighted(idx)
+      elementHighlighted(idx, event)
       {
-         return this.elementSelectedSendMIR(idx, this.obj3d.scene.mgr.global_highlight_id);
+         return this.elementSelectedSendMIR(idx, this.top_obj.scene.mgr.global_highlight_id, event);
       }
 
-      checkHighlightIndex(indx)
+      checkHighlightIndex(idx) // XXXX ?? MT Sept-2022
       {
-         if (this.obj3d && this.obj3d.scene)
-            return this.invokeSceneMethod("processCheckHighlight", indx);
+         if (this.top_obj && this.top_obj.scene)
+            return this.invokeSceneMethod("processCheckHighlight", idx);
 
          return true; // means index is different
       }
 
    } // class BoxSetControl
 
+
    // ===================================================================================
    // Calorimeter control classes
    // ===================================================================================
 
-   class Calo3DControl extends EveElemControl {
-
-      DrawForSelection(sec_idcs, res, extra) {
+   class Calo3DControl extends EveElemControl
+   {
+      DrawForSelection(sec_idcs, res, extra)
+      {
          console.log("CALO 3d draw for selection ", extra);
+         let eve_el = this.invoke_obj.eve_el;
          // locate REveCaloData cells for this object
          let cells;
          for (let i = 0; i < extra.length; i++) {
-            if (extra[i].caloVizId == this.obj3d.eve_el.fElementId) {
+            if (extra[i].caloVizId == eve_el.fElementId) {
                cells = extra[i].cells;
                break;
             }
          }
 
-         let ibuff = this.obj3d.eve_el.render_data.idxBuff;
+         let rnr_data = eve_el.render_data;
+         let ibuff = rnr_data.idxBuff;
          let nbox = ibuff.length / 2;
          let nBoxSelected = parseInt(cells.length);
-         let boxIdcs = new Uint16Array;
+         let boxIdcs = [];
          for (let i = 0; i < cells.length; i++) {
             let tower = cells[i].t;
             let slice = cells[i].s;
@@ -177,15 +191,15 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
                }
             }
          }
-         let rnr_data = this.obj3d.eve_el.render_data;
          let protoIdcs = [0, 4, 5, 0, 5, 1, 1, 5, 6, 1, 6, 2, 2, 6, 7, 2, 7, 3, 3, 7, 4, 3, 4, 0, 1, 2, 3, 1, 3, 0, 4, 7, 6, 4, 6, 5];
          let idxBuff = [];
-         let vtxBuff = new Float32Array(nbox * 8 * 3);
-         for (let i = 0; i < nBoxSelected; ++i) {
-            let BoxIdcs = boxIdcs[i];
+         let vtxBuff = new Float32Array(nBoxSelected * 8 * 3);
+         for (let i = 0; i < nBoxSelected; ++i)
+         {
+            let box_idx = boxIdcs[i];
             for (let c = 0; c < 8; c++) {
                let off = i * 24 + c * 3;
-               let pos = BoxIdcs * 24 + c * 3;
+               let pos = box_idx * 24 + c * 3;
                vtxBuff[off] = rnr_data.vtxBuff[pos];
                vtxBuff[off + 1] = rnr_data.vtxBuff[pos + 1];
                vtxBuff[off + 2] = rnr_data.vtxBuff[pos + 2];
@@ -194,7 +208,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
             // fix top corners, select can be partial
             for (let c = 0; c < 4; c++) {
                // fix vertex 1
-               let pos = BoxIdcs * 24 + c * 3;
+               let pos = box_idx * 24 + c * 3;
                let v1x = rnr_data.vtxBuff[pos];
                let v1y = rnr_data.vtxBuff[pos + 1];
                let v1z = rnr_data.vtxBuff[pos + 2];
@@ -216,62 +230,104 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          } // loop boxes
 
          let body = new RC.Geometry();
+         body.indices = RC.Uint32Attribute(idxBuff, 1);
+         body.vertices = new RC.BufferAttribute(vtxBuff, 3); // this.invoke_obj.geometry.vertices;
+         body.computeVertexNormals(); // XX should not need it when we have dFdx/y
 
-         body.indices = new RC.BufferAttribute(idxBuff, 1);
-         body.vertices = new RC.BufferAttribute(rnr_data.vtxBuff, 3);
-         body.computeVertexNormals();
-         // ? AMT do we need vertex colors
-         let mat = this.RcFancyMaterial(this.ColorBlack, 1.0, { side: RC.FRONT_SIDE });
-
-         let mesh = new RC.Mesh(body, mat);
+         let mesh = new RC.Mesh(body, null);
+         mesh._modelViewMatrix = this.invoke_obj._modelViewMatrix;
+         mesh._normalMatrix    = this.invoke_obj._normalMatrix;
 
          res.geom.push(mesh);
+
+         console.log(body, mesh, res);
       }
 
-      extractIndex(intersect) {
-         let idx = Math.floor(intersect.faceIndex / 12);
-         return idx;
-      }
-
-      elementSelectedSendMIR(idx, selectionId)
+      extractIndex(instance)
       {
-         let boxset = this.obj3d.eve_el;
-         let scene = this.obj3d.scene;
-         let multi = this.event?.ctrlKey ? true : false;
-
-         let boxIdx = idx;
-
-         let fcall = "NewShapePicked(" + boxIdx + ", " + selectionId + ", " + multi + ")"
-         scene.mgr.SendMIR(fcall, boxset.fElementId, "ROOT::Experimental::REveDigitSet");
-         return true;
+         return Math.floor(instance / 8);
       }
 
-      elementSelected(idx)
+      getTooltipText(idx)
       {
-         return this.elementSelectedSendMIR(idx, this.obj3d.scene.mgr.global_selection_id);
+         // let t = this.obj3d.eve_el.fTitle || this.obj3d.eve_el.fName || "";
+         let eve_el = this.top_obj.eve_el;
+         let val =  eve_el.render_data.nrmBuff[idx];
+         let idxBuff = eve_el.render_data.idxBuff;
+         let caloData = this.top_obj.scene.mgr.GetElement(eve_el.dataId);
+         let slice = idxBuff[idx*2];
+
+         let vbuff =  eve_el.render_data.vtxBuff;
+         let p = idx*24;
+         let x = vbuff[p];
+         let y = vbuff[p+1];
+         let z = vbuff[p+2];
+
+         let phi = Math.acos(x/Math.sqrt(x*x+y*y));
+         let cosTheta = z/Math.sqrt(x*x + y*y + z*z);
+         let eta = 0;
+         if (cosTheta*cosTheta < 1)
+         {
+            eta = -0.5* Math.log( (1.0-cosTheta)/(1.0+cosTheta) );
+         }
+
+         return caloData.sliceInfos[slice].name + "\n" + Math.floor(val*100)/100 +
+            " ("+  Math.floor(eta*100)/100 + ", " + Math.floor(phi*100)/100  + ")";
       }
 
-      elementHighlighted(idx)
+      elementSelected(idx, event)
       {
-         return this.elementSelectedSendMIR(idx, this.obj3d.scene.mgr.global_highlight_id);
+           let calo =  this.top_obj.eve_el;
+           let idxBuff = calo.render_data.idxBuff;
+           let scene = this.top_obj.scene;
+           let selectionId = scene.mgr.global_selection_id;
+           let multi = event?.ctrlKey ? true : false;
+           let fcall = "NewTowerPicked(" +  idxBuff[idx*2 + 1] + ", " +  idxBuff[idx*2] + ", "
+               + selectionId + ", " + multi + ")";
+           scene.mgr.SendMIR(fcall, calo.fElementId, "ROOT::Experimental::REveCalo3D");
+           return true;
+      }
+
+      elementHighlighted(idx, event)
+      {
+           let calo =  this.top_obj.eve_el;
+           let idxBuff = calo.render_data.idxBuff;
+           let scene = this.top_obj.scene;
+           let selectionId = scene.mgr.global_highlight_id;
+           let fcall = "NewTowerPicked(" +  idxBuff[idx*2 + 1] + ", " +  idxBuff[idx*2] + ", " + selectionId + ", false)";
+           scene.mgr.SendMIR(fcall, calo.fElementId, "ROOT::Experimental::REveCalo3D");
+       }
+
+      checkHighlightIndex(idx)
+      {
+         if (this.top_obj && this.top_obj.scene)
+         {
+            console.log("check highlight idx ?????? \n");
+            return this.invokeSceneMethod("processCheckHighlight", idx);
+
+         }
+
+         return true; // means index is different
       }
 
    } // class Calo3DControl
 
 
-   class Calo2DControl extends EveElemControl {
-
-      DrawForSelection(sec_idcs, res, extra) {
+   class Calo2DControl extends EveElemControl
+   {
+      DrawForSelection(sec_idcs, res, extra)
+      {
+         let eve_el = this.invoke_obj.eve_el;
          let cells;
          for (let i = 0; i < extra.length; i++) {
-            if (extra[i].caloVizId == this.obj3d.eve_el.fElementId) {
+            if (extra[i].caloVizId == eve_el.fElementId) {
                cells = extra[i].cells;
                break;
             }
          }
-
-         let ibuff = this.obj3d.eve_el.render_data.idxBuff;
-         let vbuff = this.obj3d.eve_el.render_data.vtxBuff;
+         let rnr_data = eve_el.render_data;
+         let ibuff = rnr_data.idxBuff;
+         let vbuff = rnr_data.vtxBuff;
          let nbox = ibuff.length / 2;
          let nBoxSelected = cells.length;
          let boxIdcs = [];
@@ -295,7 +351,6 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          let idxBuff = [];
          let vtxBuff = new Float32Array(nBoxSelected * 4 * 3);
          let protoIdcs = [0, 1, 2, 2, 3, 0];
-         let rnr_data = this.obj3d.eve_el.render_data;
          for (let i = 0; i < nBoxSelected; ++i) {
             let BoxIdcs = boxIdcs[i];
             for (let v = 0; v < 4; v++) {
@@ -337,47 +392,83 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          }
 
          let body = new RC.Geometry();
-         body.indices = new RC.BufferAttribute(idxBuff, 1);
-         body.vertices = new RC.BufferAttribute(rnr_data.vtxBuff, 3);
+         body.indices = RC.Uint32Attribute(idxBuff, 1);
+         body.vertices = new RC.BufferAttribute(vtxBuff, 3);
+         body.computeVertexNormals();
 
-         let mesh = new THREE.Mesh(body);
+         let mesh = new RC.Mesh(body, null);
+         mesh._modelViewMatrix = this.invoke_obj._modelViewMatrix;
+         mesh._normalMatrix    = this.invoke_obj._normalMatrix;
+
          res.geom.push(mesh);
       }
 
-      extractIndex(intersect)
+      extractIndex(instance)
       {
-         let idx  = Math.floor(intersect.faceIndex/2);
-         return idx;
+         return Math.floor(instance / 4);
       }
 
-      elementSelectedSendMIR(idx, selectionId)
+      getTooltipText(idx)
       {
-          let calo =  this.obj3d.eve_el;
-          let idxBuff = calo.render_data.idxBuff;
-          let scene = this.obj3d.scene;
-          let multi = this.event?.ctrlKey ? true : false;
-          let bin = idxBuff[idx*2 + 1];
-          let slice =  idxBuff[idx*2];
-          // get sign for the case of RhoZ projection
-          if (calo.render_data.vtxBuff[idx*12 + 1] < 0) bin = -bin ;
+         let eve_el = this.top_obj.eve_el;
+         let idxBuff = eve_el.render_data.idxBuff;
+         // let bin =  idxBuff[idx*2 + 1];
+         let val = eve_el.render_data.nrmBuff[idx];
+         let caloData =  this.top_obj.scene.mgr.GetElement(eve_el.dataId);
+         let slice = idxBuff[idx*2];
+         let sname = caloData.sliceInfos[slice].name;
 
-          let fcall = "NewBinPicked(" +  bin + ", " +  slice + ", " + selectionId + ", " + multi + ")"
-          scene.mgr.SendMIR(fcall, calo.fElementId, "ROOT::Experimental::REveCalo2D");
-          return true;
+         let vbuff =  eve_el.render_data.vtxBuff;
+         let p = idx*12;
+         let x = vbuff[p];
+         let y = vbuff[p+1];
+         // let z = vbuff[p+2];
+
+         if (eve_el.isRPhi) {
+            let phi =  Math.acos(x/Math.sqrt(x*x+y*y)) * Math.sign(y);
+            return  sname + " " + Math.floor(val*100)/100 +
+                  " ("+  Math.floor(phi*100)/100 + ")";
+         }
+         else
+         {
+            let cosTheta = x/Math.sqrt(x*x + y*y), eta = 0;
+            if (cosTheta*cosTheta < 1)
+            {
+                  eta = -0.5* Math.log( (1.0-cosTheta)/(1.0+cosTheta) );
+            }
+
+            return  sname + " " + Math.floor(val*100)/100 +
+                  " ("+  Math.floor(eta*100)/100 + ")";
+         }
       }
 
-     elementSelected(idx)
+      elementSelectedSendMIR(idx, selectionId, event)
+      {
+         let calo =  this.top_obj.eve_el;
+         let idxBuff = calo.render_data.idxBuff;
+         let scene = this.top_obj.scene;
+         let multi = event?.ctrlKey ? true : false;
+         let bin = idxBuff[idx*2 + 1];
+         let slice =  idxBuff[idx*2];
+         // get sign for the case of RhoZ projection
+         if (calo.render_data.vtxBuff[idx*12 + 1] < 0) bin = -bin ;
+
+         let fcall = "NewBinPicked(" +  bin + ", " +  slice + ", " + selectionId + ", " + multi + ")"
+         scene.mgr.SendMIR(fcall, calo.fElementId, "ROOT::Experimental::REveCalo2D");
+         return true;
+      }
+
+     elementSelected(idx, event)
      {
-        return this.elementSelectedSendMIR(idx, this.obj3d.scene.mgr.global_selection_id);
+        return this.elementSelectedSendMIR(idx, this.top_obj.scene.mgr.global_selection_id, event);
      }
 
-     elementHighlighted(idx)
+     elementHighlighted(idx, event)
      {
-        return this.elementSelectedSendMIR(idx, this.obj3d.scene.mgr.global_highlight_id);
+        return this.elementSelectedSendMIR(idx, this.top_obj.scene.mgr.global_highlight_id, event);
      }
 
    } // class Calo2Control
-
 
 
    //==============================================================================
@@ -531,7 +622,9 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
       RcPickable(el, obj3d, do_children = true, ctrl_class = EveElemControl)
       {
          if (el.fPickable) {
-            obj3d.get_ctrl = function(state) { return new ctrl_class(state); }
+            if (ctrl_class) {
+               obj3d.get_ctrl = function(iobj, tobj) { return new ctrl_class(iobj, tobj); }
+            }
             obj3d.pickable = true;
             if (do_children) {
                for (let i = 0; i < obj3d.children.length; ++i)
@@ -888,16 +981,14 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          }
 
          let body = new RC.Geometry();
-
          body.indices = new RC.BufferAttribute(idxBuff, 1);
          body.vertices = new RC.BufferAttribute(vBuff, 3);
          body.computeVertexNormals();
 
-         //
          // set material and colors
 
          let mat = this.RcFancyMaterial(this.ColorBlack, 1.0, { side: RC.FRONT_SIDE });
-         if (!boxset.fSingleColor)
+         if ( ! boxset.fSingleColor)
          {
             let ci = rnr_data.idxBuff;
             let off = 0
@@ -909,28 +1000,21 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
                let b = (ci[x] & 0x00FF0000) >> 16;
                for (let i = 0; i < 8; ++i)
                {
-                  colBuff[off    ] = r/256;
-                  colBuff[off + 1] = g/256;
-                  colBuff[off + 2] = b/256;
+                  colBuff[off    ] = r / 255;
+                  colBuff[off + 1] = g / 255;
+                  colBuff[off + 2] = b / 255;
                   colBuff[off + 3] = 1.0;
                   off += 4;
                }
             }
             body.vertColor = new RC.BufferAttribute(colBuff, 4);
             mat.useVertexColors = true;
-         }
-         else
-         {
-            let mcol = RcCol(boxset.fMainColor);
-            mat.color = mcol;
+         } else {
+            mat.color = RcCol(boxset.fMainColor);
          }
 
          let mesh = new RC.Mesh(body, mat);
-
-         if (boxset.fSecondarySelect)
-            mesh.get_ctrl = function() { return new BoxSetControl(mesh); };
-         else
-            mesh.get_ctrl = function() { return new EveElemControl(mesh); };
+         this.RcPickable(boxset, mesh, false, boxset.fSecondarySelect ? BoxSetControl : EveElemControl);
 
          mesh.dispose  = function() { this.geometry.dispose(); this.material.dispose(); };
 
@@ -951,8 +1035,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
             let idxBuff = new Uint32Array(nBox * protoSize);
             let p = 0;
             for (let i = 0; i < nBox; ++i) {
+               let off = i * 8;
                for (let c = 0; c < protoSize; c++) {
-                  let off = i * 8;
                   idxBuff[p++] = protoIdcs[c] + off;
                }
             }
@@ -967,7 +1051,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
             for (let x = 0; x < nBox; ++x) {
                let slice = ci[x * 2];
                let sliceColor = calo3D.sliceColors[slice];
-               let tc = new RC.Color(EVE.JSR.getColor(sliceColor));
+               let tc = RcCol(sliceColor);
                for (let i = 0; i < 8; ++i) {
                   colBuff[off] = tc.r;
                   colBuff[off + 1] = tc.g;
@@ -981,13 +1065,12 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
          let mat = this.RcFancyMaterial(this.ColorBlack, 1.0, { side: RC.FRONT_SIDE });
          //let mat = this.RcFlatMaterial(this.ColorBlack, 1.0, { side: RC.FRONT_SIDE });
-
          mat.useVertexColors = true;
+
          let mesh = new RC.Mesh(body, mat);
 
-         this.RcPickable(calo3D, mesh);
+         this.RcPickable(calo3D, mesh, false, Calo3DControl);
 
-         mesh.get_ctrl = function () { return new Calo3DControl(mesh); };
          mesh.dispose = function () { this.geometry.dispose(); this.material.dispose(); };
 
          return mesh;
@@ -1026,7 +1109,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
             for (let x = 0; x < nSquares; ++x) {
                let slice = ci[x * 2];
                let sliceColor = calo2D.sliceColors[slice];
-               let tc = new THREE.Color(EVE.JSR.getColor(sliceColor));
+               let tc = RcCol(sliceColor);
                console.log()
                for (let i = 0; i < 4; ++i) {
                   colBuff[off] = tc.r;
@@ -1044,8 +1127,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          mat.useVertexColors = true;
          let mesh = new RC.Mesh(body, mat);
 
-         this.RcPickable(calo2D, mesh);
-         //mesh.get_ctrl = function () { return new Calo2DControl(mesh); };
+         this.RcPickable(calo2D, mesh, false, Calo2DControl);
+
          mesh.dispose = function () { this.geometry.dispose(); this.material.dispose(); };
 
          return mesh;
@@ -1178,7 +1261,6 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
          let line = new RC.Line(geom, line_mat);
          line.renderingPrimitive = RC.LINES;
-
          this.RcPickable(el, line);
          obj3d.add(line);
 
@@ -1208,19 +1290,21 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          obj3d.add(marker);
 
          // For secondary selection, see EveElements.js
-         obj3d.eve_idx_buf = rnr_data.idxBuff;
+         // obj3d.eve_idx_buf = rnr_data.idxBuff;
+         // if (el.fSecondarySelect)
+         //    octrl = new StraightLineSetControl(obj3d);
+         // else
+         //    octrl = new EveElemControl(obj3d);
 
-         /*
-         let octrl;
-         if (el.fSecondarySelect)
-            octrl = new StraightLineSetControl(obj3d);
-         else
-            octrl = new EveElemControl(obj3d);
-
-         line.get_ctrl   = function() { return octrl; };
-         marker.get_ctrl = function() { return octrl; };
-         obj3d.get_ctrl  = function() { return octrl; };
-         */
+         this.RcPickable(el, obj3d, true, null);
+         obj3d.get_ctrl  = function(iobj, tobj) {
+            let octrl = new EveElemControl(iobj, tobj);
+            octrl.DrawForSelection = function(sec_idcs, res) {
+               res.geom.push(this.top_obj.children[0]);
+               res.geom.push(this.top_obj.children[1]);
+            };
+            return octrl;
+         }
 
          return obj3d;
       }

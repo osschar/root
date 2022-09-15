@@ -153,7 +153,7 @@ export class RendeQuTor
     pick_instance(state) {
         // RCRC Proto-proto-secondary-selection. Requires branch:
         // https://github.com/osschar/RenderCore/tree/img-tex-cache
-        if (state.object !== this.renderer.pickedObject3D || ! state.object.instanced) {
+        if (state.object !== this.renderer.pickedObject3D) {
             console.error("RendeQuTor::pick_instance state mismatch", state, this.renderer.pickedObject3D);
         } else {
             console.log("RenderQuTor::pick going for secondary select");
