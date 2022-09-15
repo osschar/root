@@ -55,7 +55,9 @@ sap.ui.define([
          this.creator = new EveElements(RC, this);
          // this.creator.useIndexAsIs = EVE.JSR.decodeUrl().has('useindx');
 
+         RC.GLManager.sCheckFrameBuffer = false;
          RC.Object3D.sDefaultPickable = false;
+         RC.PickingShaderMaterial.DEFAULT_PICK_MODE = RC.PickingShaderMaterial.PICK_MODE.UINT;
 
          this.createRCoreRenderer();
          this.controller.createScenes();
@@ -103,8 +105,6 @@ sap.ui.define([
          this.renderer.addShaderLoaderUrls("rootui5sys/eve7/lib/RC/shaders");
          this.renderer.addShaderLoaderUrls("rootui5sys/eve7/shaders");
          this.renderer.pickObject3D = true;
-         RC.PickingShaderMaterial.DEFAULT_PICK_MODE = RC.PickingShaderMaterial.PICK_MODE.UINT;
-         RC.GLManager.sCheckFrameBuffer = false;
 
          this.scene = new RC.Scene();
 
@@ -448,7 +448,6 @@ sap.ui.define([
 
                      this.rqt.RP_GBuffer.obj_list.push(el_entry.instance_object);
                   }
-                  console.log("AAA", el_entry.instance_object, insta_map.get(el_entry.instance_object));
                } else {
                   for (let geo of el_entry.geom)
                   {
@@ -600,13 +599,14 @@ sap.ui.define([
             return this.clearHighlight();
 
          let c = pstate.ctrl;
+         let idx = c.extractIndex(pstate.instance);
 
-         c.elementHighlighted(c.extractIndex(pstate.instance), null);
+         c.elementHighlighted(idx, null);
 
          if (this.highlighted_top_object !== pstate.top_object)
          {
             if (pstate.object && pstate.eve_el)
-               this.ttip_text.innerHTML = c.getTooltipText();
+               this.ttip_text.innerHTML = c.getTooltipText(idx);
             else
                this.ttip_text.innerHTML = "";
          }
