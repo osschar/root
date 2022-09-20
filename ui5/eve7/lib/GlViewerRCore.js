@@ -126,10 +126,11 @@ sap.ui.define([
             this.camera.isPerspectiveCamera = true;
 
             let l_int = 1.4;
-            this.lights.add(new light_class_3d(0xaa8888, l_int )); // R
-            this.lights.add(new light_class_3d(0x88aa88, l_int )); // G
-            this.lights.add(new light_class_3d(0x8888aa, l_int )); // B
-            this.lights.add(new light_class_3d(0x999999, l_int )); // gray
+            let l_att = { constant: 1, linear: 0, quadratic: 0 };
+            this.lights.add(new light_class_3d(0xaa8888, l_int, 0, 1, l_att)); // R
+            this.lights.add(new light_class_3d(0x88aa88, l_int, 0, 1, l_att)); // G
+            this.lights.add(new light_class_3d(0x8888aa, l_int, 0, 1, l_att)); // B
+            this.lights.add(new light_class_3d(0x999999, l_int, 0, 1, l_att)); // gray
 
             // Lights are positioned in resetRenderer.
 
@@ -157,14 +158,14 @@ sap.ui.define([
          // Test objects
          if (this.controller.isEveCameraPerspective())
          {
-            let c = new RC.Cube(40, new RC.Color(0.2,.4,.8));
-            c.material = new RC.MeshPhongMaterial();
-            c.material.transparent = true;
-            c.material.opacity = 0.8;
-            c.material.depthWrite  = false;
-            this.scene.add(c);
+            // let c = new RC.Cube(40, new RC.Color(0.2,.4,.8));
+            // c.material = new RC.MeshPhongMaterial();
+            // c.material.transparent = true;
+            // c.material.opacity = 0.8;
+            // c.material.depthWrite  = false;
+            // this.scene.add(c);
 
-            let ss = new RC.Stripe([0,0,0, 100,50,50, 100,200,200, 300,300,300]);
+            let ss = new RC.Stripe([0,0,0, 400,0,0, 400,400,0, 400,400,400]);
             ss.material.lineWidth = 20.0;
             ss.material.color     = new RC.Color(0xff0000);
             ss.material.emissive  = new RC.Color(0x008080);
@@ -350,10 +351,11 @@ sap.ui.define([
             this.controls.screenSpacePanning = true;
 
             let lc = this.lights.children;
-            lc[1].position.set( extR, extR, -extR); lc[1].decay = 0.5 * extR; lc[1].distance = 3 * extR;
-            lc[2].position.set(-extR, extR,  extR); lc[2].decay = 0.5 * extR; lc[2].distance = 3 * extR;
-            lc[3].position.set( extR, extR,  extR); lc[3].decay = 0.5 * extR; lc[3].distance = 3 * extR;
-            lc[4].position.set(-extR, extR, -extR); lc[4].decay = 0.5 * extR; lc[4].distance = 3 * extR;
+            // lights are const now -- no need to set decay and distance
+            lc[1].position.set( extR, extR, -extR);
+            lc[2].position.set(-extR, extR,  extR);
+            lc[3].position.set( extR, extR,  extR);
+            lc[4].position.set(-extR, extR, -extR);
 
             // console.log("resetRenderer 3D scene bbox ", sbbox, ", camera_pos ", posC, ", look_at ", this.rot_center);
          }

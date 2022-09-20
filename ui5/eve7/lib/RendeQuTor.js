@@ -41,14 +41,6 @@ export class RendeQuTor
         const nearPlane = 0.0625; // XXXX - pass to view_setup(vport, nfclip)
         const farPlane  = 8192;   // XXXX
 
-        // Why object.pickable === false in Initialize functions ???
-        // How is outline supposed to work ???
-        // Picking ???
-
-        this.OriginalMats = [];
-        this.MultiMats    = [];
-
-        // RenderQueue ... subclass or envelop?
         // For every pass, store object + resize behaviour
     }
 

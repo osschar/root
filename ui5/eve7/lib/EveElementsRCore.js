@@ -818,7 +818,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
             // idcs.push( 0, i, i + 1 );
          }
          geo_body.indices = new RC.BufferAttribute(idcs, 1);
-         geo_body.computeVertexNormals();
+         // geo_body.computeVertexNormals();
 
          let geo_rim = new RC.Geometry();
          geo_rim.vertices = pos_ba;
@@ -840,6 +840,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          let lcol = RcCol(jet.fLineColor);
 
          let mesh = new RC.Mesh(geo_body, this.RcFancyMaterial(mcol, 0.5, { side: RC.FRONT_AND_BACK_SIDE }));
+         mesh.material.normalFlat = true;
 
          let line1 = new RC.Line(geo_rim, this.RcLineMaterial(lcol, 0.8, 4));
          line1.renderingPrimitive = RC.LINE_LOOP;
@@ -877,7 +878,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          idcs[0] = 0; idcs[1] = 1; idcs[2] = 2;
          if (N > 3) { idcs[3] = 0; idcs[4] = 2; idcs[5] = 3; }
          geo_body.indices = new RC.BufferAttribute(idcs, 1);
-         geo_body.computeVertexNormals();
+         // geo_body.computeVertexNormals();
 
          let geo_rim = new RC.Geometry();
          geo_rim.vertices = pos_ba;
@@ -983,11 +984,12 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          let body = new RC.Geometry();
          body.indices = new RC.BufferAttribute(idxBuff, 1);
          body.vertices = new RC.BufferAttribute(vBuff, 3);
-         body.computeVertexNormals();
+         // body.computeVertexNormals();
 
          // set material and colors
 
          let mat = this.RcFancyMaterial(this.ColorBlack, 1.0, { side: RC.FRONT_SIDE });
+         mat.normalFlat = true;
          if ( ! boxset.fSingleColor)
          {
             let ci = rnr_data.idxBuff;
@@ -1043,7 +1045,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
             body.indices = new RC.BufferAttribute(idxBuff, 1);
             body.vertices = new RC.BufferAttribute(rnr_data.vtxBuff, 3);
-            body.computeVertexNormals();
+            // body.computeVertexNormals();
 
             let ci = rnr_data.idxBuff;
             let off = 0
@@ -1066,6 +1068,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          let mat = this.RcFancyMaterial(this.ColorBlack, 1.0, { side: RC.FRONT_SIDE });
          //let mat = this.RcFlatMaterial(this.ColorBlack, 1.0, { side: RC.FRONT_SIDE });
          mat.useVertexColors = true;
+         mat.normalFlat = true;
 
          let mesh = new RC.Mesh(body, mat);
 
@@ -1101,7 +1104,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
             body.indices = new RC.BufferAttribute(idxBuff, 1);
             body.vertices = new RC.BufferAttribute(rnrData.vtxBuff, 3);
-            body.computeVertexNormals();
+            // body.computeVertexNormals();
 
             let ci = rnrData.idxBuff;
             let colBuff = new Float32Array(nSquares * 4 * 4);
@@ -1138,7 +1141,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
       // makeEveGeometry / makeEveGeoShape
       //==============================================================================
 
-      makeEveGeometry(rnr_data)
+      makeEveGeometry(rnr_data, compute_normals)
       {
          let nVert = rnr_data.idxBuff[1] * 3;
 
@@ -1149,7 +1152,9 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          geo.vertices = new RC.BufferAttribute(rnr_data.vtxBuff, 3);
          geo.indices = new RC.BufferAttribute(rnr_data.idxBuff, 1);
          geo.setDrawRange(2, nVert);
-         geo.computeVertexNormalsIdxRange(2, nVert);
+         if (compute_normals) {
+            geo.computeVertexNormalsIdxRange(2, nVert);
+         }
 
          // XXXX Fix this. It seems we could have flat shading with usage of simple shaders.
          // XXXX Also, we could do edge detect on the server for outlines.
@@ -1165,16 +1170,16 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
       makeEveGeoShape(egs, rnr_data)
       {
-         let geom = this.makeEveGeometry(rnr_data);
+         let geom = this.makeEveGeometry(rnr_data, false);
 
          let fcol = RcCol(egs.fFillColor);
 
-         let material = this.RcFancyMaterial(fcol, 0.2);
-         material.side = RC.FRONT_AND_BACK_SIDE;
-         material.specular = new RC.Color(1, 1, 1);
-         material.shininess = 50;
+         let mat = this.RcFancyMaterial(fcol, 0.2);
+         mat.side = RC.FRONT_AND_BACK_SIDE;
+         mat.shininess = 50;
+         mat.normalFlat = true;
 
-         let mesh = new RC.Mesh(geom, material);
+         let mesh = new RC.Mesh(geom, mat);
          this.RcPickable(egs, mesh);
          return mesh;
       }
