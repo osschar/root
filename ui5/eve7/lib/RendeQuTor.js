@@ -1,27 +1,8 @@
 import {RenderQueue} from './RC/renderers/RenderQueue.js';
 import {RenderPass}  from './RC/renderers/RenderPass.js';
 import {CustomShaderMaterial} from './RC/materials/CustomShaderMaterial.js';
-import {PickingShaderMaterial} from './RC/materials/PickingShaderMaterial.js';
-import {Text2D} from './RC/objects/Text2D.js';
-import {IcoSphere} from './RC/objects/IcoSphere.js';
-
 import {FRONT_AND_BACK_SIDE, HIGHPASS_MODE_BRIGHTNESS, HIGHPASS_MODE_DIFFERENCE}
     from './RC/constants.js';
-import { Scene } from './RC/RenderCore.js';
-// import {} from '';
-
-function iterateSceneR(object, callback)
-{
-    // if (object === null || object === undefined) return;
-
-    if (object.children.length > 0) {
-        for (let i = 0; i < object.children.length; i++) {
-            iterateSceneR(object.children[i], callback);
-        }
-    }
-
-    callback(object);
-}
 
 export class RendeQuTor
 {
@@ -54,14 +35,20 @@ export class RendeQuTor
         this.SSAA_value = ssaa_val;
 
         this.make_RP_SSAA_Super();
-        this.make_RP_SSAA_Down();
 
         this.make_RP_GBuffer();
         this.make_RP_Outline();
 
-        this.make_RP_ToScreen();
-        this.RP_ToScreen.input_texture = "color_outline";
-        // this.RP_ToScreen.input_texture = "color_ssaa_super";
+        this.make_RP_GaussHVandBlend();
+
+        // this.make_RP_ToScreen();
+        // // this.RP_ToneMapToScreen.input_texture = "color_main";
+        // this.RP_ToScreen.input_texture = "color_final";
+
+        this.make_RP_ToneMapToScreen();
+        //this.RP_ToneMapToScreen.input_texture = "color_main";
+        this.RP_ToneMapToScreen.input_texture = "color_final";
+        //this.RP_ToneMapToScreen.input_texture = "depth_gbuff";
 
         this.RP_GBuffer.obj_list = [];
     }
@@ -178,7 +165,8 @@ export class RendeQuTor
             RenderPass.TEXTURE,
             null,
             "depth_picking",
-            [ { id: "color_picking", textureConfig: RenderPass.DEFAULT_R32UI_TEXTURE_CONFIG } ]
+            [ { id: "color_picking", textureConfig: RenderPass.DEFAULT_R32UI_TEXTURE_CONFIG,
+                clearColorArray: new Uint32Array([0xffffffff, 0, 0, 0]) } ]
         );
         this.PRP_plain.view_setup = function (vport) { this.viewport = vport; };
 
@@ -201,7 +189,8 @@ export class RendeQuTor
             RenderPass.TEXTURE,
             null,
             null,
-            [ { id: "depthr32f_picking", textureConfig: RenderPass.FULL_FLOAT_R32F_TEXTURE_CONFIG } ]
+            [ { id: "depthr32f_picking", textureConfig: RenderPass.FULL_FLOAT_R32F_TEXTURE_CONFIG,
+                clearColorArray: new Float32Array([1, 0, 0, 0]) } ]
         );
         this.PRP_depth2r.view_setup = function (vport) { this.viewport = vport; };
 
@@ -250,9 +239,9 @@ export class RendeQuTor
             // Viewport
             null,
             // Bind depth texture to this ID
-            "depthDefaultSuper",
+            "depth_main",
             // Outputs
-            [ { id: "color_ssaa_super", textureConfig: RenderPass.DEFAULT_RGBA_TEXTURE_CONFIG } ]
+            [ { id: "color_main", textureConfig: RenderPass.DEFAULT_RGBA16F_TEXTURE_CONFIG } ]
         );
         this.RP_SSAA_Super.view_setup = function (vport) { this.viewport = { width: vport.width*pthis.SSAA_value, height: vport.height*pthis.SSAA_value }; };
 
@@ -287,9 +276,9 @@ export class RendeQuTor
             // Bind depth texture to this ID
             null,
 
-            [ { id: "color_ssaa_down", textureConfig: RenderPass.DEFAULT_RGBA_TEXTURE_CONFIG } ]
+            [ { id: "color_main", textureConfig: RenderPass.DEFAULT_RGBA16F_TEXTURE_CONFIG } ]
         );
-        this.RP_SSAA_Down.input_texture = "color_ssaa_super";
+        this.RP_SSAA_Down.input_texture = "color_super";
         this.RP_SSAA_Down.view_setup = function(vport) { this.viewport = vport; };
 
         this.queue.pushRenderPass(this.RP_SSAA_Down);
@@ -313,10 +302,36 @@ export class RendeQuTor
             RenderPass.SCREEN,
             null
         );
-        this.RP_ToScreen.input_texture = "color_ssaa_down";
+        this.RP_ToScreen.input_texture = "color_main";
         this.RP_ToScreen.view_setup = function(vport) { this.viewport = vport; };
 
         this.queue.pushRenderPass(this.RP_ToScreen);
+    }
+
+    make_RP_ToneMapToScreen()
+    {
+        this.RP_ToneMapToScreen_mat = new CustomShaderMaterial("ToneMapping",
+            { MODE: 1.0, gamma: 1.0, exposure: 2.0 });
+            // u_clearColor set from MeshRenderer
+        this.RP_ToneMapToScreen_mat.lights = false;
+
+        let pthis = this;
+
+        this.RP_ToneMapToScreen = new RenderPass(
+            RenderPass.POSTPROCESS,
+            function (textureMap, additionalData) {},
+            function (textureMap, additionalData) {
+                return { material: pthis.RP_ToneMapToScreen_mat,
+                         textures: [ textureMap[this.input_texture] ] };
+            },
+            function (textureMap, additionalData) {},
+            RenderPass.SCREEN,
+            null
+        );
+        this.RP_ToneMapToScreen.input_texture = "color_main";
+        this.RP_ToneMapToScreen.view_setup = function(vport) { this.viewport = vport; };
+
+        this.queue.pushRenderPass(this.RP_ToneMapToScreen);
     }
 
     //=============================================================================
@@ -411,7 +426,13 @@ export class RendeQuTor
         this.RP_GBuffer_mat.lights = false;
         this.RP_GBuffer_mat.side = FRONT_AND_BACK_SIDE;
 
+        this.RP_GBuffer_mat_flat = new CustomShaderMaterial("GBufferMini");
+        this.RP_GBuffer_mat_flat.lights = false;
+        this.RP_GBuffer_mat_flat.side = FRONT_AND_BACK_SIDE;
+        this.RP_GBuffer_mat_flat.normalFlat = true;
+
         let pthis = this;
+        let clear_arr = new Float32Array([0,0,0,0]);
 
         this.RP_GBuffer = new RenderPass(
             RenderPass.BASIC,
@@ -420,7 +441,9 @@ export class RendeQuTor
                 pthis.renderer._outlineEnabled = true;
                 pthis.renderer._outlineArray = this.obj_list;
                 pthis.renderer._defaultOutlineMat = pthis.RP_GBuffer_mat;
+                pthis.renderer._defaultOutlineMatFlat = pthis.RP_GBuffer_mat_flat;
                 pthis.renderer._fillRequiredPrograms(pthis.RP_GBuffer_mat.requiredProgram(pthis.renderer));
+                pthis.renderer._fillRequiredPrograms(pthis.RP_GBuffer_mat_flat.requiredProgram(pthis.renderer));
                 for (const o3d of this.obj_list) {
                     if (o3d.outlineMaterial)
                         pthis.renderer._fillRequiredPrograms(o3d.outlineMaterial.requiredProgram(pthis.renderer));
@@ -433,10 +456,12 @@ export class RendeQuTor
             },
             RenderPass.TEXTURE,
             null,
-            "depthDefault",
+            "depth_gbuff",
             [
-                {id: "normal",  textureConfig: RenderPass.DEFAULT_RGBA16F_TEXTURE_CONFIG},
-                {id: "viewDir", textureConfig: RenderPass.DEFAULT_RGBA16F_TEXTURE_CONFIG}
+                {id: "normal",  textureConfig: RenderPass.DEFAULT_RGBA16F_TEXTURE_CONFIG,
+                 clearColorArray: clear_arr},
+                {id: "viewDir", textureConfig: RenderPass.DEFAULT_RGBA16F_TEXTURE_CONFIG,
+                 clearColorArray: clear_arr}
             ]
         );
         this.RP_GBuffer.view_setup = function (vport) { this.viewport = vport; };
@@ -449,8 +474,8 @@ export class RendeQuTor
     make_RP_Outline()
     {
         this.RP_Outline_mat = new CustomShaderMaterial("outline",
-          { scale: 1.5*Math.E, // Math.E,
-            edgeColor: [0.7, 0.1, 0.5, 1.0],
+          { scale: 1.0,
+            edgeColor: [ 1.4, 0.0, 0.8, 1.0 ],
             _DepthThreshold: 6.0,
             _NormalThreshold: 0.6, // 0.4,
             _DepthNormalThreshold: 0.5,
@@ -464,15 +489,15 @@ export class RendeQuTor
             function (textureMap, additionalData) {},
             function (textureMap, additionalData) {
                 return { material: pthis.RP_Outline_mat,
-                         textures: [ textureMap["depthDefault"], textureMap["normal"],
-                                     textureMap["viewDir"], textureMap["color_ssaa_down"] ] };
+                         textures: [ textureMap["depth_gbuff"], textureMap["normal"],
+                                     textureMap["viewDir"] ] };
             },
             function (textureMap, additionalData) {},
             RenderPass.TEXTURE,
             null,
             null,
             [
-                {id: "color_outline", textureConfig: RenderPass.DEFAULT_RGBA_TEXTURE_CONFIG}
+                {id: "color_outline", textureConfig: RenderPass.DEFAULT_RGBA16F_TEXTURE_CONFIG}
             ]
         );
         this.RP_Outline.view_setup = function (vport) { this.viewport = vport; };
@@ -482,4 +507,74 @@ export class RendeQuTor
         return this.RP_Outline;
     }
 
+    make_RP_GaussHVandBlend()
+    {
+        let pthis = this;
+
+        this.RP_GaussH_mat = new CustomShaderMaterial("gaussBlur", {horizontal: true, power: 4.0});
+        this.RP_GaussH_mat.lights = false;
+
+        this.RP_GaussH = new RenderPass(
+            RenderPass.POSTPROCESS,
+            (textureMap, additionalData) => {},
+            (textureMap, additionalData) => {
+                return {material: pthis.RP_GaussH_mat, textures: [textureMap["color_outline"]]};
+            },
+            (textureMap, additionalData) => {},
+            RenderPass.TEXTURE,
+            null,
+            null,
+            [
+                {id: "gauss_h", textureConfig: RenderPass.DEFAULT_RGBA16F_TEXTURE_CONFIG}
+            ]
+        );
+        this.RP_GaussH.view_setup = function (vport) { this.viewport = vport; };
+
+        this.RP_GaussV_mat = new CustomShaderMaterial("gaussBlur", {horizontal: false, power: 4.0});
+        this.RP_GaussV_mat.lights = false;
+
+        this.RP_GaussV = new RenderPass(
+            RenderPass.POSTPROCESS,
+            (textureMap, additionalData) => {},
+            (textureMap, additionalData) => {
+                return {material: pthis.RP_GaussV_mat, textures: [textureMap["gauss_h"]]};
+            },
+            (textureMap, additionalData) => {},
+            RenderPass.TEXTURE,
+            null,
+            null,
+            [
+                {id: "gauss_hv", textureConfig: RenderPass.DEFAULT_RGBA16F_TEXTURE_CONFIG}
+            ]
+        );
+        this.RP_GaussV.view_setup = function (vport) { this.viewport = vport; };
+
+        this.RP_Blend_mat = new CustomShaderMaterial("blendingAdditive");
+        this.RP_Blend_mat.lights = false;
+
+        this.RP_Blend = new RenderPass(
+            RenderPass.POSTPROCESS,
+            (textureMap, additionalData) => {},
+            (textureMap, additionalData) => {
+                return {material: pthis.RP_Blend_mat,
+                        textures: [textureMap["gauss_hv"],
+                                   textureMap["color_main"]]};
+            },
+            (textureMap, additionalData) => {},
+            // Target
+            RenderPass.TEXTURE,
+            null,
+            null,
+            [
+                {id: "color_final", textureConfig: RenderPass.DEFAULT_RGBA16F_TEXTURE_CONFIG}
+            ]
+        );
+        this.RP_Blend.view_setup = function (vport) { this.viewport = vport; };
+
+        this.queue.pushRenderPass(this.RP_GaussH);
+        this.queue.pushRenderPass(this.RP_GaussV);
+        this.queue.pushRenderPass(this.RP_Blend);
+
+        return this.RP_Blend;
+    }
 }

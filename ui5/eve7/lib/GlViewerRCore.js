@@ -101,7 +101,7 @@ sap.ui.define([
 
          this.renderer = new RC.MeshRenderer(this.canvas, RC.WEBGL2, {antialias: false, stencil: true});
          this.renderer._logLevel = 1;
-         this.renderer.clearColor = "#FFFFFFFF";
+         this.renderer.clearColor = "#FFFFFF00"; // "#00000000";
          this.renderer.addShaderLoaderUrls("rootui5sys/eve7/lib/RC/shaders");
          this.renderer.addShaderLoaderUrls("rootui5sys/eve7/shaders");
          this.renderer.pickObject3D = true;
