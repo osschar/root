@@ -113,6 +113,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          let mesh = new RC.Mesh(body, null);
          mesh._modelViewMatrix = this.invoke_obj._modelViewMatrix;
          mesh._normalMatrix    = this.invoke_obj._normalMatrix;
+         mesh._material        = this.invoke_obj._material;
 
          res.geom.push(mesh);
       }
@@ -237,6 +238,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          let mesh = new RC.Mesh(body, null);
          mesh._modelViewMatrix = this.invoke_obj._modelViewMatrix;
          mesh._normalMatrix    = this.invoke_obj._normalMatrix;
+         mesh._material        = this.invoke_obj._material;
 
          res.geom.push(mesh);
 
@@ -399,6 +401,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          let mesh = new RC.Mesh(body, null);
          mesh._modelViewMatrix = this.invoke_obj._modelViewMatrix;
          mesh._normalMatrix    = this.invoke_obj._normalMatrix;
+         mesh._material        = this.invoke_obj._material;
 
          res.geom.push(mesh);
       }
@@ -664,6 +667,23 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          );
       }
 
+      GetRgbaTexture(name, callback)
+      {
+         let url = window.location.origin + '/rootui5sys/eve7/textures/' + name;
+
+         this.tex_cache.deliver(url,
+            callback,
+            (image) => {
+               return new RC.Texture
+                  (image, RC.Texture.ClampToEdgeWrapping, RC.Texture.ClampToEdgeWrapping,
+                          RC.Texture.LinearFilter, RC.Texture.LinearFilter,
+                          RC.Texture.RGBA, RC.Texture.RGBA, RC.Texture.UNSIGNED_BYTE,
+                          image.width, image.height);
+            },
+            () => { this.viewer.request_render() }
+         );
+      }
+
       AddMapToAllMaterials(o3d, tex)
       {
          if (o3d.material) o3d.material.addMap(tex);
@@ -696,13 +716,13 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          //    sm.addMap(tex);
          // });
 
-         sm.instanceData = new RC.Texture(rnr_data.vtxBuff,
+         sm.addInstanceData(new RC.Texture(rnr_data.vtxBuff,
             RC.Texture.ClampToEdgeWrapping, RC.Texture.ClampToEdgeWrapping,
             RC.Texture.NearestFilter, RC.Texture.NearestFilter,
             // RC.Texture.R32F, RC.Texture.R32F, RC.Texture.FLOAT,
             RC.Texture.RGBA32F, RC.Texture.RGBA, RC.Texture.FLOAT,
-            hit.fTexX, hit.fTexY);
-         sm.instanceData.flipy = false;
+            hit.fTexX, hit.fTexY));
+         sm.instanceData[0].flipy = false;
 
          let s = new RC.ZSprite(null, sm);
          s.frustumCulled = false; // need a way to speciy bounding box/sphere !!!
@@ -710,10 +730,9 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          s.instanceCount = hit.fSize;
 
          this.GetLumAlphaTexture("star5-32a.png", this.AddMapToAllMaterials.bind(this, s));
+         // this.GetRgbaTexture("unicorn-a.png", this.AddMapToAllMaterials.bind(this, s));
 
          this.RcPickable(hit, s);
-
-         s.dispose = () => { delete this; } // ??? RCRC instanceData texture ???
 
          return s;
       }
@@ -791,7 +810,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          //line.hightlightWidthScale = 2;
 
          this.RcPickable(track, line);
-         line.dispose = function() { /*delete this.geometry; delete this.material;*/ };
+
          return line;
       }
 
@@ -850,12 +869,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
          mesh.add(line1);
          mesh.add(line2);
-         this.RcPickable(jet, mesh);
-
-         mesh.dispose = function() {
-            //this.children.forEach(c => { delete c.geometry; delete c.material; });
-            //delete this.geometry; delete this.material;
-         };
+         this.RcPickable(jet, mesh, false);
 
          return mesh;
       }
@@ -895,10 +909,9 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          let fcol = RcCol(jet.fFillColor);
          let lcol = RcCol(jet.fLineColor);
          // Process transparency !!!
-         // console.log("cols", fcol, lcol);
 
-         // double-side material required for correct tracing of colors - otherwise points sequence should be changed
          let mesh = new RC.Mesh(geo_body, this.RcFlatMaterial(fcol, 0.5));
+         mesh.material.normalFlat = true;
 
          let line1 = new RC.Line(geo_rim, this.RcLineMaterial(lcol, 0.8, 2));
 
@@ -907,13 +920,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
          mesh.add(line1);
          mesh.add(line2);
-         this.RcPickable(jet, mesh);
+         this.RcPickable(jet, mesh, false);
 
-         mesh.dispose = function() {
-            //this.children.forEach(c => { delete c.geometry; delete c.material; });
-            //delete this.geometry; delete this.material;
-         };
-   
          return mesh;
       }
 
@@ -1018,8 +1026,6 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          let mesh = new RC.Mesh(body, mat);
          this.RcPickable(boxset, mesh, false, boxset.fSecondarySelect ? BoxSetControl : EveElemControl);
 
-         mesh.dispose  = function() { this.geometry.dispose(); this.material.dispose(); };
-
          return mesh;
       }
       //==============================================================================
@@ -1073,8 +1079,6 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          let mesh = new RC.Mesh(body, mat);
 
          this.RcPickable(calo3D, mesh, false, Calo3DControl);
-
-         mesh.dispose = function () { this.geometry.dispose(); this.material.dispose(); };
 
          return mesh;
       }
@@ -1131,8 +1135,6 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          let mesh = new RC.Mesh(body, mat);
 
          this.RcPickable(calo2D, mesh, false, Calo2DControl);
-
-         mesh.dispose = function () { this.geometry.dispose(); this.material.dispose(); };
 
          return mesh;
       }

@@ -428,7 +428,9 @@ sap.ui.define([], function() {
 
          let lastoff = offset;
 
-         for (let n=1; n<arr.length;++n) {
+         // Start at 1, EveScene does not have render data.
+         for (let n = 1; n < arr.length; ++n)
+         {
             let elem = arr[n];
 
             if (!elem.render_data) continue;
