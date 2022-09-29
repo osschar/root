@@ -13,6 +13,10 @@ export class RendeQuTor
         this.camera   = camera;
         this.queue    = new RenderQueue(renderer);
         this.pqueue   = new RenderQueue(renderer);
+        this.vp_w = 0;
+        this.vp_h = 0;
+        this.pick_radius = 32;
+        this.pick_center = 16;
 
         this.make_PRP_plain();
         this.make_PRP_depth2r();
@@ -66,17 +70,15 @@ export class RendeQuTor
 
     updateViewport(w, h)
     {
+        this.vp_w = w;
+        this.vp_h = h;
         let vp = { width: w, height: h };
         let rq = this.queue._renderQueue;
         for (let i = 0; i < rq.length; i++)
         {
             rq[i].view_setup(vp);
         }
-        rq = this.pqueue._renderQueue;
-        for (let i = 0; i < rq.length; i++)
-        {
-            rq[i].view_setup(vp);
-        }
+        // Picking render-passes stay constant.
     }
 
     render()
@@ -84,9 +86,22 @@ export class RendeQuTor
         this.queue.render();
     }
 
+    pick_begin(x, y)
+    {
+        this.camera.prePickStoreTBLR();
+        this.camera.narrowProjectionForPicking(this.vp_w, this.vp_h,
+                                               this.pick_radius, this.pick_radius,
+                                               x, this.vp_h - 1 - y);
+    }
+
+    pick_end()
+    {
+        this.camera.postPickRestoreTBLR();
+    }
+
     pick(x, y, detect_depth = false)
     {
-        this.renderer.pick_setup(x, y);
+        this.renderer.pick_setup(this.pick_center, this.pick_center);
 
         let state = this.pqueue.render();
         state.x = x;
@@ -95,23 +110,15 @@ export class RendeQuTor
         state.object = this.renderer.pickedObject3D;
         // console.log("RenderQuTor::pick", state);
 
-        if (detect_depth && this.renderer.pickedObject3D !== null) {
-            let glman  = this.renderer.glManager;
-            let gl     = this.renderer.gl;
-            let texref = this.pqueue._textureMap["depthr32f_picking"];
-            let tex    = glman.getTexture(texref);
-
-            // console.log("Dumper:", glman, gl, texref, tex);
-
-            const fb = gl.createFramebuffer();
-			gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
-			gl.framebufferTexture2D(gl.READ_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-
-            let x = this.renderer._pickCoordinateX;
-            let y = this.renderer._canvas.height - this.renderer._pickCoordinateY;
+        if (detect_depth && this.renderer.pickedObject3D !== null)
+        {
+            let rdr = this.renderer;
+            let x = rdr._pickCoordinateX;
+            let y = rdr._canvas.height - rdr._pickCoordinateY;
 
             let d = new Float32Array(9);
-            gl.readPixels(x-1, y-1, 3, 3, gl.RED, gl.FLOAT, d);
+            rdr.gl.readBuffer(rdr.gl.COLOR_ATTACHMENT0);
+            rdr.gl.readPixels(this.pick_center - 1, this.pick_center - 1, 3, 3, gl.RED, gl.FLOAT, d);
 
             let near = this.camera.near;
             let far  = this.camera.far;
@@ -119,9 +126,6 @@ export class RendeQuTor
                 d[i] = (2.0 * near * far) / (far + near - d[i] * (far - near));
 
             console.log("Pick depth at", x, ",", y, ":", d);
-
-            gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
-            gl.deleteFramebuffer(fb);
 
             state.depth = d[4];
         }
@@ -163,12 +167,11 @@ export class RendeQuTor
             },
             function (textureMap, additionalData) {},
             RenderPass.TEXTURE,
-            null,
+            { width: this.pick_radius, height: this.pick_radius },
             "depth_picking",
             [ { id: "color_picking", textureConfig: RenderPass.DEFAULT_R32UI_TEXTURE_CONFIG,
                 clearColorArray: new Uint32Array([0xffffffff, 0, 0, 0]) } ]
         );
-        this.PRP_plain.view_setup = function (vport) { this.viewport = vport; };
 
         this.pqueue.pushRenderPass(this.PRP_plain);
     }
@@ -187,12 +190,11 @@ export class RendeQuTor
             },
             function (textureMap, additionalData) {},
             RenderPass.TEXTURE,
-            null,
+            { width: this.pick_radius, height: this.pick_radius },
             null,
             [ { id: "depthr32f_picking", textureConfig: RenderPass.FULL_FLOAT_R32F_TEXTURE_CONFIG,
                 clearColorArray: new Float32Array([1, 0, 0, 0]) } ]
         );
-        this.PRP_depth2r.view_setup = function (vport) { this.viewport = vport; };
 
         this.pqueue.pushRenderPass(this.PRP_depth2r);
     }
