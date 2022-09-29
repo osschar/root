@@ -704,7 +704,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          if (this.TestRnr("hit", hit, rnr_data)) return null;
 
          let   col   = RcCol(hit.fMarkerColor);
-         const msize = this.POINT_SIZE_FAC * hit.fMarkerSize;
+         const msize = hit.fMarkerSize;
          let sm = new RC.ZSpriteBasicMaterial( {
             SpriteMode: RC.SPRITE_SPACE_SCREEN, SpriteSize: [msize, msize],
             color: this.ColorBlack,
@@ -728,6 +728,10 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          s.frustumCulled = false; // need a way to speciy bounding box/sphere !!!
          s.instanced = true;
          s.instanceCount = hit.fSize;
+
+         // Now that outline and picking shaders are setup with final pixel-size,
+         // scale up the main size to account for SSAA.
+         sm.setUniform("SpriteSize", [msize * this.POINT_SIZE_FAC, msize * this.POINT_SIZE_FAC]);
 
          this.GetLumAlphaTexture("star5-32a.png", this.AddMapToAllMaterials.bind(this, s));
          // this.GetRgbaTexture("unicorn-a.png", this.AddMapToAllMaterials.bind(this, s));

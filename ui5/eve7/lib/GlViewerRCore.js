@@ -99,7 +99,8 @@ sap.ui.define([
 
          let gl = this.canvas.getContext("webgl2");
 
-         this.renderer = new RC.MeshRenderer(this.canvas, RC.WEBGL2, {antialias: false, stencil: true});
+         this.renderer = new RC.MeshRenderer(this.canvas, RC.WEBGL2,
+                                             { antialias: false, stencil: false });
          this.renderer._logLevel = 1;
          this.renderer.clearColor = "#FFFFFF00"; // "#00000000";
          this.renderer.addShaderLoaderUrls("rootui5sys/eve7/lib/RC/shaders");
@@ -489,9 +490,14 @@ sap.ui.define([
 
          if (this.canvas.width <= 0 || this.canvas.height <= 0) return null;
 
+         this.rqt.pick_begin(x, y);
+
          let state = this.rqt.pick(x, y, detect_depth);
 
-         if (state.object === null) return null;
+         if (state.object === null) {
+            this.rqt.pick_end();
+            return null;
+         }
 
          let top_obj = state.object;
          while (top_obj.eve_el === undefined)
@@ -502,6 +508,8 @@ sap.ui.define([
 
          if (state.eve_el.fSecondarySelect)
             this.rqt.pick_instance(state);
+
+         this.rqt.pick_end();
 
          state.w = this.get_width();;
          state.h = this.get_height();
@@ -553,8 +561,6 @@ sap.ui.define([
          this.canvas.height = h;
 
          this.camera.aspect = w / h;
-
-         this.renderer.updateViewport(w, h);
 
          this.rqt.updateViewport(w, h);
 
