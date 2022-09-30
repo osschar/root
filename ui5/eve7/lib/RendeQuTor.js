@@ -113,12 +113,13 @@ export class RendeQuTor
         if (detect_depth && this.renderer.pickedObject3D !== null)
         {
             let rdr = this.renderer;
+            let gl  = rdr.gl;
             let x = rdr._pickCoordinateX;
             let y = rdr._canvas.height - rdr._pickCoordinateY;
 
             let d = new Float32Array(9);
-            rdr.gl.readBuffer(rdr.gl.COLOR_ATTACHMENT0);
-            rdr.gl.readPixels(this.pick_center - 1, this.pick_center - 1, 3, 3, gl.RED, gl.FLOAT, d);
+            gl.readBuffer(rdr.gl.COLOR_ATTACHMENT0);
+            gl.readPixels(this.pick_center - 1, this.pick_center - 1, 3, 3, gl.RED, gl.FLOAT, d);
 
             let near = this.camera.near;
             let far  = this.camera.far;
