@@ -129,7 +129,7 @@ export class RendeQuTor
             let near = this.camera.near;
             let far  = this.camera.far;
             for (let i = 0; i < 9; ++i)
-                d[i] = (2.0 * near * far) / (far + near - d[i] * (far - near));
+                d[i] = (near * far) / ((near - far) * d[i] + far);
 
             console.log("Pick depth at", x, ",", y, ":", d);
 
