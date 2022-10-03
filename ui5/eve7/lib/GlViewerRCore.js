@@ -122,8 +122,6 @@ sap.ui.define([
          if (this.controller.isEveCameraPerspective())
          {
             this.camera = new RC.PerspectiveCamera(75, w / h, 20, 4000);
-            this.camera.position = new RC.Vector3(-500, 0, 0);
-            this.camera.lookAt(new RC.Vector3(0, 0, 0), new RC.Vector3(0, 1, 0));
             this.camera.isPerspectiveCamera = true;
 
             let l_int = 1.4;
@@ -145,8 +143,6 @@ sap.ui.define([
          else
          {
             this.camera = new RC.OrthographicCamera(-w/2, w/2, -h/2, h/2, 20, 2000);
-            this.camera.position = new RC.Vector3(0, 0, 50);
-            this.camera.lookAt(new RC.Vector3(0, 0, 0), new RC.Vector3(0, 1, 0));
             this.camera.isOrthographicCamera = true;
 
             let l_int = 0.85;
@@ -155,6 +151,10 @@ sap.ui.define([
 
             // Lights are positioned in resetRenderer.
          }
+
+         // AMT, disable auto update in camera in order prevent reading quaternions in update of
+         // model view  matrix in Obejct3D function updateMatrixWorld
+         this.camera.matrixAutoUpdate = false;
 
          // Test objects
          if (this.controller.isEveCameraPerspective())
@@ -170,6 +170,7 @@ sap.ui.define([
             ss.material.lineWidth = 20.0;
             ss.material.color     = new RC.Color(0xff0000);
             ss.material.emissive  = new RC.Color(0x008080);
+            ss.pickable = true;
             this.scene.add(ss);
          }
 
@@ -318,6 +319,25 @@ sap.ui.define([
          this.controls = new RC.REveCameraControls(this.camera, this.get_view().getDomRef());
          this.controls.addEventListener('change', this.render.bind(this));
 
+         // camera center marker
+         let col = new RC.Color(0.5, 0, 0);
+         const msize = this.RQ_SSAA * 8; // marker size
+         let sm = new RC.ZSpriteBasicMaterial({
+            SpriteMode: RC.SPRITE_SPACE_SCREEN, SpriteSize: [msize, msize],
+            color: this.ColorBlack,
+            emissive: col,
+            diffuse: col.clone().multiplyScalar(0.5)
+         }
+         );
+         let vtx = new Float32Array(3);
+         vtx[0] = 0; vtx[1] = 0; vtx[2] = 0;
+         let s = new RC.ZSprite(null, sm);
+         s.instanced = false;
+         s.position.set(0, 0, 0);
+         s.visible = false;
+         this.scene.add(s);
+         this.controls.centerMarker = s;
+
          // This will also call render().
          this.resetRenderer();
       }
@@ -344,11 +364,7 @@ sap.ui.define([
 
          if (this.camera.isPerspectiveCamera)
          {
-            let posC = new RC.Vector3(-0.7 * extR, 0.5 * extR, -0.7 * extR);
-
-            this.camera.position.copy(posC);
-            this.camera.lookAt(new RC.Vector3(0,0,0), new RC.Vector3(0,1,0));
-
+            this.controls.setCamBaseMtx(new RC.Vector3(-1, 0, 0), new RC.Vector3(0, 1, 0)); //XOZ floor
             this.controls.screenSpacePanning = true;
 
             let lc = this.lights.children;
@@ -358,14 +374,11 @@ sap.ui.define([
             lc[3].position.set( extR, extR,  extR);
             lc[4].position.set(-extR, extR, -extR);
 
-            // console.log("resetRenderer 3D scene bbox ", sbbox, ", camera_pos ", posC, ", look_at ", this.rot_center);
+            // console.log("resetRenderer 3D scene bbox ", sbbox, ", look_at ", this.rot_center);
          }
          else
          {
-            let posC = new RC.Vector3(0, 0, extR);
-
-            this.camera.position.copy(posC);
-
+            this.controls.setCamBaseMtx(new RC.Vector3(0, 0, 1), new RC.Vector3(0, 1, 0)); // XOY floor
             let ey = 1.02 * extV.y;
             let ex = ey / this.get_height() * this.get_width();
             this.camera._left   = -ex;
@@ -386,7 +399,8 @@ sap.ui.define([
 
             // console.log("resetRenderer 2D scene bbox ex ey", sbbox, ex, ey, ", camera_pos ", posC, ", look_at ", this.rot_center);
          }
-         this.controls.target.copy( this.rot_center );
+
+         this.controls.setFromBBox(sbbox);
 
          // this.composer.reset();
 
@@ -699,6 +713,9 @@ sap.ui.define([
          if (pstate) {
             if (pstate.eve_el)
             menu.add("Browse to " + (pstate.eve_el.fName || "element"), pstate.eve_el.fElementId, this.controller.invokeBrowseOf.bind(this.controller));
+
+            let data = { "p": pstate, "v":this, "cctrl": this.controls};
+            menu.add("Set Camera Center", data, this.setCameraCenter.bind(data));
          }
 
          menu.add("Reset camera", this.resetRenderer);
@@ -713,6 +730,28 @@ sap.ui.define([
          // menu.add("endsub:");
 
          menu.show(event);
+      }
+
+      setCameraCenter(data)
+      {
+         let pthis = data.v;
+
+         let fov_rad_half = pthis.camera.fov * 0.5 * (Math.PI/180);
+         let ftan = Math.tan(fov_rad_half);
+         let x = data.p.mouse.x * data.p.w / data.p.h * data.p.depth * ftan;
+         let y = data.p.mouse.y * data.p.depth * ftan;
+         let e = new RC.Vector4(-data.p.depth, x, y, 1);
+
+         // console.log("picked point >>> ", x, y, data.p.depth);
+         // console.log("picked camera vector ", e);
+         // pthis.camera.testMtx.dump();
+
+         let mvMtx = pthis.camera.testMtx;
+         e.applyMatrix4(pthis.camera.testMtx);
+         // console.log("picked word view coordinates ", e);
+
+         pthis.controls.setCameraCenter(e.x, e.y, e.z);
+         pthis.request_render();
       }
 
       defaultContextMenuAction(arg)
