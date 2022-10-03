@@ -114,12 +114,17 @@ export class RendeQuTor
         {
             let rdr = this.renderer;
             let gl  = rdr.gl;
+            let fbm = rdr.glManager._fboManager;
             let x = rdr._pickCoordinateX;
             let y = rdr._canvas.height - rdr._pickCoordinateY;
 
+            fbm.bindFramebuffer(this.pqueue._renderTarget);
+
             let d = new Float32Array(9);
-            gl.readBuffer(rdr.gl.COLOR_ATTACHMENT0);
+            gl.readBuffer(gl.COLOR_ATTACHMENT0);
             gl.readPixels(this.pick_center - 1, this.pick_center - 1, 3, 3, gl.RED, gl.FLOAT, d);
+
+            fbm.unbindFramebuffer();
 
             let near = this.camera.near;
             let far  = this.camera.far;
