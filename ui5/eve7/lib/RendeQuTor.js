@@ -20,13 +20,17 @@ export class RendeQuTor
 
         this.make_PRP_plain();
         this.make_PRP_depth2r();
+        this.renderer.preDownloadPrograms(
+          [ this.PRP_depth2r_mat.requiredProgram(this.renderer)
+          ]);
 
-        this.SSAA_value = 1;
+          this.SSAA_value = 1;
 
-        const nearPlane = 0.0625; // XXXX - pass to view_setup(vport, nfclip)
-        const farPlane  = 8192;   // XXXX
+        this.clear_zero_f32arr = new Float32Array([0,0,0,0]);
 
-        // For every pass, store object + resize behaviour
+        this.std_textures = [];
+        this.std_tex_cnt  = 0;
+        this.std_tex_used = new Set();
     }
 
     initDirectToScreen()
@@ -46,15 +50,17 @@ export class RendeQuTor
         this.make_RP_GaussHVandBlend();
 
         // this.make_RP_ToScreen();
-        // // this.RP_ToneMapToScreen.input_texture = "color_main";
-        // this.RP_ToScreen.input_texture = "color_final";
-
         this.make_RP_ToneMapToScreen();
-        //this.RP_ToneMapToScreen.input_texture = "color_main";
-        this.RP_ToneMapToScreen.input_texture = "color_final";
-        //this.RP_ToneMapToScreen.input_texture = "depth_gbuff";
 
         this.RP_GBuffer.obj_list = [];
+
+        this.renderer.preDownloadPrograms(
+          [ this.RP_GBuffer_mat.requiredProgram(this.renderer),
+            this.RP_Outline_mat.requiredProgram(this.renderer),
+            this.RP_GaussH_mat.requiredProgram(this.renderer),
+            this.RP_Blend_mat.requiredProgram(this.renderer),
+            this.RP_ToneMapToScreen_mat.requiredProgram(this.renderer)
+          ]);
     }
 
     initFull(ssaa_val)
@@ -81,10 +87,137 @@ export class RendeQuTor
         // Picking render-passes stay constant.
     }
 
+    //=============================================================================
+
+    pop_std_texture() {
+        let tex;
+        if (this.std_textures.length == 0) {
+            tex = "std_tex_" + this.std_tex_cnt++;
+        } else {
+            tex = this.std_textures.pop();
+        }
+        this.std_tex_used.add(tex);
+        return tex;
+    }
+
+    push_std_texture(tex) {
+        this.std_tex_used.delete(tex);
+        this.std_textures.push(tex);
+    }
+
+    release_std_textures() {
+        if (this.std_tex_used.size > 0) {
+            // console.log("RendeQuTor releasing std textures", this.std_tex_used.size);
+            for (const tex of this.std_tex_used)
+                this.std_textures.push(tex);
+            this.std_tex_used.clear();
+        }
+    }
+
+    // ----------
+
+    render_outline()
+    {
+        let tex_normal = this.pop_std_texture();
+        let tex_view_dir = this.pop_std_texture();
+        this.RP_GBuffer.outTextures[0].id = tex_normal;
+        this.RP_GBuffer.outTextures[1].id = tex_view_dir;
+
+        this.queue.render_pass(this.RP_GBuffer, "GBuffer");
+
+        this.RP_Outline.intex_normal = tex_normal;
+        this.RP_Outline.intex_view_dir = tex_view_dir;
+        if ( ! this.tex_outline) {
+            // First outline, get the texture to accumulate all outlines
+            this.tex_outline = this.pop_std_texture();
+        } else {
+            // Additional outlines, do not clear the accumulatortexture.
+            this.RP_Outline.outTextures[0].clearColorArray = null;
+        }
+        this.RP_Outline.outTextures[0].id = this.tex_outline;
+
+        this.queue.render_pass(this.RP_Outline, "Outline");
+
+        this.push_std_texture(tex_normal);
+        this.push_std_texture(tex_view_dir);
+    }
+
+    render_main_and_blend_outline()
+    {
+        let main_is_std = (this.SSAA_value == 1);
+        let tex_main = main_is_std ? this.pop_std_texture() : "color_main";
+
+        this.RP_SSAA_Super.outTextures[0].id = tex_main;
+        this.queue.render_pass(this.RP_SSAA_Super, "SSAA Super");
+
+        if (this.tex_outline) {
+            let tA = this.tex_outline;
+            let tB = this.pop_std_texture();
+
+            this.RP_GaussH.intex = tA;
+            this.RP_GaussH.outTextures[0].id = tB;
+            this.queue.render_pass(this.RP_GaussH, "GaussH");
+
+            this.RP_GaussV.intex = tB;
+            this.RP_GaussV.outTextures[0].id = tA;
+            this.queue.render_pass(this.RP_GaussV, "GaussV");
+
+            this.RP_Blend.intex_outline_blurred = tA;
+            this.RP_Blend.intex_main = tex_main;
+            this.RP_Blend.outTextures[0].id = tB;
+            this.queue.render_pass(this.RP_Blend, "Blend");
+
+            if (main_is_std) this.push_std_texture(tex_main);
+
+            this.push_std_texture(this.tex_outline);
+            this.RP_Outline.outTextures[0].clearColorArray = this.clear_zero_f32arr;
+            this.tex_outline = null;
+
+            this.tex_final = tB;
+            this.tex_final_push = true;
+        } else {
+            this.tex_final = tex_main;
+            this.tex_final_push = main_is_std;
+        }
+    }
+
+    render_tone_map_to_screen()
+    {
+        this.RP_ToneMapToScreen.input_texture = this.tex_final;
+
+        this.queue.render_pass(this.RP_ToneMapToScreen, "Tone Map To Screen");
+
+        if (this.tex_final_push) {
+            this.push_std_texture(this.tex_final);
+            this.tex_final = null;
+            this.tex_final_push = null;
+        }
+    }
+
+    render_begin(used_check)
+    {
+        this.tex_outline = null;
+
+        this.queue.render_begin(used_check);
+    }
+
+    render_end()
+    {
+        this.queue.render_end();
+        this.release_std_textures();
+    }
+
+    // ----------
+
     render()
     {
+        // This can work for setups without outline passes -- once they are
+        // brought back to life.
+
         this.queue.render();
     }
+
+    //=============================================================================
 
     pick_begin(x, y)
     {
@@ -131,7 +264,7 @@ export class RendeQuTor
             for (let i = 0; i < 9; ++i)
                 d[i] = (near * far) / ((near - far) * d[i] + far);
 
-            console.log("Pick depth at", x, ",", y, ":", d);
+            // console.log("Pick depth at", x, ",", y, ":", d);
 
             state.depth = d[4];
         }
@@ -145,7 +278,7 @@ export class RendeQuTor
         if (state.object !== this.renderer.pickedObject3D) {
             console.error("RendeQuTor::pick_instance state mismatch", state, this.renderer.pickedObject3D);
         } else {
-            console.log("RenderQuTor::pick going for secondary select");
+            // console.log("RenderQuTor::pick_instance going for secondary select");
 
             this.renderer._pickSecondaryEnabled = true;
             this.pqueue.render();
@@ -162,13 +295,12 @@ export class RendeQuTor
 
     make_PRP_plain()
     {
-        var pthis = this;
+        let pthis = this;
 
         this.PRP_plain = new RenderPass(
             RenderPass.BASIC,
             function (textureMap, additionalData) {},
             function (textureMap, additionalData) {
-                // pthis.renderer._specialRenderFoo = "Choopacabra";
                 return { scene: pthis.scene, camera: pthis.camera };
             },
             function (textureMap, additionalData) {},
@@ -186,7 +318,7 @@ export class RendeQuTor
     {
         this.PRP_depth2r_mat = new CustomShaderMaterial("copyDepth2RReve");
         this.PRP_depth2r_mat.lights = false;
-        var pthis = this;
+        let pthis = this;
 
         this.PRP_depth2r = new RenderPass(
             RenderPass.POSTPROCESS,
@@ -212,7 +344,7 @@ export class RendeQuTor
 
     make_RP_DirectToScreen()
     {
-        var pthis = this;
+        let pthis = this;
 
         this.RP_DirectToScreen = new RenderPass(
             RenderPass.BASIC,
@@ -231,7 +363,7 @@ export class RendeQuTor
 
     make_RP_SSAA_Super()
     {
-        var pthis = this;
+        let pthis = this;
 
         this.RP_SSAA_Super = new RenderPass(
             // Rendering pass type
@@ -344,9 +476,175 @@ export class RendeQuTor
 
     //=============================================================================
 
+    make_RP_GBuffer()
+    {
+        this.RP_GBuffer_mat = new CustomShaderMaterial("GBufferMini");
+        this.RP_GBuffer_mat.lights = false;
+        this.RP_GBuffer_mat.side = FRONT_AND_BACK_SIDE;
+
+        this.RP_GBuffer_mat_flat = new CustomShaderMaterial("GBufferMini");
+        this.RP_GBuffer_mat_flat.lights = false;
+        this.RP_GBuffer_mat_flat.side = FRONT_AND_BACK_SIDE;
+        this.RP_GBuffer_mat_flat.normalFlat = true;
+
+        let pthis = this;
+
+        this.RP_GBuffer = new RenderPass(
+            RenderPass.BASIC,
+            function (textureMap, additionalData) {},
+            function (textureMap, additionalData) {
+                pthis.renderer._outlineEnabled = true;
+                pthis.renderer._outlineArray = this.obj_list;
+                pthis.renderer._defaultOutlineMat = pthis.RP_GBuffer_mat;
+                pthis.renderer._defaultOutlineMatFlat = pthis.RP_GBuffer_mat_flat;
+                pthis.renderer._fillRequiredPrograms(pthis.RP_GBuffer_mat.requiredProgram(pthis.renderer));
+                pthis.renderer._fillRequiredPrograms(pthis.RP_GBuffer_mat_flat.requiredProgram(pthis.renderer));
+                for (const o3d of this.obj_list) {
+                    if (o3d.outlineMaterial)
+                        pthis.renderer._fillRequiredPrograms(o3d.outlineMaterial.requiredProgram(pthis.renderer));
+                }
+                return { scene: pthis.scene, camera: pthis.camera };
+            },
+            function (textureMap, additionalData) {
+                pthis.renderer._outlineEnabled = false; // can remain true if not all progs are loaded
+                pthis.renderer._outlineArray = null;
+            },
+            RenderPass.TEXTURE,
+            null,
+            "depth_gbuff",
+            [
+                {id: "normal",  textureConfig: RenderPass.DEFAULT_RGBA16F_TEXTURE_CONFIG,
+                 clearColorArray: this.clear_zero_f32arr},
+                {id: "view_dir", textureConfig: RenderPass.DEFAULT_RGBA16F_TEXTURE_CONFIG,
+                 clearColorArray: this.clear_zero_f32arr}
+            ]
+        );
+        this.RP_GBuffer.view_setup = function (vport) { this.viewport = vport; };
+
+        // TODO: No push, GBuffer/Outline passes should be handled separately as there can be more of them.
+        this.queue.pushRenderPass(this.RP_GBuffer);
+    }
+
+    make_RP_Outline()
+    {
+        this.RP_Outline_mat = new CustomShaderMaterial("outline",
+          { scale: 1.0,
+            edgeColor: [ 1.4, 0.0, 0.8, 1.0 ],
+            _DepthThreshold: 6.0,
+            _NormalThreshold: 0.6, // 0.4,
+            _DepthNormalThreshold: 0.5,
+            _DepthNormalThresholdScale: 7.0 });
+        this.RP_Outline_mat.addSBFlag("DISCARD_NON_EDGE");
+        this.RP_Outline_mat.lights = false;
+
+        let pthis = this;
+
+        this.RP_Outline = new RenderPass(
+            RenderPass.POSTPROCESS,
+            function (textureMap, additionalData) {},
+            function (textureMap, additionalData) {
+                return { material: pthis.RP_Outline_mat,
+                         textures: [ textureMap["depth_gbuff"],
+                                     textureMap[this.intex_normal],
+                                     textureMap[this.intex_view_dir] ] };
+            },
+            function (textureMap, additionalData) {},
+            RenderPass.TEXTURE,
+            null,
+            null,
+            [
+                {id: "color_outline", textureConfig: RenderPass.DEFAULT_RGBA16F_TEXTURE_CONFIG,
+                 clearColorArray: this.clear_zero_f32arr}
+            ]
+        );
+        this.RP_Outline.intex_normal = "normal";
+        this.RP_Outline.intex_view_dir = "view_dir";
+        this.RP_Outline.view_setup = function (vport) { this.viewport = vport; };
+
+        // TODO: No push, GBuffer/Outline passes should be handled separately as there can be more of them.
+        this.queue.pushRenderPass(this.RP_Outline);
+    }
+
+    make_RP_GaussHVandBlend()
+    {
+        let pthis = this;
+
+        this.RP_GaussH_mat = new CustomShaderMaterial("gaussBlur", {horizontal: true, power: 4.0});
+        this.RP_GaussH_mat.lights = false;
+
+        this.RP_GaussH = new RenderPass(
+            RenderPass.POSTPROCESS,
+            function(textureMap, additionalData) {},
+            function(textureMap, additionalData) {
+                return {material: pthis.RP_GaussH_mat, textures: [textureMap[this.intex]]};
+            },
+            function(textureMap, additionalData) {},
+            RenderPass.TEXTURE,
+            null,
+            null,
+            [
+                {id: "gauss_h", textureConfig: RenderPass.DEFAULT_RGBA16F_TEXTURE_CONFIG}
+            ]
+        );
+        this.RP_GaussH.intex = "color_outline";
+        this.RP_GaussH.view_setup = function (vport) { this.viewport = vport; };
+
+        this.RP_GaussV_mat = new CustomShaderMaterial("gaussBlur", {horizontal: false, power: 4.0});
+        this.RP_GaussV_mat.lights = false;
+
+        this.RP_GaussV = new RenderPass(
+            RenderPass.POSTPROCESS,
+            function(textureMap, additionalData) {},
+            function(textureMap, additionalData) {
+                return {material: pthis.RP_GaussV_mat, textures: [textureMap[this.intex]]};
+            },
+            function(textureMap, additionalData) {},
+            RenderPass.TEXTURE,
+            null,
+            null,
+            [
+                {id: "gauss_hv", textureConfig: RenderPass.DEFAULT_RGBA16F_TEXTURE_CONFIG}
+            ]
+        );
+        this.RP_GaussV.intex = "gauss_h";
+        this.RP_GaussV.view_setup = function (vport) { this.viewport = vport; };
+
+        this.RP_Blend_mat = new CustomShaderMaterial("blendingAdditive");
+        this.RP_Blend_mat.lights = false;
+
+        this.RP_Blend = new RenderPass(
+            RenderPass.POSTPROCESS,
+            function(textureMap, additionalData) {},
+            function(textureMap, additionalData) {
+                return {material: pthis.RP_Blend_mat,
+                        textures: [textureMap[this.intex_outline_blurred],
+                                   textureMap[this.intex_main]]};
+            },
+            function(textureMap, additionalData) {},
+            // Target
+            RenderPass.TEXTURE,
+            null,
+            null,
+            [
+                {id: "color_final", textureConfig: RenderPass.DEFAULT_RGBA16F_TEXTURE_CONFIG}
+            ]
+        );
+        this.RP_Blend.intex_outline_blurred = "gauss_hv";
+        this.RP_Blend.intex_main = "color_main";
+        this.RP_Blend.view_setup = function (vport) { this.viewport = vport; };
+
+        this.queue.pushRenderPass(this.RP_GaussH);
+        this.queue.pushRenderPass(this.RP_GaussV);
+        this.queue.pushRenderPass(this.RP_Blend);
+    }
+
+    //=============================================================================
+    // HighPass and Bloom
+    //=============================================================================
+
     make_RP_HighPassGaussBloom()
     {
-        var pthis = this;
+        let pthis = this;
         // let hp = new CustomShaderMaterial("highPass", {MODE: HIGHPASS_MODE_BRIGHTNESS, targetColor: [0.2126, 0.7152, 0.0722], threshold: 0.75});
         let hp = new CustomShaderMaterial("highPass", { MODE: HIGHPASS_MODE_DIFFERENCE,
                                              targetColor: [0x0/255, 0x0/255, 0xff/255], threshold: 0.1});
@@ -424,165 +722,5 @@ export class RendeQuTor
         );
         this.RP_Bloom.view_setup = function (vport) { this.viewport = { width: vport.width*pthis.SSAA_value, height: vport.height*pthis.SSAA_value }; };
         this.queue.pushRenderPass(this.RP_Bloom);
-    }
-
-    //=============================================================================
-
-    make_RP_GBuffer()
-    {
-        this.RP_GBuffer_mat = new CustomShaderMaterial("GBufferMini");
-        this.RP_GBuffer_mat.lights = false;
-        this.RP_GBuffer_mat.side = FRONT_AND_BACK_SIDE;
-
-        this.RP_GBuffer_mat_flat = new CustomShaderMaterial("GBufferMini");
-        this.RP_GBuffer_mat_flat.lights = false;
-        this.RP_GBuffer_mat_flat.side = FRONT_AND_BACK_SIDE;
-        this.RP_GBuffer_mat_flat.normalFlat = true;
-
-        let pthis = this;
-        let clear_arr = new Float32Array([0,0,0,0]);
-
-        this.RP_GBuffer = new RenderPass(
-            RenderPass.BASIC,
-            function (textureMap, additionalData) {},
-            function (textureMap, additionalData) {
-                pthis.renderer._outlineEnabled = true;
-                pthis.renderer._outlineArray = this.obj_list;
-                pthis.renderer._defaultOutlineMat = pthis.RP_GBuffer_mat;
-                pthis.renderer._defaultOutlineMatFlat = pthis.RP_GBuffer_mat_flat;
-                pthis.renderer._fillRequiredPrograms(pthis.RP_GBuffer_mat.requiredProgram(pthis.renderer));
-                pthis.renderer._fillRequiredPrograms(pthis.RP_GBuffer_mat_flat.requiredProgram(pthis.renderer));
-                for (const o3d of this.obj_list) {
-                    if (o3d.outlineMaterial)
-                        pthis.renderer._fillRequiredPrograms(o3d.outlineMaterial.requiredProgram(pthis.renderer));
-                }
-                return { scene: pthis.scene, camera: pthis.camera };
-            },
-            function (textureMap, additionalData) {
-                pthis.renderer._outlineEnabled = false; // can remain true if not all progs are loaded
-                pthis.renderer._outlineArray = null;
-            },
-            RenderPass.TEXTURE,
-            null,
-            "depth_gbuff",
-            [
-                {id: "normal",  textureConfig: RenderPass.DEFAULT_RGBA16F_TEXTURE_CONFIG,
-                 clearColorArray: clear_arr},
-                {id: "viewDir", textureConfig: RenderPass.DEFAULT_RGBA16F_TEXTURE_CONFIG,
-                 clearColorArray: clear_arr}
-            ]
-        );
-        this.RP_GBuffer.view_setup = function (vport) { this.viewport = vport; };
-
-        // TODO: No push, GBuffer/Outline passes should be handled separately as there can be more of them.
-        this.queue.pushRenderPass(this.RP_GBuffer);
-        return this.RP_GBuffer;
-    }
-
-    make_RP_Outline()
-    {
-        this.RP_Outline_mat = new CustomShaderMaterial("outline",
-          { scale: 1.0,
-            edgeColor: [ 1.4, 0.0, 0.8, 1.0 ],
-            _DepthThreshold: 6.0,
-            _NormalThreshold: 0.6, // 0.4,
-            _DepthNormalThreshold: 0.5,
-            _DepthNormalThresholdScale: 7.0 });
-        this.RP_Outline_mat.lights = false;
-
-        let pthis = this;
-
-        this.RP_Outline = new RenderPass(
-            RenderPass.POSTPROCESS,
-            function (textureMap, additionalData) {},
-            function (textureMap, additionalData) {
-                return { material: pthis.RP_Outline_mat,
-                         textures: [ textureMap["depth_gbuff"], textureMap["normal"],
-                                     textureMap["viewDir"] ] };
-            },
-            function (textureMap, additionalData) {},
-            RenderPass.TEXTURE,
-            null,
-            null,
-            [
-                {id: "color_outline", textureConfig: RenderPass.DEFAULT_RGBA16F_TEXTURE_CONFIG}
-            ]
-        );
-        this.RP_Outline.view_setup = function (vport) { this.viewport = vport; };
-
-        // TODO: No push, GBuffer/Outline passes should be handled separately as there can be more of them.
-        this.queue.pushRenderPass(this.RP_Outline);
-        return this.RP_Outline;
-    }
-
-    make_RP_GaussHVandBlend()
-    {
-        let pthis = this;
-
-        this.RP_GaussH_mat = new CustomShaderMaterial("gaussBlur", {horizontal: true, power: 4.0});
-        this.RP_GaussH_mat.lights = false;
-
-        this.RP_GaussH = new RenderPass(
-            RenderPass.POSTPROCESS,
-            (textureMap, additionalData) => {},
-            (textureMap, additionalData) => {
-                return {material: pthis.RP_GaussH_mat, textures: [textureMap["color_outline"]]};
-            },
-            (textureMap, additionalData) => {},
-            RenderPass.TEXTURE,
-            null,
-            null,
-            [
-                {id: "gauss_h", textureConfig: RenderPass.DEFAULT_RGBA16F_TEXTURE_CONFIG}
-            ]
-        );
-        this.RP_GaussH.view_setup = function (vport) { this.viewport = vport; };
-
-        this.RP_GaussV_mat = new CustomShaderMaterial("gaussBlur", {horizontal: false, power: 4.0});
-        this.RP_GaussV_mat.lights = false;
-
-        this.RP_GaussV = new RenderPass(
-            RenderPass.POSTPROCESS,
-            (textureMap, additionalData) => {},
-            (textureMap, additionalData) => {
-                return {material: pthis.RP_GaussV_mat, textures: [textureMap["gauss_h"]]};
-            },
-            (textureMap, additionalData) => {},
-            RenderPass.TEXTURE,
-            null,
-            null,
-            [
-                {id: "gauss_hv", textureConfig: RenderPass.DEFAULT_RGBA16F_TEXTURE_CONFIG}
-            ]
-        );
-        this.RP_GaussV.view_setup = function (vport) { this.viewport = vport; };
-
-        this.RP_Blend_mat = new CustomShaderMaterial("blendingAdditive");
-        this.RP_Blend_mat.lights = false;
-
-        this.RP_Blend = new RenderPass(
-            RenderPass.POSTPROCESS,
-            (textureMap, additionalData) => {},
-            (textureMap, additionalData) => {
-                return {material: pthis.RP_Blend_mat,
-                        textures: [textureMap["gauss_hv"],
-                                   textureMap["color_main"]]};
-            },
-            (textureMap, additionalData) => {},
-            // Target
-            RenderPass.TEXTURE,
-            null,
-            null,
-            [
-                {id: "color_final", textureConfig: RenderPass.DEFAULT_RGBA16F_TEXTURE_CONFIG}
-            ]
-        );
-        this.RP_Blend.view_setup = function (vport) { this.viewport = vport; };
-
-        this.queue.pushRenderPass(this.RP_GaussH);
-        this.queue.pushRenderPass(this.RP_GaussV);
-        this.queue.pushRenderPass(this.RP_Blend);
-
-        return this.RP_Blend;
     }
 }
