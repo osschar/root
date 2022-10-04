@@ -507,8 +507,10 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
    class EveElements
    {
-      constructor(rc, viewer) {
-         console.log("EveElements -- RCore");
+      constructor(rc, viewer)
+      {
+         if (viewer._logLevel >= 2)
+            console.log("EveElements -- RCore instantiated.");
 
          RC = rc;
          this.viewer = viewer;
@@ -543,6 +545,11 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          p.pointSize = m.pointSize;
          p.pointsScale = m.pointsScale;
          p.drawCircles = m.drawCircles;
+      }
+
+      RcCol(root_col)
+      {
+         return RcCol(root_col);
       }
 
       RcPointMaterial(color, opacity, point_size, props)

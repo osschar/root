@@ -43,7 +43,8 @@ sap.ui.define([
          // import("https://desire.physics.ucsd.edu/matevz/alja.github.io/rootui5/eve7/rnr_core/RenderCore.js").then((module) => {
 
          import(window.location.origin + '/rootui5sys/eve7/lib/REveRenderCore.js').then((module) => {
-            console.log("GlViewerRCore.onInit - RenderCore.js loaded");
+            if (this._logLevel >= 2)
+               console.log("GlViewerRCore.onInit - RenderCore.js loaded");
 
             RC = module;
             pthis.bootstrap();
@@ -166,12 +167,11 @@ sap.ui.define([
             // c.material.depthWrite  = false;
             // this.scene.add(c);
 
-            let ss = new RC.Stripe([0,0,0, 400,0,0, 400,400,0, 400,400,400]);
-            ss.material.lineWidth = 20.0;
-            ss.material.color     = new RC.Color(0xff0000);
-            ss.material.emissive  = new RC.Color(0x008080);
-            ss.pickable = true;
-            this.scene.add(ss);
+            // let ss = new RC.Stripe([0,0,0, 400,0,0, 400,400,0, 400,400,400]);
+            // ss.material.lineWidth = 20.0;
+            // ss.material.color     = new RC.Color(0xff0000);
+            // ss.material.emissive  = new RC.Color(0x008080);
+            // this.scene.add(ss);
          }
 
          this.rot_center = new RC.Vector3(0,0,0);
@@ -360,7 +360,8 @@ sap.ui.define([
          let extV = new RC.Vector3; extV = negV; extV.negate(); extV.max(posV);
          let extR = extV.length();
 
-         console.log("GlViewerRenderCore.resetRenderer", sbbox, posV, negV, extV, extR);
+         if (this._logLevel >= 2)
+            console.log("GlViewerRenderCore.resetRenderer", sbbox, posV, negV, extV, extR);
 
          if (this.camera.isPerspectiveCamera)
          {
@@ -402,8 +403,6 @@ sap.ui.define([
 
          this.controls.setFromBBox(sbbox);
 
-         // this.composer.reset();
-
          this.controls.update();
       }
 
@@ -426,24 +425,16 @@ sap.ui.define([
 
          if (this.canvas.width <= 0 || this.canvas.height <= 0) return;
 
-         // Workaround to merge secondary-indices from multiple selections. See comments below.
-         let insta_map = new Map(); // Keep track of instanced-based secondary-seectables
+         this.rqt.render_begin(true);
+
+         // Render outlines for active selections.
 
          for (let sel_id of this._selection_list)
          {
             let sel_entry = this._selection_map[ sel_id ];
 
-            // Extract edge color (note, root colors), width from selection object.
-            // let sel_object = this.get_manager().GetElement(sel_id);
-            // console.log("selection", sel_object.fVisibleEdgeColor, sel_object.fHiddenEdgeColor);
-
-            // TODO: for now we do single outline pass, merging all objects together into
-            // a single list. This needs to be split into actuall separate outline passes.
-            // Problem: an object that uses instanced rendering and secondary selection can
-            // be in several selections. And we use the same object with the same
-            // outlineMaterial (where indicies are defined as vertex-atttrib with divisor 1) for
-            // all of them. So the buffer needs to be set for every pass (if needed).
-            // In this case, we have to merge the lists (not caring if certain index appears multiple times).
+            let obj_list = this.rqt.RP_GBuffer.obj_list;
+            // let instance_list = [];
 
             for (let el_idx in sel_entry)
             {
@@ -453,42 +444,42 @@ sap.ui.define([
                // or setup secondary indices for sub-instance drawing
 
                if (el_entry.instance_object) {
-                  if (insta_map.has(el_entry.instance_object))
-                  {
-                     insta_map.get(el_entry.instance_object).push(...el_entry.instance_sec_idcs);
-                  }
-                  else
-                  {
-                     let arr = [];
-                     arr.push(...el_entry.instance_sec_idcs);
-                     insta_map.set(el_entry.instance_object, arr);
-
-                     this.rqt.RP_GBuffer.obj_list.push(el_entry.instance_object);
-                  }
+                     // instance_list.push(el_entry.instance_object);
+                     obj_list.push(el_entry.instance_object);
+                     el_entry.instance_object.outlineMaterial.outline_instances_setup( el_entry.instance_sec_idcs );
                } else {
                   for (let geo of el_entry.geom)
                   {
-                     this.rqt.RP_GBuffer.obj_list.push(geo);
+                     obj_list.push(geo);
                   }
                }
             }
+
+            if (obj_list.length == 0)
+               continue;
+
+            // Extract edge color (note, root colors), width from selection object.
+            let sel_object = this.get_manager().GetElement(sel_id);
+            let c = this.creator.RcCol(sel_object.fVisibleEdgeColor);
+            this.rqt.RP_Outline_mat.setUniform("edgeColor", [ 2*c.r, 2*c.g, 2*c.b, 1 ]);
+            this.rqt.render_outline();
+
+            // for (const obj of instance_list) {
+            //    obj.outlineMaterial.outline_instances_reset();
+            // }
+
+            this.rqt.RP_GBuffer.obj_list = [];
          }
 
-         // This would then be done per outline pass, if needed. Same for loop below render call.
-         for (const [obj, arr] of insta_map) {
-            obj.outlineMaterial.outline_instances_setup(arr);
+         this.rqt.render_main_and_blend_outline();
+
+         if (this.rqt.queue.used_fail_count == 0) {
+            this.rqt.render_tone_map_to_screen();
          }
 
-         this.rqt.render();
+         this.rqt.render_end();
 
-         for (const [obj, arr] of insta_map) {
-            obj.outlineMaterial.outline_instances_reset();
-         }
-
-         this.rqt.RP_GBuffer.obj_list = [];
-
-         if (this.renderer.used == false) {
-            // RCRC Ideally there would be an onShadersLoaded callback.
+         if (this.rqt.queue.used_fail_count > 0) {
             if (this._logLevel >= 2)
                console.log("GlViewerRCore render: not all programs compiled -- setting up render timer");
             setTimeout(this.render.bind(this), 200);
@@ -500,7 +491,7 @@ sap.ui.define([
 
       render_for_picking(x, y, detect_depth)
       {
-         console.log("RENDER FOR PICKING", this.scene, this.camera, this.canvas, this.renderer);
+         // console.log("RENDER FOR PICKING", this.scene, this.camera, this.canvas, this.renderer);
 
          if (this.canvas.width <= 0 || this.canvas.height <= 0) return null;
 
@@ -536,7 +527,7 @@ sap.ui.define([
 
          state.ctrl = ctrl_obj.get_ctrl(ctrl_obj, top_obj);
 
-         console.log("pick result", state);
+         // console.log("pick result", state);
          return state;
       }
 
@@ -561,13 +552,14 @@ sap.ui.define([
 
       onResizeTimeout()
       {
-         let w = this.get_width();
-         let h = this.get_height();
-
          if ( ! this.canvas) {
-            console.log("GlViewerRCore onResizeTimeout", w, h, "canvas IS NOT SET, STOP CALLING ME!");
+            if (this._logLevel >= 2)
+               console.log("GlViewerRCore onResizeTimeout -- canvas is not set yet.");
             return;
          }
+
+         let w = this.get_width();
+         let h = this.get_height();
 
          //console.log("GlViewerRCore onResizeTimeout", w, h, "canvas=", this.canvas, this.canvas.width, this.canvas.height);
 
