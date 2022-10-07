@@ -60,7 +60,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
                obj3d.matrixAutoUpdate = false;
                if (elem.render_data.matrix) {
                   if (this.mgr.is_rcore) {
-                     obj3d.setMatrixFromArray(arr);
+                     obj3d.setMatrixFromArray(elem.render_data.matrix);
                   } else {
                      obj3d.matrix.fromArray(elem.render_data.matrix);
                      obj3d.updateMatrixWorld(true);
