@@ -248,8 +248,6 @@ export class RendeQuTor
             let rdr = this.renderer;
             let gl  = rdr.gl;
             let fbm = rdr.glManager._fboManager;
-            let x = rdr._pickCoordinateX;
-            let y = rdr._canvas.height - rdr._pickCoordinateY;
 
             fbm.bindFramebuffer(this.pqueue._renderTarget);
 
@@ -263,18 +261,15 @@ export class RendeQuTor
             let far  = this.camera.far;
             for (let i = 0; i < 9; ++i)
                 d[i] = (near * far) / ((near - far) * d[i] + far);
-
-            // console.log("Pick depth at", x, ",", y, ":", d);
-
             state.depth = d[4];
+            // console.log("    pick depth at", x, ",", y, ":", d);
         }
 
         return state;
     }
 
-    pick_instance(state) {
-        // RCRC Proto-proto-secondary-selection. Requires branch:
-        // https://github.com/osschar/RenderCore/tree/img-tex-cache
+    pick_instance(state)
+    {
         if (state.object !== this.renderer.pickedObject3D) {
             console.error("RendeQuTor::pick_instance state mismatch", state, this.renderer.pickedObject3D);
         } else {

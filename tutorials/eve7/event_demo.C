@@ -209,12 +209,14 @@ void projectScenes(bool geomp, bool eventp)
    }
    if (eventp)
    {
+      int depth = 50;
       for (auto &ie : eveMng->GetEventScene()->RefChildren())
       {
-         mngRhoPhi->SetCurrentDepth(10);
+         mngRhoPhi->SetCurrentDepth(depth);
          mngRhoPhi->ImportElements(ie, rPhiEventScene);
-         mngRhoZ  ->SetCurrentDepth(10);
+         mngRhoZ  ->SetCurrentDepth(depth);
          mngRhoZ  ->ImportElements(ie, rhoZEventScene);
+         depth -= 10;
       }
    }
 
@@ -258,12 +260,7 @@ public:
       auto scene = eveMng->GetEventScene();
       scene->DestroyElements();
       makeEventScene();
-      for (auto &ie : scene->RefChildren()) {
-         if (mngRhoPhi)
-            mngRhoPhi->ImportElements(ie, rPhiEventScene);
-         if (mngRhoZ)
-            mngRhoZ->ImportElements(ie, rhoZEventScene);
-      }
+      projectScenes(false, true);
       // if (++fCount % 10 == 0) printf("At event %d\n", fCount);
    }
 
