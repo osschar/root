@@ -1253,7 +1253,18 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
             }
 
          }
-         this.RcPickable(psp, psp_ro);
+
+         if (psp.fPickable) {
+            for (let m of meshes) m.pickable = true;
+         }
+         psp_ro.get_ctrl = function (iobj, tobj) {
+            let octrl = new EveElemControl(iobj, tobj);
+            octrl.DrawForSelection = function (sec_idcs, res) {
+               res.geom.push(...meshes);
+               //res.geom.push(...tobj.children);
+            }
+            return octrl;
+         }
 
          return psp_ro;
       }
