@@ -615,8 +615,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          // let mat = new RC.MeshBasicMaterial;
 
          mat._color = color;
-         mat._specular = this.ColorWhite;
-         mat._shininess = 32;
+         mat._specular = new RC.Color(0.3, 0.8, 0.0); // this.ColorWhite;
+         mat._shininess = 64;
    
          if (opacity !== undefined && opacity < 1.0) {
             mat._opacity = opacity;
@@ -795,30 +795,26 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
             pos += 6;
          }
 
-         let style = (track.fLineStyle > 1) ? EVE.JSR.getSvgLineStyle(track.fLineStyle) : "",
-            dash = style ? style.split(",") : [],
-            lineMaterial;
-
-         if (dash && (dash.length > 1))
-         {
-            lineMaterial = this.RcLineMaterial(track_color, 1.0, track_width, { dashSize: parseInt(dash[0]), gapSize: parseInt(dash[1]) });
-         } else
-         {
-            lineMaterial = this.RcLineMaterial(track_color, 1.0, track_width);
-         }
-
-         let geom = new RC.Geometry();
-         geom.vertices = new RC.BufferAttribute(buf, 3);
-
-         let line = new RC.Line(geom, lineMaterial);
-         line.renderingPrimitive = RC.LINES;
-         line.lineWidth = track_width;
-
-         // required for the dashed material
-         //if (dash && (dash.length > 1))
-         //   line.computeLineDistances();
-
-         //line.hightlightWidthScale = 2;
+         const geom = new RC.Geometry();
+         geom.vertices = new RC.Float32Attribute(buf, 3);
+ 
+         let line = new RC.Stripes(
+            {
+               geometry: new RC.StripesGeometry(
+                  {
+                        baseGeometry: geom
+                  }
+               ), 
+               material: new RC.StripesBasicMaterial(
+                  {
+                        baseGeometry: geom, 
+                        lineWidth: track_width, 
+                        mode: RC.STRIPE_SPACE_SCREEN,
+                        color: track_color
+                  }
+               )
+            }
+         );
 
          this.RcPickable(track, line);
 
@@ -924,10 +920,41 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          let mesh = new RC.Mesh(geo_body, this.RcFlatMaterial(fcol, 0.5));
          mesh.material.normalFlat = true;
 
-         let line1 = new RC.Line(geo_rim, this.RcLineMaterial(lcol, 0.8, 2));
+         let line1 = new RC.Stripes(
+            {
+               geometry: new RC.StripesGeometry(
+                  {
+                     baseGeometry: geo_rim
+                  }
+               ),
+               material: new RC.StripesBasicMaterial(
+                  {
+                     baseGeometry: geo_rim,
+                     lineWidth: 2,
+                     mode: RC.STRIPE_SPACE_SCREEN,
+                     color: lcol
+                  }
+               )
+            }
+         );
 
-         let line2 = new RC.Line(geo_rays, this.RcLineMaterial(lcol, 0.8, 0.5));
-         line2.renderingPrimitive = RC.LINES;
+         let line2 = new RC.Stripes(
+            {
+               geometry: new RC.StripesGeometry(
+                  {
+                     baseGeometry: geo_rays
+                  }
+               ),
+               material: new RC.StripesBasicMaterial(
+                  {
+                     baseGeometry: geo_rays,
+                     lineWidth: 1,
+                     mode: RC.STRIPE_SPACE_SCREEN,
+                     color: lcol
+                  }
+               )
+            }
+         );
 
          mesh.add(line1);
          mesh.add(line2);
@@ -1217,6 +1244,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
          let line_mat = this.RcLineMaterial(fcol);
 
+         let meshes = [];
          for (let ib_pos = 0; ib_pos < ib_len;)
          {
             if (rnr_data.idxBuff[ib_pos] == GL.TRIANGLES)
@@ -1230,6 +1258,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
                let mesh = new RC.Mesh(geo, material);
                this.RcPickable(psp, mesh);
                psp_ro.add(mesh);
+               meshes.push(mesh);
 
                ib_pos += 2 + 3 * rnr_data.idxBuff[ib_pos + 1];
             }
@@ -1253,7 +1282,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
             }
 
          }
-
+         // this.RcPickable(psp, psp_ro);
+         // this.RcPickable(el, psp_ro, false, null);
          if (psp.fPickable) {
             for (let m of meshes) m.pickable = true;
          }
@@ -1283,13 +1313,30 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
             buf[i] = rnr_data.vtxBuff[i];
          }
 
-         let line_mat = this.RcLineMaterial(RcCol(el.fMainColor));
-
          let geom = new RC.Geometry();
          geom.vertices = new RC.BufferAttribute(buf, 3);
 
-         let line = new RC.Line(geom, line_mat);
-         line.renderingPrimitive = RC.LINES;
+         let line_color = RcCol(el.fMainColor);
+
+         const line = new RC.Stripes(
+            {
+               geometry: new RC.StripesGeometry(
+                  {
+                        baseGeometry: geom
+                  }
+               ), 
+               material: new RC.StripesBasicMaterial(
+                  {
+                        baseGeometry: geom, 
+                        lineWidth: el.fLineWidth, 
+                        mode: RC.STRIPE_SPACE_SCREEN,
+                        color: line_color
+                  }
+               )
+            }
+         );
+
+
          this.RcPickable(el, line);
          obj3d.add(line);
 
