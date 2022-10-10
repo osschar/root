@@ -629,6 +629,39 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          return mat;
       }
 
+      RcMakeStripes(geom, line_width, line_color)
+      {
+         return new RC.Stripes(
+            { geometry: new RC.StripesGeometry({ baseGeometry: geom }),
+              material: new RC.StripesBasicMaterial({
+                           baseGeometry: geom, mode: RC.STRIPE_SPACE_SCREEN,
+                           lineWidth: line_width, color: line_color})
+            }
+         );
+      }
+
+      RcApplyStripesMaterials(eve_el, stripes)
+      {
+         if (eve_el.fPickable) {
+            let m = stripes.material;
+            stripes.pickingMaterial = new RC.StripesBasicMaterial(
+               { lineWidth: m.lineWidth, mode: m.mode, color: m.color });
+            let pm = stripes.pickingMaterial;
+            pm.addSBFlag("PICK_MODE_UINT");
+            pm.prevVertex = m.prevVertex;
+            pm.nextVertex = m.nextVertex;
+            pm.deltaOffset = m.deltaOffset;
+
+            stripes.outlineMaterial = new RC.StripesBasicMaterial(
+               { lineWidth: m.lineWidth, mode: m.mode, color: m.color });
+            let om = stripes.outlineMaterial;
+            om.programName = "custom_GBufferMini_stripes";
+            om.prevVertex = m.prevVertex;
+            om.nextVertex = m.nextVertex;
+            om.deltaOffset = m.deltaOffset;
+         }
+      }
+
       RcPickable(el, obj3d, do_children = true, ctrl_class = EveElemControl)
       {
          if (el.fPickable) {
@@ -785,7 +818,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
                buf[pos + 3] = rnr_data.vtxBuff[k * 3];
                buf[pos + 4] = rnr_data.vtxBuff[k * 3 + 1];
                buf[pos + 5] = rnr_data.vtxBuff[k * 3 + 2];
-            } else
+            }
+            else
             {
                buf[pos + 3] = rnr_data.vtxBuff[k * 3 + 3];
                buf[pos + 4] = rnr_data.vtxBuff[k * 3 + 4];
@@ -798,24 +832,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          const geom = new RC.Geometry();
          geom.vertices = new RC.Float32Attribute(buf, 3);
  
-         let line = new RC.Stripes(
-            {
-               geometry: new RC.StripesGeometry(
-                  {
-                        baseGeometry: geom
-                  }
-               ), 
-               material: new RC.StripesBasicMaterial(
-                  {
-                        baseGeometry: geom, 
-                        lineWidth: track_width, 
-                        mode: RC.STRIPE_SPACE_SCREEN,
-                        color: track_color
-                  }
-               )
-            }
-         );
-
+         const line = this.RcMakeStripes(geom, track_width, track_color);
+         this.RcApplyStripesMaterials(track, line);
          this.RcPickable(track, line);
 
          return line;
@@ -920,42 +938,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          let mesh = new RC.Mesh(geo_body, this.RcFlatMaterial(fcol, 0.5));
          mesh.material.normalFlat = true;
 
-         let line1 = new RC.Stripes(
-            {
-               geometry: new RC.StripesGeometry(
-                  {
-                     baseGeometry: geo_rim
-                  }
-               ),
-               material: new RC.StripesBasicMaterial(
-                  {
-                     baseGeometry: geo_rim,
-                     lineWidth: 2,
-                     mode: RC.STRIPE_SPACE_SCREEN,
-                     color: lcol
-                  }
-               )
-            }
-         );
-
-         let line2 = new RC.Stripes(
-            {
-               geometry: new RC.StripesGeometry(
-                  {
-                     baseGeometry: geo_rays
-                  }
-               ),
-               material: new RC.StripesBasicMaterial(
-                  {
-                     baseGeometry: geo_rays,
-                     lineWidth: 1,
-                     mode: RC.STRIPE_SPACE_SCREEN,
-                     color: lcol
-                  }
-               )
-            }
-         );
-
+         let line1 = this.RcMakeStripes(geo_rim,  2, lcol);
+         let line2 = this.RcMakeStripes(geo_rays, 1, lcol);
          mesh.add(line1);
          mesh.add(line2);
          this.RcPickable(jet, mesh, false);
@@ -1318,25 +1302,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
          let line_color = RcCol(el.fMainColor);
 
-         const line = new RC.Stripes(
-            {
-               geometry: new RC.StripesGeometry(
-                  {
-                        baseGeometry: geom
-                  }
-               ), 
-               material: new RC.StripesBasicMaterial(
-                  {
-                        baseGeometry: geom, 
-                        lineWidth: el.fLineWidth, 
-                        mode: RC.STRIPE_SPACE_SCREEN,
-                        color: line_color
-                  }
-               )
-            }
-         );
-
-
+         const line = this.Rc.MakeStripes(geom, el.fLineWidth, line_color);
+         this.RcApplyStripesMaterials(el, line);
          this.RcPickable(el, line);
          obj3d.add(line);
 
