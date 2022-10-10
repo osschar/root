@@ -6,6 +6,7 @@ sap.ui.define([
    "use strict";
 
    let RC, RP, RendeQuTor;
+   let datGUI;
 
    class GlViewerRCore extends GlViewer {
 
@@ -49,6 +50,10 @@ sap.ui.define([
             RC = module;
             pthis.bootstrap();
          });
+
+         if (!datGUI) {
+            datGUI = new EVE.JSR.gui.GUI();
+         }
       }
 
       bootstrap()
@@ -107,6 +112,19 @@ sap.ui.define([
          this.renderer.addShaderLoaderUrls("rootui5sys/eve7/lib/RC/shaders");
          this.renderer.addShaderLoaderUrls("rootui5sys/eve7/shaders");
          this.renderer.pickObject3D = true;
+
+         // add dat GUI option to set background
+         let vd = this.controller.getView().getViewData();
+         let name = vd.mgr.GetElement(vd.eveViewerId).fName;
+         name = name.substring(0,3);
+         let parName = name + "_WhiteBG";
+         let conf = {}; conf[parName] = true;
+         let pr = this;
+         datGUI.add(conf, parName).onChange(function (wbg) {
+            conf[parName] = wbg;
+            pr.renderer.clearColor = wbg ? "#FFFFFF00" : "#00000000";
+            pr.request_render();
+         });
 
          this.scene = new RC.Scene();
 
