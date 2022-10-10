@@ -635,7 +635,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
             { geometry: new RC.StripesGeometry({ baseGeometry: geom }),
               material: new RC.StripesBasicMaterial({
                            baseGeometry: geom, mode: RC.STRIPE_SPACE_SCREEN,
-                           lineWidth: line_width, color: line_color})
+                           lineWidth: line_width * this.LINE_WIDTH_FAC,
+                           color: line_color})
             }
          );
       }
@@ -1139,7 +1140,6 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
                let slice = ci[x * 2];
                let sliceColor = calo2D.sliceColors[slice];
                let tc = RcCol(sliceColor);
-               console.log()
                for (let i = 0; i < 4; ++i) {
                   colBuff[off] = tc.r;
                   colBuff[off + 1] = tc.g;
@@ -1152,7 +1152,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          }
 
 
-         let mat = this.RcFlatMaterial(this.ColorBlack,0.5);
+         let mat = this.RcFlatMaterial(this.ColorBlack, 1);
          mat.useVertexColors = true;
          let mesh = new RC.Mesh(body, mat);
 
@@ -1287,7 +1287,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
       makeStraightLineSet(el, rnr_data)
       {
-         console.log("makeStraightLineSet ...");
+         // console.log("makeStraightLineSet ...");
 
          let obj3d = new RC.Group();
 
@@ -1302,7 +1302,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
          let line_color = RcCol(el.fMainColor);
 
-         const line = this.Rc.MakeStripes(geom, el.fLineWidth, line_color);
+         const line = this.RcMakeStripes(geom, el.fLineWidth, line_color);
          this.RcApplyStripesMaterials(el, line);
          this.RcPickable(el, line);
          obj3d.add(line);
