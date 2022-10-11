@@ -43,7 +43,10 @@ sap.ui.define([
          // // console.log(window.location.pathname); // where are we loading from?
          // import("https://desire.physics.ucsd.edu/matevz/alja.github.io/rootui5/eve7/rnr_core/RenderCore.js").then((module) => {
 
-         import(window.location.origin + '/rootui5sys/eve7/lib/REveRenderCore.js').then((module) => {
+         let sp = EVE.JSR.source_dir;
+         let rp = sp.substring(0, sp.length - 10); // take out 'jsrootsys' to replace it with 'rootui5sys'
+         rp += 'rootui5sys/eve7/lib/REveRenderCore.js';
+         import(rp).then((module) => {
             if (this._logLevel >= 2)
                console.log("GlViewerRCore.onInit - RenderCore.js loaded");
 
