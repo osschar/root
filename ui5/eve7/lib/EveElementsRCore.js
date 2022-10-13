@@ -648,6 +648,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
             stripes.pickingMaterial = new RC.StripesBasicMaterial(
                { lineWidth: m.lineWidth, mode: m.mode, color: m.color });
             let pm = stripes.pickingMaterial;
+            pm.programName = "custom_GBufferMini_stripes";
             pm.addSBFlag("PICK_MODE_UINT");
             pm.prevVertex = m.prevVertex;
             pm.nextVertex = m.nextVertex;
