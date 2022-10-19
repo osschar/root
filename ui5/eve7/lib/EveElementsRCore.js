@@ -631,14 +631,18 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
       RcMakeStripes(geom, line_width, line_color)
       {
-         return new RC.Stripes(
+         let s = new RC.Stripes(
             { geometry: new RC.StripesGeometry({ baseGeometry: geom }),
               material: new RC.StripesBasicMaterial({
                            baseGeometry: geom, mode: RC.STRIPE_SPACE_SCREEN,
                            lineWidth: line_width * this.LINE_WIDTH_FAC,
-                           color: line_color})
+                           color: this.ColorBlack,
+                           emissive: line_color
+                        })
             }
          );
+         s.lights = false;
+         return s;
       }
 
       RcApplyStripesMaterials(eve_el, stripes)
