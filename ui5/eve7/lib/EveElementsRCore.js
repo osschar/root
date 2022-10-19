@@ -1098,9 +1098,14 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
             }
             body.vertColor = new RC.BufferAttribute(colBuff, 4);
          }
+         else
+         {
+            body.indices = new RC.BufferAttribute(new Uint32Array(0), 1);
+            body.vertices = new RC.BufferAttribute(new Float32Array(0), 3);
+            body.vertColor = new RC.BufferAttribute(new Float32Array, 4);
+         }
 
          let mat = this.RcFancyMaterial(this.ColorBlack, 1.0, { side: RC.FRONT_SIDE });
-         //let mat = this.RcFlatMaterial(this.ColorBlack, 1.0, { side: RC.FRONT_SIDE });
          mat.useVertexColors = true;
          mat.normalFlat = true;
 
@@ -1155,7 +1160,12 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
             }
             body.vertColor = new RC.BufferAttribute(colBuff, 4);
          }
-
+         else
+         {
+            body.indices = new RC.BufferAttribute(new Uint32Array(0), 1);
+            body.vertices = new RC.BufferAttribute(new Float32Array(0), 3);
+            body.vertColor = new RC.BufferAttribute(new Float32Array, 4);
+         }
 
          let mat = this.RcFlatMaterial(this.ColorBlack, 1);
          mat.useVertexColors = true;
@@ -1179,8 +1189,11 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
          let geo = new RC.Geometry();
          geo.vertices = new RC.BufferAttribute(rnr_data.vtxBuff, 3);
-         geo.indices = new RC.BufferAttribute(rnr_data.idxBuff, 1);
-         geo.setDrawRange(2, nVert);
+         let ib = rnr_data.idxBuff;
+         geo.indices = new RC.BufferAttribute(
+            new Uint32Array(ib.buffer, ib.byteOffset + 8, nVert),
+            1);
+
          if (compute_normals) {
             geo.computeVertexNormalsIdxRange(2, nVert);
          }
