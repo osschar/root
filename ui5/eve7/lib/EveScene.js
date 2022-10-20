@@ -261,10 +261,12 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
 
             this.id2obj_map.delete(elId);
 
-            if (typeof obj3d.dispose !== 'function')
-               console.log("EveScene.elementsRemoved no dispose function for " + this.mgr.GetElement(elId)._typename, ", rnr obj ", obj3d._typename, obj3d);
-            else
-               obj3d.dispose();
+            if (!this.mgr.is_rcore) {
+               if (typeof obj3d.dispose !== 'function')
+                  console.log("EveScene.elementsRemoved no dispose function for " + this.mgr.GetElement(elId)._typename, ", rnr obj ", obj3d._typename, obj3d);
+               else
+                  obj3d.dispose();
+            }
          }
       }
 
