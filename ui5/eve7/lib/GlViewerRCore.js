@@ -55,7 +55,11 @@ sap.ui.define([
          });
 
          if (!datGUI) {
-            datGUI = new EVE.JSR.gui.GUI();
+            datGUI = new EVE.JSR.gui.GUI({ autoPlace: false, width: 220 });
+            datGUI.domElement.id = 'posDatGUI';
+            pthis.datGUIFolder = datGUI.addFolder("background")
+            let dome = this.controller.getView().getParent().getParent();
+            dome.getDomRef().appendChild(datGUI.domElement);
          }
       }
 
@@ -123,7 +127,7 @@ sap.ui.define([
          let parName = name + "_WhiteBG";
          let conf = {}; conf[parName] = true;
          let pr = this;
-         datGUI.add(conf, parName).onChange(function (wbg) {
+         datGUI.__folders.background.add(conf, parName).onChange(function (wbg) {
             conf[parName] = wbg;
             pr.renderer.clearColor = wbg ? "#FFFFFF00" : "#00000000";
             pr.request_render();
