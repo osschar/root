@@ -244,10 +244,13 @@ export class REveCameraControls extends EventDispatcher {
 					let b1 = camTrans.getBaseVector(1);
 					let b4 = camTrans.getBaseVector(4);
 					let orig_dot = b1.dot(b4);
-					let newMag = Math.sqrt(orig_dot) * scale;
+					let lookAtDist = Math.sqrt(orig_dot);
+					let newMag = Math.sqrt(lookAtDist) * scale;
 					b4.multiplyScalar(scale);
 					camTrans.setBaseVector(4, b4);
 					scale = 1.0;
+
+					scope.object.near = Math.min(lookAtDist*0.1, 20);	
 				}
 
 				// pan/ truck
