@@ -11,6 +11,7 @@
 
 #include <ROOT/REveStraightLineSet.hxx>
 #include <ROOT/REveRenderData.hxx>
+#include <ROOT/REveManager.hxx>
 #include <ROOT/REveProjectionManager.hxx>
 
 #include "TClass.h"
@@ -170,6 +171,13 @@ Int_t REveStraightLineSet::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
    j["fMarkerStyle"] = fMarkerStyle;
    j["fSecondarySelect"] = fAlwaysSecSelect;
 
+   if (fMarkerSize && gEve->IsRCore()) {
+      int x, y;
+      int ms = fMarkerPlex.Size();
+      REveRenderData::CalcTextureSize(ms, 1, x, y);
+      j["fTexX"] = x;
+      j["fTexY"] = y;
+   }
    return ret;
 }
 

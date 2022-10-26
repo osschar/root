@@ -629,6 +629,38 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          return mat;
       }
 
+      RcMakeZSprite(colIdx, sSize, nInstance, vbuff, instX, instY, textureName)
+      { 
+         let   col   = RcCol(colIdx);
+         let sm = new RC.ZSpriteBasicMaterial( {
+            SpriteMode: RC.SPRITE_SPACE_SCREEN, SpriteSize: [sSize, sSize],
+            color: this.ColorBlack,
+            emissive: col,
+            diffuse: col.clone().multiplyScalar(0.5) } );
+         sm.transparent = true;
+
+         sm.addInstanceData(new RC.Texture(vbuff,
+            RC.Texture.ClampToEdgeWrapping, RC.Texture.ClampToEdgeWrapping,
+            RC.Texture.NearestFilter, RC.Texture.NearestFilter,
+            // RC.Texture.R32F, RC.Texture.R32F, RC.Texture.FLOAT,
+            RC.Texture.RGBA32F, RC.Texture.RGBA, RC.Texture.FLOAT,
+            instX, instY));
+         sm.instanceData[0].flipy = false;
+
+         let s = new RC.ZSprite(null, sm);
+         s.frustumCulled = false; // need a way to speciy bounding box/sphere !!!
+         s.instanced = true;
+         s.instanceCount = nInstance;
+
+         // Now that outline and picking shaders are setup with final pixel-size,
+         // scale up the main size to account for SSAA.
+         sm.setUniform("SpriteSize", [sSize * this.POINT_SIZE_FAC, sSize * this.POINT_SIZE_FAC]);
+
+         this.GetLumAlphaTexture(textureName, this.AddMapToAllMaterials.bind(this, s));
+
+         return s;
+      }
+      
       RcMakeStripes(geom, line_width, line_color)
       {
          let s = new RC.Stripes(
@@ -749,38 +781,9 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
       {
          if (this.TestRnr("hit", hit, rnr_data)) return null;
 
-         let   col   = RcCol(hit.fMarkerColor);
-         const msize = hit.fMarkerSize;
-         let sm = new RC.ZSpriteBasicMaterial( {
-            SpriteMode: RC.SPRITE_SPACE_SCREEN, SpriteSize: [msize, msize],
-            color: this.ColorBlack,
-            emissive: col,
-            diffuse: col.clone().multiplyScalar(0.5) } );
-         sm.transparent = true;
-         // sm.depthWrite = false;
-         // this.GetLumAlphaTexture("star5-32a.png", (tex) => {
-         //    sm.addMap(tex);
-         // });
-
-         sm.addInstanceData(new RC.Texture(rnr_data.vtxBuff,
-            RC.Texture.ClampToEdgeWrapping, RC.Texture.ClampToEdgeWrapping,
-            RC.Texture.NearestFilter, RC.Texture.NearestFilter,
-            // RC.Texture.R32F, RC.Texture.R32F, RC.Texture.FLOAT,
-            RC.Texture.RGBA32F, RC.Texture.RGBA, RC.Texture.FLOAT,
-            hit.fTexX, hit.fTexY));
-         sm.instanceData[0].flipy = false;
-
-         let s = new RC.ZSprite(null, sm);
-         s.frustumCulled = false; // need a way to speciy bounding box/sphere !!!
-         s.instanced = true;
-         s.instanceCount = hit.fSize;
-
-         // Now that outline and picking shaders are setup with final pixel-size,
-         // scale up the main size to account for SSAA.
-         sm.setUniform("SpriteSize", [msize * this.POINT_SIZE_FAC, msize * this.POINT_SIZE_FAC]);
-
-         this.GetLumAlphaTexture("star5-32a.png", this.AddMapToAllMaterials.bind(this, s));
-         // this.GetRgbaTexture("unicorn-a.png", this.AddMapToAllMaterials.bind(this, s));
+         let s = this.RcMakeZSprite(hit.fMarkerColor, hit.fMarkerSize, hit.fSize,
+            rnr_data.vtxBuff, hit.fTexX, hit.fTexY,
+            "star5-32a.png");
 
          this.RcPickable(hit, s);
 
@@ -1327,29 +1330,27 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
          // ---------------- DUH, could share buffer attribute. XXXXX
 
-         let msize = el.fMarkerPlexSize;
+         if (el.fMarkerPlexSize) {
+            let nPnts = el.fMarkerPlexSize;
+            let off = el.fLinePlexSize * 6;
+            let p_buf = new Float32Array(el.fTexX*el.fTexY*4);
+            for (let i = 0; i < nPnts; ++i) {
+               let j = i*3;
+               let k = i*4;
+               p_buf[k]   = rnr_data.vtxBuff[j+off];
+               p_buf[k+1] = rnr_data.vtxBuff[j+off+1];
+               p_buf[k+2] = rnr_data.vtxBuff[j+off+2];
+               p_buf[k+3] = 0;
+            }
+            
+            console.log("straight line set = ",p_buf );
+            console.log("eve el = ",  el.fTexX, el.fTexY);
 
-         let p_buf = new Float32Array(msize * 3);
-
-         let startIdx = el.fLinePlexSize * 6;
-         let endIdx = startIdx + msize * 3;
-         for (let i = startIdx; i < endIdx; ++i)
-         {
-            p_buf[i] = rnr_data.vtxBuff[i];
+            let marker = this.RcMakeZSprite(el.fMainColor, el.fMarkerSize, nPnts,
+               p_buf, el.fTexX, el.fTexY,
+               "star5-32a.png");
+            obj3d.add(marker);
          }
-
-         let p_geom = new RC.Geometry();
-         p_geom.vertices = new RC.BufferAttribute(p_buf, 3);
-
-         let p_mat = this.RcPointMaterial(RcCol(el.fMarkerColor), 1, el.fMarkerSize);
-         p_mat.pointsScale = false;
-         p_mat.drawCircles = true;
-
-         let marker = new RC.Point({ geometry: p_geom, material: p_mat });
-         this.UpdatePointPickingMaterial(marker);
-         this.RcPickable(el, marker);
-         obj3d.add(marker);
-
          // For secondary selection, see EveElements.js
          // obj3d.eve_idx_buf = rnr_data.idxBuff;
          // if (el.fSecondarySelect)
