@@ -256,6 +256,9 @@ public:
    static void         ExecuteInMainThread(std::function<void()> func);
    static void         QuitRoot();
 
+   static void    ErrorHandler(Int_t level, Bool_t abort, const char *location,
+                               const char *msg);
+
 
    // Access to internals, needed for low-level control in advanced
    // applications.

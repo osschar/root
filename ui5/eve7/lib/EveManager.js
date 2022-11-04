@@ -147,8 +147,15 @@ sap.ui.define([], function() {
             }
             else if (resp.content == "EndChanges") {
                this.ServerEndRedrawCallback();
-               if (resp.log)
-                  console.log(resp.log);
+               if (resp.log) {
+                  resp.log.forEach((item) => {
+                     // use console error above warning serverity
+                     if (item.lvl < 3)
+                        console.error(item.msg);
+                     else
+                        console.log(item.msg);
+                  });
+               }
             }
             else if (resp.content == "BrowseElement") {
                this.BrowseElement(resp.id);

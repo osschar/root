@@ -164,6 +164,10 @@ REveManager::REveManager()
    fWebWindow->SetMaxQueueLength(30); // number of allowed entries in the window queue
 
    fMIRExecThread = std::thread{[this] { MIRExecThread(); }};
+
+   // activate interpreter error report
+   gInterpreter->ReportDiagnosticsToErrorHandler();
+   SetErrorHandler(ErrorHandler);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -945,20 +949,25 @@ void REveManager::PublishChanges()
    jobj["content"] = "EndChanges";
 
    if (!gEveLogEntries.empty()) {
-
       constexpr static int numLevels = static_cast<int>(ELogLevel::kDebug) + 1;
       constexpr static std::array<const char *, numLevels> sTag{
-         {"{unset-error-level please report}", "FATAL", "Error", "Warning", "Info", "Debug"}};
+        {"{unset-error-level please report}", "FATAL", "Error", "Warning", "Info", "Debug"}};
 
+      jobj["log"] = nlohmann::json::array();
       std::stringstream strm;
       for (auto entry : gEveLogEntries) {
+         nlohmann::json item = {};
+         item["lvl"] = entry.fLevel; 
          int cappedLevel = std::min(static_cast<int>(entry.fLevel), numLevels - 1);
-         strm << sTag[cappedLevel];
+         strm <<  "Server " << sTag[cappedLevel] << ":";
+
          if (!entry.fLocation.fFuncName.empty())
             strm << " " << entry.fLocation.fFuncName;
-         strm << " " << entry.fMessage; 
+         strm << " " << entry.fMessage;
+         item["msg"] = strm.str();
+         jobj["log"].push_back(item);
+         strm.clear();
       }
-      jobj["log"] = strm.str();
       gEveLogEntries.clear();
    }
 
@@ -1132,6 +1141,18 @@ REveManager::ChangeGuard::ChangeGuard()
 REveManager::ChangeGuard::~ChangeGuard()
 {
    gEve->EndChange();
+}
+
+// Error handler streams error-level messages to client log
+void REveManager::ErrorHandler(Int_t level, Bool_t abort, const char * location, const char *msg)
+{
+   if (level >= kError)
+   {
+      RLogEntry entry(ELogLevel::kError, REveLog());
+      entry.fMessage = msg;
+      gEveLogEntries.emplace_back(entry);
+   }
+   ::DefaultErrorHandler(level, abort, location, msg);
 }
 
 /** \class REveManager::RExceptionHandler
