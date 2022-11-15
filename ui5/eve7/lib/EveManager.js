@@ -696,14 +696,25 @@ sap.ui.define([], function() {
       {
          // console.log("ServerEndRedrawCallback ", this.listScenesToRedraw);
          let recs = new Set();
+         let viewers = new Set();
          for ( let i =0; i < this.listScenesToRedraw.length; i++) {
             let scene = this.listScenesToRedraw[i];
             if (scene.$receivers) {
                for (let r=0; r < scene.$receivers.length; r++) {
-                  recs.add( scene.$receivers[r]);
+                  let sr = scene.$receivers[r];
+                  recs.add(sr);
+                  if (sr.glctrl) { viewers.add(sr.glctrl.viewer)};
                }
             }
          }
+
+         if (this.is_rcore)
+         {
+            for (let v of viewers ) {
+               v.timeStampAttributesAndTextures();
+            }
+         }
+
          for (let item of recs) {
             try {
                item.endChanges();
@@ -715,6 +726,14 @@ sap.ui.define([], function() {
                // XXXX We might want to send e.name, e.message, e.stack back to the server.
             }
          }
+
+         if (this.is_rcore)
+         {
+            for (let v of viewers ) {
+               v.clearAttributesAndTextures();
+            }
+         }
+
 
          if (this.handle.kind != "file")
             this.handle.send("__REveDoneChanges");

@@ -791,6 +791,27 @@ sap.ui.define([
          }
       }
 
+      timeStampAttributesAndTextures() {
+         try {
+            this.renderer.glManager._textureManager.incrementTime();
+            this.renderer.glManager._attributeManager.incrementTime();
+         }
+         catch (e) {
+            console.error("Exception cought in timeStampAttributesAndTextures", e);
+         }
+      }
+
+      clearAttributesAndTextures() {
+         try {
+            let delta = 10;
+            this.renderer.glManager._textureManager.deleteTextures(true, delta);
+            this.renderer.glManager._attributeManager.deleteBuffers(true, delta);
+         }
+         catch (e) {
+            console.error("Exception cought in clearAttributesAndTextures", e);
+         }
+      }
+
    } // class GlViewerRCore
 
    return GlViewerRCore;
