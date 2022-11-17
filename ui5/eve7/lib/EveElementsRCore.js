@@ -730,7 +730,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
       GetLumAlphaTexture(name, callback)
       {
-         let url = window.location.origin + '/rootui5sys/eve7/textures/' + name;
+         let sp = EVE.JSR.source_dir; let rp = sp.substring(0, sp.length - 10);
+         let url = rp + '/rootui5sys/eve7/textures/' + name;
 
          this.tex_cache.deliver(url,
             callback,
