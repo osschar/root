@@ -44,10 +44,8 @@ sap.ui.define([], function() {
       globExceptionHandler(msg, url, lineNo, columnNo, error) {
          // NOTE: currently NOT connected, see onWebsocketOpened() below.
 
-         console.log("EveManager got global error", msg, url, lineNo, columnNo, error);
+         console.error("EveManager got global error", msg, url, lineNo, columnNo, error);
 
-         EVE.alert("Global Exception handler: " + msg + "\n" + url +
-            " line:" + lineNo + " col:" + columnNo);
          let suppress_alert = false;
          return suppress_alert;
       }
@@ -719,10 +717,7 @@ sap.ui.define([], function() {
             try {
                item.endChanges();
             } catch (e) {
-               EVE.alert("EveManager: Exception caught during update processing: " + e + "\n" +
-                  "You might want to reload the page in browser and / or check error consoles.");
                console.error("EveManager: Exception caught during update processing", e);
-
                // XXXX We might want to send e.name, e.message, e.stack back to the server.
             }
          }
