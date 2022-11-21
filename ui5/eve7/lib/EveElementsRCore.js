@@ -1363,8 +1363,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          obj3d.get_ctrl  = function(iobj, tobj) {
             let octrl = new EveElemControl(iobj, tobj);
             octrl.DrawForSelection = function(sec_idcs, res) {
-               res.geom.push(this.top_obj.children[0]);
-               res.geom.push(this.top_obj.children[1]);
+               res.geom.push(...this.top_obj.children);
             };
             return octrl;
          }
