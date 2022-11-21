@@ -5,7 +5,7 @@ sap.ui.define([
 
    "use strict";
 
-   let RC, RP, RendeQuTor;
+   let RC;
    let datGUI;
 
    class GlViewerRCore extends GlViewer {
@@ -22,6 +22,10 @@ sap.ui.define([
          this.RQ_Mode = (mode_mm) ? mode_mm[0] : "Simple";
          this.RQ_SSAA = (ssaa_mm) ? ssaa_mm[0] : 2;
 
+         let jsrp = EVE.JSR.source_dir;
+         // take out 'jsrootsys' and replace it with 'rootui5sys/eve7/'
+         this.eve_path = jsrp.substring(0, jsrp.length - 10) + 'rootui5sys/eve7/';
+
          console.log("GlViewerRCore RQ_Mode:", this.RQ_Mode, "RQ_SSAA:", this.RQ_SSAA);
 
          this._selection_map = {};
@@ -36,6 +40,14 @@ sap.ui.define([
 
          let pthis = this;
 
+         if (!datGUI) {
+            datGUI = new EVE.JSR.gui.GUI({ autoPlace: false, width: 220 });
+            datGUI.domElement.id = 'posDatGUI';
+            pthis.datGUIFolder = datGUI.addFolder("background")
+            let dome = this.controller.getView().getParent().getParent();
+            dome.getDomRef().appendChild(datGUI.domElement);
+         }
+
          // For offline mode, one needs a a full URL or the request
          // gets forwarded to openi5.hana.ondemand.com.
          // This has to be understood and fixed. Loading of shaders
@@ -43,23 +55,15 @@ sap.ui.define([
          // // console.log(window.location.pathname); // where are we loading from?
          // import("https://desire.physics.ucsd.edu/matevz/alja.github.io/rootui5/eve7/rnr_core/RenderCore.js").then((module) => {
 
-         let sp = EVE.JSR.source_dir;
-         let rp = sp.substring(0, sp.length - 10); // take out 'jsrootsys' to replace it with 'rootui5sys'
-         rp += 'rootui5sys/eve7/lib/REveRenderCore.js';
-         import(rp).then((module) => {
-            if (this._logLevel >= 2)
-               console.log("GlViewerRCore.onInit - RenderCore.js loaded");
-
-            RC = module;
-            pthis.bootstrap();
-         });
-
-         if (!datGUI) {
-            datGUI = new EVE.JSR.gui.GUI({ autoPlace: false, width: 220 });
-            datGUI.domElement.id = 'posDatGUI';
-            pthis.datGUIFolder = datGUI.addFolder("background")
-            let dome = this.controller.getView().getParent().getParent();
-            dome.getDomRef().appendChild(datGUI.domElement);
+         if (!RC) {
+            import(this.eve_path + 'lib/RenderCore.js').then((module) => {
+               if (this._logLevel >= 2)
+                  console.log("GlViewerRCore.onInit - RenderCore.js loaded");
+               RC = module;
+               pthis.bootstrap();
+            });
+         } else {
+            this.bootstrap();
          }
       }
 
@@ -116,8 +120,7 @@ sap.ui.define([
                                              { antialias: false, stencil: false });
          this.renderer._logLevel = 0;
          this.renderer.clearColor = "#FFFFFF00"; // "#00000000";
-         this.renderer.addShaderLoaderUrls("rootui5sys/eve7/lib/RC/shaders");
-         this.renderer.addShaderLoaderUrls("rootui5sys/eve7/shaders");
+         this.renderer.addShaderLoaderUrls(this.eve_path + RC.REveShaderPath);
          this.renderer.pickObject3D = true;
 
          // add dat GUI option to set background
@@ -737,14 +740,11 @@ sap.ui.define([
 
          menu.add("Reset camera", this.resetRenderer);
 
-         menu.add("separator");
-
-         let fff = this.defaultContextMenuAction;
-         // menu.add("sub:Sub Test");
-         // menu.add("Foo",     'foo', fff);
-         // menu.add("Bar",     'bar', fff);
-         // menu.add("Baz",     'baz', fff);
-         // menu.add("endsub:");
+         if (RC.REveDevelMode) {
+            menu.add("separator");
+            menu.add("Show program names", 'names', this.showShaderJson);
+            menu.add("Show programs", 'progs', this.showShaderJson);
+         }
 
          menu.show(event);
       }
@@ -771,11 +771,6 @@ sap.ui.define([
          pthis.request_render();
       }
 
-      defaultContextMenuAction(arg)
-      {
-         console.log("GLC::defaultContextMenuAction", this, arg);
-      }
-
       handleMouseSelect(event)
       {
          let pstate = this.render_for_picking(event.offsetX, event.offsetY, false);
@@ -797,21 +792,63 @@ sap.ui.define([
             this.renderer.glManager._attributeManager.incrementTime();
          }
          catch (e) {
-            console.error("Exception cought in timeStampAttributesAndTextures", e);
+            console.error("Exception caught in timeStampAttributesAndTextures.", e);
          }
       }
 
       clearAttributesAndTextures() {
          try {
-            let delta = 10;
+            let delta = 2;
             this.renderer.glManager._textureManager.deleteTextures(true, delta);
             this.renderer.glManager._attributeManager.deleteBuffers(true, delta);
          }
          catch (e) {
-            console.error("Exception cought in clearAttributesAndTextures", e);
+            console.error("Exception caught in clearAttributesAndTextures.", e);
          }
       }
 
+      static showShaderCount = 0;
+      showShaderJson(arg)
+      {
+         let progs = RC.ShaderLoader.sAllPrograms;
+         let json;
+         if (arg == "names") {
+            let names = [];
+            for (const p of progs) names.push(p);
+            json = JSON.stringify(names, null, 2);
+         } else if (arg == "progs") {
+            let shdrs = this.rqt.renderer._shaderLoader.resolvePrograms( progs );
+            json = JSON.stringify(shdrs, null, 2);
+         } else {
+            json = "bad option '" + arg + "' to GlViewerRCore.showShaderJson";
+         }
+
+         let count = GlViewerRCore.showShaderCount++;
+         let extra = count ? ("-" + count) : "";
+
+         const win = window.open("", "rcore.programs.json");
+         win.document.open();
+         win.document.write(`<html>
+<head>
+   <title>programs.json</title>
+   <script>function save() {
+     let b = new Blob( [ \`${json}\` ], {type: 'application/json'});
+     const a = document.createElement('a');
+     a.href = URL.createObjectURL(b);
+     a.download = document.getElementById("filename").value; // 'programs'; // filename to download
+     a.click();
+   }</script>
+</head>
+<body>
+   <form name="myform"> 
+      <input type="text" id="filename" name="Filename" value="programs${extra}">
+      <input type="button" onClick="save();" value="Save">
+   </form> 
+   <pre> ${json} </pre>
+</body>
+         </html>`);
+         win.document.close();
+      }
    } // class GlViewerRCore
 
    return GlViewerRCore;
