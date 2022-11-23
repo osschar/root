@@ -125,16 +125,18 @@ sap.ui.define([
 
          // add dat GUI option to set background
          let vd = this.controller.getView().getViewData();
-         let name = vd.mgr.GetElement(vd.eveViewerId).fName;
-         name = name.substring(0,3);
-         let parName = name + "_WhiteBG";
-         let conf = {}; conf[parName] = true;
-         let pr = this;
-         datGUI.__folders.background.add(conf, parName).onChange(function (wbg) {
-            conf[parName] = wbg;
-            pr.renderer.clearColor = wbg ? "#FFFFFF00" : "#00000000";
-            pr.request_render();
-         });
+         if (vd) {
+            let name = vd.mgr.GetElement(vd.eveViewerId).fName;
+            name = name.substring(0, 3);
+            let parName = name + "_WhiteBG";
+            let conf = {}; conf[parName] = true;
+            let pr = this;
+            datGUI.__folders.background.add(conf, parName).onChange(function (wbg) {
+               conf[parName] = wbg;
+               pr.renderer.clearColor = wbg ? "#FFFFFF00" : "#00000000";
+               pr.request_render();
+            });
+         }
 
          this.scene = new RC.Scene();
 
