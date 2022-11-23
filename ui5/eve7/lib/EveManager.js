@@ -440,6 +440,14 @@ sap.ui.define([], function() {
 
             if (!elem.render_data) continue;
 
+            // in the scene change update check change bits are kCBElementAdded or kCBObjProps
+           //  see REveScene::StreamRepresentationChanges binary stream
+            if (this.scene_changes) {
+               if (!(elem.changeBit & this.EChangeBits.kCBObjProps
+                  || elem.changeBit & this.EChangeBits.kCBAdded))
+                  continue;
+            }
+
             let rd = elem.render_data,
                 off = offset + rd.rnr_offset,
                 obj = this.GetElement(elem.fElementId);
