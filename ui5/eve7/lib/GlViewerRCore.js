@@ -476,9 +476,11 @@ sap.ui.define([
                      obj_list.push(el_entry.instance_object);
                      el_entry.instance_object.outlineMaterial.outline_instances_setup( el_entry.instance_sec_idcs );
                } else {
-                  for (let geo of el_entry.geom)
-                  {
-                     obj_list.push(geo);
+                  for (let geo of el_entry.geom) {
+                     if (geo === undefined)
+                        console.warning("Processing viewer selection, undefined object for element", this.mgr.GetElement(el_idx));
+                     else
+                        obj_list.push(geo);
                   }
                }
             }
