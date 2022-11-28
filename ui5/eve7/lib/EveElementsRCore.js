@@ -640,10 +640,10 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          sm.transparent = true;
 
          sm.addInstanceData(new RC.Texture(vbuff,
-            RC.Texture.ClampToEdgeWrapping, RC.Texture.ClampToEdgeWrapping,
-            RC.Texture.NearestFilter, RC.Texture.NearestFilter,
-            // RC.Texture.R32F, RC.Texture.R32F, RC.Texture.FLOAT,
-            RC.Texture.RGBA32F, RC.Texture.RGBA, RC.Texture.FLOAT,
+            RC.Texture.WRAPPING.ClampToEdgeWrapping, RC.Texture.WRAPPING.ClampToEdgeWrapping,
+            RC.Texture.FILTER.NearestFilter, RC.Texture.FILTER.NearestFilter,
+            // RC.Texture.FORMAT.R32F, RC.Texture.FORMAT.R32F, RC.Texture.TYPE.FLOAT,
+            RC.Texture.FORMAT.RGBA32F, RC.Texture.FORMAT.RGBA, RC.Texture.TYPE.FLOAT,
             instX, instY));
          sm.instanceData[0].flipy = false;
 
@@ -736,9 +736,10 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
             callback,
             (image) => {
                return new RC.Texture
-                  (image, RC.Texture.ClampToEdgeWrapping, RC.Texture.ClampToEdgeWrapping,
-                          RC.Texture.LinearFilter, RC.Texture.LinearFilter,
-                          RC.Texture.LUMINANCE_ALPHA, RC.Texture.LUMINANCE_ALPHA, RC.Texture.UNSIGNED_BYTE,
+                  (image, RC.Texture.WRAPPING.ClampToEdgeWrapping, RC.Texture.WRAPPING.ClampToEdgeWrapping,
+                          RC.Texture.FILTER.LinearFilter, RC.Texture.FILTER.LinearFilter,
+                          RC.Texture.FORMAT.LUMINANCE_ALPHA, RC.Texture.FORMAT.LUMINANCE_ALPHA,
+                          RC.Texture.TYPE.UNSIGNED_BYTE,
                           image.width, image.height);
             },
             () => { this.viewer.request_render() }
@@ -753,9 +754,10 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
             callback,
             (image) => {
                return new RC.Texture
-                  (image, RC.Texture.ClampToEdgeWrapping, RC.Texture.ClampToEdgeWrapping,
-                          RC.Texture.LinearFilter, RC.Texture.LinearFilter,
-                          RC.Texture.RGBA, RC.Texture.RGBA, RC.Texture.UNSIGNED_BYTE,
+                  (image, RC.Texture.WRAPPING.ClampToEdgeWrapping, RC.Texture.WRAPPING.ClampToEdgeWrapping,
+                          RC.Texture.FILTER.LinearFilter, RC.Texture.FILTER.LinearFilter,
+                          RC.Texture.FORMAT.RGBA, RC.Texture.FORMAT.RGBA,
+                          RC.Texture.TYPE.UNSIGNED_BYTE,
                           image.width, image.height);
             },
             () => { this.viewer.request_render() }
