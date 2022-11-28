@@ -507,6 +507,7 @@ sap.ui.define([
 
          if (this.rqt.queue.used_fail_count == 0) {
             this.rqt.render_tone_map_to_screen();
+            // this.rqt.render_final_to_screen();
          }
 
          this.rqt.render_end();
