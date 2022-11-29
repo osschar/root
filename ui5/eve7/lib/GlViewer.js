@@ -29,8 +29,8 @@ sap.ui.define([], function() {
 
       get_name() { return "EVE.GlViewer" + this.viewer_class; }
       get_view() { return this.controller.getView(); }
-      get_width() { return this.controller.getView().$().width() * window.devicePixelRatio; }
-      get_height() { return this.controller.getView().$().height() * window.devicePixelRatio; }
+      get_width() { return this.controller.getView().$().width(); }
+      get_height() { return this.controller.getView().$().height(); }
 
       //==============================================================================
 

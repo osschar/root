@@ -677,12 +677,13 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          return s;
       }
 
-      RcApplyStripesMaterials(eve_el, stripes)
+      RcApplyStripesMaterials(eve_el, stripes, pick_width_scale = 2)
       {
          if (eve_el.fPickable) {
             let m = stripes.material;
             stripes.pickingMaterial = new RC.StripesBasicMaterial(
-               { lineWidth: m.lineWidth, mode: m.mode, color: m.color });
+               { lineWidth: m.lineWidth * pick_width_scale / this.LINE_WIDTH_FAC,
+                 mode: m.mode, color: m.color });
             let pm = stripes.pickingMaterial;
             pm.programName = "custom_GBufferMini_stripes";
             pm.addSBFlag("PICK_MODE_UINT");
@@ -691,7 +692,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
             pm.deltaOffset = m.deltaOffset;
 
             stripes.outlineMaterial = new RC.StripesBasicMaterial(
-               { lineWidth: m.lineWidth, mode: m.mode, color: m.color });
+               { lineWidth: m.lineWidth / this.LINE_WIDTH_FAC, mode: m.mode, color: m.color });
             let om = stripes.outlineMaterial;
             om.programName = "custom_GBufferMini_stripes";
             om.prevVertex = m.prevVertex;
@@ -844,7 +845,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          geom.vertices = new RC.Float32Attribute(buf, 3);
  
          const line = this.RcMakeStripes(geom, track_width, track_color);
-         this.RcApplyStripesMaterials(track, line);
+         this.RcApplyStripesMaterials(track, line, 2);
          this.RcPickable(track, line);
 
          return line;
@@ -1326,7 +1327,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          let line_color = RcCol(el.fMainColor);
 
          const line = this.RcMakeStripes(geom, el.fLineWidth, line_color);
-         this.RcApplyStripesMaterials(el, line);
+         this.RcApplyStripesMaterials(el, line, 2);
          this.RcPickable(el, line);
          obj3d.add(line);
 

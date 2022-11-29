@@ -102,19 +102,13 @@ sap.ui.define([
 
       createRCoreRenderer()
       {
-         let w = this.get_width();
-         let h = this.get_height();
+         this.canvas = new RC.Canvas(this.get_view().getDomRef());
+         let w = this.canvas.width;
+         let h = this.canvas.height;
+         this.fixCssSize();
+         this.canvas.parentDOM.style.overflow = "hidden";
+         this.canvas.canvasDOM.style.overflow = "hidden";
 
-         //this.canvas = document.createElementNS( 'http://www.w3.org/1999/xhtml', 'canvas' );
-         this.canvas = document.createElement('canvas');
-         this.canvas.id     = "rcore-canvas";
-         this.canvas.width  = w;
-         this.canvas.height = h;
-         this.get_view().getDomRef().appendChild(this.canvas);
-
-         this.canvas.canvasDOM = this.canvas; // RCore wants this in GLManager ctor ?
-
-         let gl = this.canvas.getContext("webgl2");
 
          this.renderer = new RC.MeshRenderer(this.canvas, RC.WEBGL2,
                                              { antialias: false, stencil: false });
@@ -245,9 +239,9 @@ sap.ui.define([
 
             glc.removeMouseupListener();
 
-            if (event.buttons === 0 && event.srcElement === glc.canvas) {
+            if (event.buttons === 0 && event.srcElement === glc.canvas.canvasDOM) {
                glc.removeMouseMoveTimeout();
-               glc.mousemove_timeout = setTimeout(glc.onMouseMoveTimeout.bind(glc, event.offsetX, event.offsetY), glc.controller.htimeout);
+               glc.mousemove_timeout = setTimeout(glc.onMouseMoveTimeout.bind(glc, event), glc.controller.htimeout);
             } else {
                // glc.clearHighlight();
             }
@@ -549,8 +543,8 @@ sap.ui.define([
 
          this.rqt.pick_end();
 
-         state.w = this.get_width();;
-         state.h = this.get_height();
+         state.w = this.canvas.width;
+         state.h = this.canvas.height;
          state.mouse = new RC.Vector2( ((x + 0.5) / state.w) * 2 - 1,
                                       -((y + 0.5) / state.h) * 2 + 1 );
 
@@ -583,6 +577,18 @@ sap.ui.define([
 
       //==============================================================================
 
+      fixCssSize() {
+         let s = this.canvas.canvasDOM.style;
+         s.width  = this.canvas.canvasDOM.clientWidth  + "px";
+         s.height = this.canvas.canvasDOM.clientHeight + "px";
+      }
+
+      floatCssSize() {
+         let s = this.canvas.canvasDOM.style;
+         s.width = "100%";
+         s.height = "100%";
+      }
+
       onResizeTimeout()
       {
          if ( ! this.canvas) {
@@ -591,20 +597,19 @@ sap.ui.define([
             return;
          }
 
-         let w = this.get_width();
-         let h = this.get_height();
-
+         this.floatCssSize();
+         this.canvas.updateSize();
+         let w = this.canvas.width;
+         let h = this.canvas.height;
          //console.log("GlViewerRCore onResizeTimeout", w, h, "canvas=", this.canvas, this.canvas.width, this.canvas.height);
 
-         this.canvas.width  = w;
-         this.canvas.height = h;
-
          this.camera.aspect = w / h;
-
          this.rqt.updateViewport(w, h);
-
          this.controls.update();
+
          this.render();
+
+         this.fixCssSize();
       }
 
 
@@ -636,10 +641,12 @@ sap.ui.define([
          }
       }
 
-      onMouseMoveTimeout(x, y)
+      onMouseMoveTimeout(event)
       {
          delete this.mousemove_timeout;
 
+         let x = event.offsetX * this.canvas.pixelRatio;
+         let y = event.offsetY * this.canvas.pixelRatio;
          let pstate = this.render_for_picking(x, y, false);
 
          if ( ! pstate)
@@ -664,17 +671,17 @@ sap.ui.define([
          let offs  = (mouse.x > 0 || mouse.y < 0) ? this.getRelativeOffsets(dome) : null;
 
          if (mouse.x <= 0) {
-            this.ttip.style.left  = (x + dome.offsetLeft + 10) + "px";
+            this.ttip.style.left  = (event.offsetX + dome.offsetLeft + 10) + "px";
             this.ttip.style.right = null;
          } else {
-            this.ttip.style.right = (pstate.w - x + offs.right + 10) + "px";
+            this.ttip.style.right = (this.canvas.canvasDOM.clientWidth - event.offsetX + offs.right + 10) + "px";
             this.ttip.style.left  = null;
          }
          if (mouse.y >= 0) {
-            this.ttip.style.top    = (y + dome.offsetTop + 10) + "px";
+            this.ttip.style.top    = (event.offsetY + dome.offsetTop + 10) + "px";
             this.ttip.style.bottom = null;
          } else {
-            this.ttip.style.bottom = (pstate.h - y + offs.bottom + 10) + "px";
+            this.ttip.style.bottom = (this.canvas.canvasDOM.clientHeight - event.offsetY + offs.bottom + 10) + "px";
             this.ttip.style.top = null;
          }
 
@@ -731,7 +738,9 @@ sap.ui.define([
 
          // See js/modules/menu/menu.mjs createMenu(), menu.add()
 
-         let pstate = this.render_for_picking(event.offsetX, event.offsetY, true);
+         let x = event.offsetX * this.canvas.pixelRatio;
+         let y = event.offsetY * this.canvas.pixelRatio;
+         let pstate = this.render_for_picking(x, y, true);
 
          menu.add("header:Context Menu");
 
@@ -739,7 +748,7 @@ sap.ui.define([
             if (pstate.eve_el)
             menu.add("Browse to " + (pstate.eve_el.fName || "element"), pstate.eve_el.fElementId, this.controller.invokeBrowseOf.bind(this.controller));
 
-            let data = { "p": pstate, "v":this, "cctrl": this.controls};
+            let data = { "p": pstate, "v": this, "cctrl": this.controls};
             menu.add("Set Camera Center", data, this.setCameraCenter.bind(data));
          }
 
@@ -768,7 +777,6 @@ sap.ui.define([
          // console.log("picked camera vector ", e);
          // pthis.camera.testMtx.dump();
 
-         let mvMtx = pthis.camera.testMtx;
          e.applyMatrix4(pthis.camera.testMtx);
          // console.log("picked word view coordinates ", e);
 
@@ -778,7 +786,9 @@ sap.ui.define([
 
       handleMouseSelect(event)
       {
-         let pstate = this.render_for_picking(event.offsetX, event.offsetY, false);
+         let x = event.offsetX * this.canvas.pixelRatio;
+         let y = event.offsetY * this.canvas.pixelRatio;
+         let pstate = this.render_for_picking(x, y, false);
 
          if (pstate) {
             let c = pstate.ctrl;
