@@ -208,12 +208,12 @@ sap.ui.define([
          else if (this.RQ_Mode == "Simple")
          {
             this.rqt.initSimple(this.RQ_SSAA);
-            this.creator.SetupPointLineFacs(this.RQ_SSAA, this.RQ_SSAA);
+            this.creator.SetupPointLineFacs(this.RQ_SSAA * this.canvas.pixelRatio, this.RQ_SSAA * this.canvas.pixelRatio);
          }
          else
          {
             this.rqt.initFull(this.RQ_SSAA);
-            this.creator.SetupPointLineFacs(this.RQ_SSAA, this.RQ_SSAA);
+            this.creator.SetupPointLineFacs(this.RQ_SSAA * this.canvas.pixelRatio, this.RQ_SSAA * this.canvas.pixelRatio);
          }
          this.rqt.updateViewport(w, h);
       }
