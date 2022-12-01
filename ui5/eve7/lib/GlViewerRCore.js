@@ -84,6 +84,11 @@ sap.ui.define([
          this.controller.glViewerInitDone();
       }
 
+      cleanup() {
+         if (this.controller) this.controller.removeScenes();
+         super.cleanup();
+      }
+
       //==============================================================================
 
       make_object(name)
@@ -220,14 +225,14 @@ sap.ui.define([
 
       setupEventHandlers()
       {
-         let dome = this.get_view().getDomRef();
+         let dome = this.canvas.canvasDOM;
 
          // Setup tooltip
          this.ttip = document.createElement('div');
          this.ttip.setAttribute('class', 'eve_tooltip');
          this.ttip_text = document.createElement('div');
          this.ttip.appendChild(this.ttip_text);
-         dome.appendChild(this.ttip);
+         this.get_view().getDomRef().appendChild(this.ttip);
 
          // Setup some event pre-handlers
          let glc = this;
@@ -340,7 +345,7 @@ sap.ui.define([
             }
          });
 
-         this.controls = new RC.REveCameraControls(this.camera, this.get_view().getDomRef());
+         this.controls = new RC.REveCameraControls(this.camera, this.canvas.canvasDOM);
          this.controls.addEventListener('change', this.render.bind(this));
 
          // camera center marker
@@ -727,7 +732,7 @@ sap.ui.define([
       {
          if (this.mouseup_listener)
          {
-            this.get_view().getDomRef().removeEventListener('pointerup', this.mouseup_listener);
+            this.canvas.canvasDOM.removeEventListener('pointerup', this.mouseup_listener);
             this.mouseup_listener = 0;
          }
       }
