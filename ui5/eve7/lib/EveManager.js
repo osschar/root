@@ -207,6 +207,18 @@ sap.ui.define([], function() {
             elem.$receivers.push(receiver);
       }
 
+      /** Disconnect scene from the updates */
+      UnRegisterSceneReceiver(id, receiver){
+         let elem = this.GetElement(id);
+
+         if (!elem) return;
+         let idx = elem.$receivers.indexOf(receiver);
+         if (idx > -1) { // only splice array when item is found
+            console.log("unregister scene receiver");
+            elem.$receivers.splice(idx, 1); // 2nd parameter means remove one item only
+          }
+      }
+
       /** Returns list of scene elements */
       getSceneElements()
       {

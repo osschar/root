@@ -155,6 +155,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
          while (cont.children.length > 0)
             cont.remove(cont.children[0]);
 
+         this.mgr.UnRegisterSceneReceiver(this.id, this);
          this.first_time = true;
       }
 
