@@ -123,18 +123,22 @@ sap.ui.define([
          this.renderer.pickObject3D = true;
 
          // add dat GUI option to set background
-         let vd = this.controller.getView().getViewData();
-         if (vd) {
-            let name = vd.mgr.GetElement(vd.eveViewerId).fName;
-            name = name.substring(0, 3);
-            let parName = name + "_WhiteBG";
-            let conf = {}; conf[parName] = true;
-            let pr = this;
+         let eveView = this.controller.mgr.GetElement(this.controller.eveViewerId);
+         let name = eveView.fName;
+         name = name.substring(0, 3);
+         let parName = name + "_WhiteBG";
+         let conf = {}; conf[parName] = true;
+         let pr = this;
+         if (this.controller.getView().getViewData()) {
             datGUI.__folders.background.add(conf, parName).onChange(function (wbg) {
                conf[parName] = wbg;
-               pr.renderer.clearColor = wbg ? "#FFFFFF00" : "#00000000";
+               eveView.clearColor = wbg ? "#FFFFFF00" : "#00000000";
+               pr.renderer.clearColor = eveView.clearColor;
                pr.request_render();
             });
+         }
+         else if (eveView.clearColor) {
+            pr.renderer.clearColor = eveView.clearColor;
          }
 
          this.scene = new RC.Scene();
