@@ -79,37 +79,31 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
    {
       DrawForSelection(xsec_idcs, res, extra)
       {
-         let sec_idcs = extra.shape_idcs; // XXXX MT we have sec_idcs argument here
-
-         console.log(xsec_idcs, res, extra);
+         let sec_idcs = extra.shape_idcs;
 
          let body = new RC.Geometry();
          body._vertices = this.top_obj.geometry._vertices;
+         let origIndices = this.top_obj.geometry._indices;
 
-         let protoIdcs = [0, 4, 5, 0, 5, 1, 1, 5, 6, 1, 6, 2, 2, 6, 7, 2, 7, 3, 3, 7, 4, 3, 4, 0, 1, 2, 3, 1, 3, 0, 4, 7, 6, 4, 6, 5];
+         let protoIdcsLen = 3 * 12;
+         let indicesPerDigit = 8;
+         if (this.top_obj.eve_el.boxType == 6) {
+            protoIdcsLen = 3 * 24;
+            indicesPerDigit = 14;
+         }
+
          let idxBuff = [];
 
-         let eve_el = this.top_obj.eve_el;
-         let N = eve_el.render_data.idxBuff.length / 2;
+         let N = this.top_obj.eve_el.render_data.idxBuff.length / 2;
          for (let b = 0; b < sec_idcs.length; ++b) {
             let idx = sec_idcs[b];
-            if (eve_el.fDetIdsAsSecondaryIndices) {
-               for (let x = 0; x < N; ++x) {
-                  if (eve_el.render_data.idxBuff[x + N] === idx)
-                  {
-                     idx = x;
-                     break;
-                  }
-               }
+            let idxOff = idx * indicesPerDigit;
+            for (let i = 0; i < protoIdcsLen; i++) {
+               idxBuff.push(idxOff + origIndices.array[i]);
             }
-            let idxOff = idx * 8;
-            for (let i = 0; i < protoIdcs.length; i++)
-               idxBuff.push(idxOff + protoIdcs[i]);
          }
 
          body.indices = RC.Uint32Attribute(idxBuff, 1);
-         body.computeVertexNormals();
-
          let mesh = new RC.Mesh(body, null);
          mesh._modelViewMatrix = this.invoke_obj._modelViewMatrix;
          mesh._normalMatrix    = this.invoke_obj._normalMatrix;
@@ -118,9 +112,12 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          res.geom.push(mesh);
       }
 
-      extractIndex(instance)
-      {
-         return Math.floor(instance / 8);
+      extractIndex(instance) {
+         let verticesPerDigi = 8;
+         if (this.top_obj.eve_el.boxType == 6)
+            verticesPerDigi = 14;
+         let idx = Math.floor(instance / verticesPerDigi);
+         return idx;
       }
 
       elementSelectedSendMIR(idx, selectionId, event)
@@ -969,60 +966,129 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
            return new RC.Geometry(); // AMT TODO test when digits are filtered
 
          let vBuff;
-         if (boxset.boxType == 1) // free box
-         {
-            vBuff = rnr_data.vtxBuff;
-         }
-         else if (boxset.boxType == 2) // axis aligned
-         {
-            let N = rnr_data.vtxBuff.length/6;
-            vBuff = new Float32Array(N*8*3);
+         let idxBuff;
+         let nVerticesPerDigit = 0;
 
-            let off = 0;
-            for (let i = 0; i < N; ++i)
+         if (boxset.boxType == 6) // hexagon
+         {
+            nVerticesPerDigit = 14;
+            let stepAngle = Math.PI / 3;
+            let N_hex = rnr_data.vtxBuff.length / 6;
+            vBuff = new Float32Array(N_hex * 7 * 2 * 3);
+            for (let i = 0; i < N_hex; ++i) {
+               let rdoff = i * 6;
+               let R = rnr_data.vtxBuff[rdoff + 3];
+               let hexRotation = rnr_data.vtxBuff[rdoff + 4];
+               let hexHeight = rnr_data.vtxBuff[rdoff + 5];
+               let off = i* 3 * 7 * 2;
+
+               // position
+               let pos = [rnr_data.vtxBuff[rdoff], rnr_data.vtxBuff[rdoff + 1], rnr_data.vtxBuff[rdoff + 2]];
+
+               // center
+               vBuff[off]     = pos[0];
+               vBuff[off + 1] = pos[1];
+               vBuff[off + 2] = pos[2];
+
+               off += 3;
+               for (let j = 0; j < 6; ++j) {
+                  let angle = j*stepAngle + hexRotation;
+                  let x = R * Math.cos(angle) + pos[0];
+                  let y = R * Math.sin(angle) + pos[1];
+                  let z = pos[2];
+
+                  // write buffer
+                  vBuff[off]     = x;
+                  vBuff[off + 1] = y;
+                  vBuff[off + 2] = z;
+                  off += 3;
+               }
+
+               // copy for depth
+               let ro = i* 3 * 7 * 2;
+               for (let j = 0; j < 7; ++j)
+               {
+                  vBuff[ro + 21] = vBuff[ro];
+                  vBuff[ro + 22] = vBuff[ro+1];
+                  vBuff[ro + 23] = vBuff[ro+2] + hexHeight;
+                  ro += 3;
+               }
+            } // end loop vertex buffer
+
+            let protoIdcs = [0,1,2, 0,2,3, 0,3,4, 0,4,5, 0,5,6, 0,6,1];
+            let protoIdcs2 = [2,1,0,  3,2,0,  4,3, 0,   5,4,0,  6, 5, 0,  1, 6, 0];
+            let sideIdcs = [8,1,2,2,9,8,  9,2,3,3,10,9,  10,3,4,4,11,10,  
+                            11,4,5,5,12,11,  5,6,13,5,13,12, 13,6,1,1,8,13 ];
+            let idxBuffSize =  N_hex * (protoIdcs.length * 2 + sideIdcs.length);
+            idxBuff = new Uint32Array(idxBuffSize);
+            let b = 0;
+            for (let i = 0; i < N_hex; ++i) {
+               let off0 = i * 7 * 2;
+               for (let c = 0; c < protoIdcs.length; c++) {
+                  idxBuff[b++] = off0 + protoIdcs2[c];
+               }
+               for (let c = 0; c < protoIdcs.length; c++) {
+                  idxBuff[b++] = off0 + protoIdcs[c] +7;
+               }
+               for (let c = 0; c < sideIdcs.length; c++) {
+                  idxBuff[b++] = off0 + sideIdcs[c];
+               }
+            }
+         }
+         else {
+            nVerticesPerDigit = 8;
+            if (boxset.boxType == 1) // free box
             {
-               let rdoff = i*6;
-               let x  =  rnr_data.vtxBuff[rdoff];
-               let y  =  rnr_data.vtxBuff[rdoff + 1];
-               let z  =  rnr_data.vtxBuff[rdoff + 2];
-               let dx =  rnr_data.vtxBuff[rdoff + 3];
-               let dy =  rnr_data.vtxBuff[rdoff + 4];
-               let dz =  rnr_data.vtxBuff[rdoff + 5];
+               vBuff = rnr_data.vtxBuff;
+            }
+            else if (boxset.boxType == 2) // axis aligned
+            {
+               let N = rnr_data.vtxBuff.length / 6;
+               vBuff = new Float32Array(N * 8 * 3);
 
-               // top
-               vBuff[off  ] = x;      vBuff[off + 1] = y + dy; vBuff[off + 2] = z;
-               off += 3;
-               vBuff[off  ] = x + dx; vBuff[off + 1] = y + dy; vBuff[off + 2] = z;
-               off += 3;
-               vBuff[off  ] = x + dx; vBuff[off + 1] = y;      vBuff[off + 2] = z;
-               off += 3;
-               vBuff[off  ] = x;      vBuff[off + 1] = y;      vBuff[off + 2] = z;
-               off += 3;
-               // bottom
-               vBuff[off  ] = x;      vBuff[off + 1] = y + dy; vBuff[off + 2] = z + dz;
-               off += 3;
-               vBuff[off  ] = x + dx; vBuff[off + 1] = y + dy; vBuff[off + 2] = z + dz;
-               off += 3;
-               vBuff[off  ] = x + dx; vBuff[off + 1] = y;      vBuff[off + 2] = z + dz;
-               off += 3;
-               vBuff[off  ] = x;      vBuff[off + 1] = y;      vBuff[off + 2] = z + dz;
-               off += 3;
+               let off = 0;
+               for (let i = 0; i < N; ++i) {
+                  let rdoff = i * 6;
+                  let x = rnr_data.vtxBuff[rdoff];
+                  let y = rnr_data.vtxBuff[rdoff + 1];
+                  let z = rnr_data.vtxBuff[rdoff + 2];
+                  let dx = rnr_data.vtxBuff[rdoff + 3];
+                  let dy = rnr_data.vtxBuff[rdoff + 4];
+                  let dz = rnr_data.vtxBuff[rdoff + 5];
+
+                  // top
+                  vBuff[off] = x; vBuff[off + 1] = y + dy; vBuff[off + 2] = z;
+                  off += 3;
+                  vBuff[off] = x + dx; vBuff[off + 1] = y + dy; vBuff[off + 2] = z;
+                  off += 3;
+                  vBuff[off] = x + dx; vBuff[off + 1] = y; vBuff[off + 2] = z;
+                  off += 3;
+                  vBuff[off] = x; vBuff[off + 1] = y; vBuff[off + 2] = z;
+                  off += 3;
+                  // bottom
+                  vBuff[off] = x; vBuff[off + 1] = y + dy; vBuff[off + 2] = z + dz;
+                  off += 3;
+                  vBuff[off] = x + dx; vBuff[off + 1] = y + dy; vBuff[off + 2] = z + dz;
+                  off += 3;
+                  vBuff[off] = x + dx; vBuff[off + 1] = y; vBuff[off + 2] = z + dz;
+                  off += 3;
+                  vBuff[off] = x; vBuff[off + 1] = y; vBuff[off + 2] = z + dz;
+                  off += 3;
+               }
+            }
+
+            let protoSize = 6 * 2 * 3;
+            let protoIdcs = [0, 4, 5, 0, 5, 1, 1, 5, 6, 1, 6, 2, 2, 6, 7, 2, 7, 3, 3, 7, 4, 3, 4, 0, 1, 2, 3, 1, 3, 0, 4, 7, 6, 4, 6, 5];
+            let nBox = vBuff.length / 24;
+            idxBuff = new Uint32Array(nBox * protoSize);
+            let iCnt = 0;
+            for (let i = 0; i < nBox; ++i) {
+               for (let c = 0; c < protoSize; c++) {
+                  let off = i * 8;
+                  idxBuff[iCnt++] = protoIdcs[c] + off;
+               }
             }
          }
-
-         let protoSize = 6 * 2 * 3;
-         let protoIdcs = [0, 4, 5, 0, 5, 1, 1, 5, 6, 1, 6, 2, 2, 6, 7, 2, 7, 3, 3, 7, 4, 3, 4, 0, 1, 2, 3, 1, 3, 0, 4, 7, 6, 4, 6, 5];
-         let nBox = vBuff.length / 24;
-         let idxBuff = new Uint32Array(nBox * protoSize);
-         let iCnt = 0;
-         for (let i = 0; i < nBox; ++i)
-         {
-            for (let c = 0; c < protoSize; c++) {
-               let off = i * 8;
-               idxBuff[iCnt++] = protoIdcs[c] + off;
-            }
-         }
-
          let body = new RC.Geometry();
          body.indices = new RC.BufferAttribute(idxBuff, 1);
          body.vertices = new RC.BufferAttribute(vBuff, 3);
@@ -1035,14 +1101,15 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          if ( ! boxset.fSingleColor)
          {
             let ci = rnr_data.idxBuff;
-            let off = 0
-            let colBuff = new Float32Array( nBox * 8 * 4 );
+            let off = 0;
+            let nVert = vBuff.length /3;
+            let colBuff = new Float32Array( nVert * 4 );
             for (let x = 0; x < ci.length; ++x)
             {
                let r = (ci[x] & 0x000000FF) >>  0;
                let g = (ci[x] & 0x0000FF00) >>  8;
                let b = (ci[x] & 0x00FF0000) >> 16;
-               for (let i = 0; i < 8; ++i)
+               for (let i = 0; i < nVerticesPerDigit; ++i)
                {
                   colBuff[off    ] = r / 255;
                   colBuff[off + 1] = g / 255;
