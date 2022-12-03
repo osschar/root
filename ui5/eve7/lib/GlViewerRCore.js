@@ -18,20 +18,27 @@ sap.ui.define([
 
          let mode_mm = /^(?:Direct|Simple|Full)$/.exec(urlParams.get('RQ_Mode'));
          let ssaa_mm = /^(1|2|4)$/.               exec(urlParams.get('RQ_SSAA'));
+         let marker_scale = /^([\d\.]+)$/.        exec(urlParams.get('RQ_MarkerScale'));
+         let line_scale = /^([\d\.]+)$/.          exec(urlParams.get('RQ_LineScale'));
 
          this.RQ_Mode = (mode_mm) ? mode_mm[0] : "Simple";
          this.RQ_SSAA = (ssaa_mm) ? ssaa_mm[0] : 2;
+         this.RQ_MarkerScale = (marker_scale) ? marker_scale[0] : 1;
+         this.RQ_LineScale   = (line_scale) ? line_scale[0] : 1;
 
          let jsrp = EVE.JSR.source_dir;
          // take out 'jsrootsys' and replace it with 'rootui5sys/eve7/'
          this.eve_path = jsrp.substring(0, jsrp.length - 10) + 'rootui5sys/eve7/';
 
-         console.log("GlViewerRCore RQ_Mode:", this.RQ_Mode, "RQ_SSAA:", this.RQ_SSAA);
+         this._logLevel = 1; // 0 - error, 1 - warning, 2 - info, 3 - debug
+
+         if (this._logLevel > 2) {
+            console.log("GlViewerRCore RQ_Mode:", this.RQ_Mode, "RQ_SSAA:", this.RQ_SSAA,
+                        'RQ_MarkerScale', this.RQ_MarkerScale,  'RQ_LineScale', this.RQ_LineScale);
+         }
 
          this._selection_map = {};
          this._selection_list = [];
-
-         this._logLevel = 1; // 0 - error, 1 - warning, 2 - info, 3 - debug
       }
 
       init(controller)
@@ -113,7 +120,12 @@ sap.ui.define([
          this.fixCssSize();
          this.canvas.parentDOM.style.overflow = "hidden";
          this.canvas.canvasDOM.style.overflow = "hidden";
-
+         // It seems SSAA of 2 is still beneficial on retina.
+         // if (this.canvas.pixelRatio > 1 && this.RQ_SSAA > 1) {
+         //    console.log("Correcting RQ_SSAA for pixelRatio", this.canvas.pixelRatio,
+         //                "from", this.RQ_SSAA, "to", this.RQ_SSAA / this.canvas.pixelRatio);
+         //    this.RQ_SSAA /= this.canvas.pixelRatio;
+         // }
 
          this.renderer = new RC.MeshRenderer(this.canvas, RC.WEBGL2,
                                              { antialias: false, stencil: false });
@@ -151,6 +163,7 @@ sap.ui.define([
          this.lights.add(a_light);
 
          let light_class_3d = RC.PointLight; // RC.DirectionalLight; // RC.PointLight;
+         let args_3d = { smap_size: 0 };
          let light_class_2d = RC.DirectionalLight;
 
          if (this.controller.isEveCameraPerspective())
@@ -217,12 +230,14 @@ sap.ui.define([
          else if (this.RQ_Mode == "Simple")
          {
             this.rqt.initSimple(this.RQ_SSAA);
-            this.creator.SetupPointLineFacs(this.RQ_SSAA * this.canvas.pixelRatio, this.RQ_SSAA * this.canvas.pixelRatio);
+            this.creator.SetupPointLineFacs(this.RQ_MarkerScale * this.RQ_SSAA * this.canvas.pixelRatio,
+                                            this.RQ_LineScale   * this.RQ_SSAA * this.canvas.pixelRatio);
          }
          else
          {
             this.rqt.initFull(this.RQ_SSAA);
-            this.creator.SetupPointLineFacs(this.RQ_SSAA * this.canvas.pixelRatio, this.RQ_SSAA * this.canvas.pixelRatio);
+            this.creator.SetupPointLineFacs(this.RQ_MarkerScale * this.RQ_SSAA * this.canvas.pixelRatio,
+                                            this.RQ_LineScale   * this.RQ_SSAA * this.canvas.pixelRatio);
          }
          this.rqt.updateViewport(w, h);
       }

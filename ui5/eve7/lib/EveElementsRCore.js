@@ -577,8 +577,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
             mat._transparent = true;
             mat._depthWrite = false;
          }
-         mat._lineWidth = this.LINE_WIDTH_FAC;
-         if (line_width !== undefined) mat._lineWidth *= line_width;
+         mat.lineWidth = this.LINE_WIDTH_FAC;
+         if (line_width !== undefined) mat.lineWidth *= line_width;
          if (props !== undefined) {
             mat.update(props);
          }
@@ -667,7 +667,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
                            lineWidth: line_width * this.LINE_WIDTH_FAC,
                            color: this.ColorBlack,
                            emissive: line_color
-                        })
+                        }),
+              GBufferMaterial: null
             }
          );
          s.lights = false;
@@ -799,10 +800,10 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          if (this.TestRnr("track", track, rnr_data)) return null;
 
          let N = rnr_data.vtxBuff.length / 3;
-         let track_width = 2 * (track.fLineWidth || 1) * this.LINE_WIDTH_FAC;
+         let track_width = 2 * track.fLineWidth;
          let track_color = RcCol(track.fLineColor);
 
-         if (EVE.JSR.browser.isWin) track_width = 1;  // not supported on windows
+         // if (EVE.JSR.browser.isWin) track_width = 1;  // not supported on windows
 
          let buf = new Float32Array((N - 1) * 6), pos = 0;
          for (let k = 0; k < (N - 1); ++k)
