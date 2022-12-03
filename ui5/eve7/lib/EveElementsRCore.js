@@ -1394,7 +1394,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
          let line_color = RcCol(el.fMainColor);
 
-         let line_width = 2 * (el.fLineWidth || 1) * this.LINE_WIDTH_FAC;
+         let line_width = 2 * (el.fLineWidth || 1);
          const line = this.RcMakeStripes(geom, line_width, line_color);
          this.RcApplyStripesMaterials(el, line, 2);
          this.RcPickable(el, line);
