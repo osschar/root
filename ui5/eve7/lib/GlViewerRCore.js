@@ -176,7 +176,8 @@ sap.ui.define([
             this.lights.add(new light_class_3d(0xaa8888, l_int, 0, 1, l_att)); // R
             this.lights.add(new light_class_3d(0x88aa88, l_int, 0, 1, l_att)); // G
             this.lights.add(new light_class_3d(0x8888aa, l_int, 0, 1, l_att)); // B
-            this.lights.add(new light_class_3d(0x999999, l_int, 0, 1, l_att)); // gray
+            this.lights.add(new light_class_3d(0xaaaa66, l_int, 0, 1, l_att)); // Y
+            this.lights.add(new light_class_3d(0x666666, l_int, 0, 1, l_att)); // gray, bottom
 
             // Lights are positioned in resetRenderer.
 
@@ -424,6 +425,7 @@ sap.ui.define([
             lc[2].position.set(-extR, extR,  extR);
             lc[3].position.set( extR, extR,  extR);
             lc[4].position.set(-extR, extR, -extR);
+            lc[5].position.set(0, -extR, 0);
 
             // console.log("resetRenderer 3D scene bbox ", sbbox, ", look_at ", this.rot_center);
          }

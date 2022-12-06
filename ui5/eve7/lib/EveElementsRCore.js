@@ -528,8 +528,9 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
       GenerateTypeName(obj) { return "RC." + obj.type; }
 
-      SetupPointLineFacs(pf, lf)
+      SetupPointLineFacs(ssaa, pf, lf)
       {
+         this.SSAA = ssaa; // to scale down points / lines for picking and outlines
          this.POINT_SIZE_FAC = pf;
          this.LINE_WIDTH_FAC = lf;
       }
@@ -628,7 +629,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
       RcMakeZSprite(colIdx, sSize, nInstance, vbuff, instX, instY, textureName)
       { 
-         let   col   = RcCol(colIdx);
+         let col = RcCol(colIdx);
+         sSize *= this.POINT_SIZE_FAC;
          let sm = new RC.ZSpriteBasicMaterial( {
             SpriteMode: RC.SPRITE_SPACE_SCREEN, SpriteSize: [sSize, sSize],
             color: this.ColorBlack,
@@ -651,7 +653,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
          // Now that outline and picking shaders are setup with final pixel-size,
          // scale up the main size to account for SSAA.
-         sm.setUniform("SpriteSize", [sSize * this.POINT_SIZE_FAC, sSize * this.POINT_SIZE_FAC]);
+         sSize *= this.SSAA;
+         sm.setUniform("SpriteSize", [sSize, sSize]);
 
          this.GetLumAlphaTexture(textureName, this.AddMapToAllMaterials.bind(this, s));
 
@@ -660,11 +663,12 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
       
       RcMakeStripes(geom, line_width, line_color)
       {
+         // Setup width for SSAA, scaled down for picking and outline materials.
          let s = new RC.Stripes(
             { geometry: new RC.StripesGeometry({ baseGeometry: geom }),
               material: new RC.StripesBasicMaterial({
                            baseGeometry: geom, mode: RC.STRIPE_SPACE_SCREEN,
-                           lineWidth: line_width * this.LINE_WIDTH_FAC,
+                           lineWidth: line_width * this.LINE_WIDTH_FAC * this.SSAA,
                            color: this.ColorBlack,
                            emissive: line_color
                         }),
@@ -680,7 +684,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          if (eve_el.fPickable) {
             let m = stripes.material;
             stripes.pickingMaterial = new RC.StripesBasicMaterial(
-               { lineWidth: m.lineWidth * pick_width_scale / this.LINE_WIDTH_FAC,
+               { lineWidth: m.lineWidth * pick_width_scale / this.SSAA,
                  mode: m.mode, color: m.color });
             let pm = stripes.pickingMaterial;
             pm.programName = "custom_GBufferMini_stripes";
@@ -690,7 +694,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
             pm.deltaOffset = m.deltaOffset;
 
             stripes.outlineMaterial = new RC.StripesBasicMaterial(
-               { lineWidth: m.lineWidth / this.LINE_WIDTH_FAC, mode: m.mode, color: m.color });
+               { lineWidth: m.lineWidth / this.SSAA, mode: m.mode, color: m.color });
             let om = stripes.outlineMaterial;
             om.programName = "custom_GBufferMini_stripes";
             om.prevVertex = m.prevVertex;
