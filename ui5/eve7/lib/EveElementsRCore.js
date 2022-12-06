@@ -613,7 +613,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          // let mat = new RC.MeshBasicMaterial;
 
          mat._color = color;
-         mat._specular = new RC.Color(0.3, 0.8, 0.0); // this.ColorWhite;
+         mat._specular = new RC.Color(0.3, 0.4, 0.3); // this.ColorWhite;
          mat._shininess = 64;
    
          if (opacity !== undefined && opacity < 1.0) {
