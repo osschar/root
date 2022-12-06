@@ -963,8 +963,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
       makeBoxSet(boxset, rnr_data)
       {
-         if (!rnr_data.vtxBuff)
-           return new RC.Geometry(); // AMT TODO test when digits are filtered
+         if (this.TestRnr("boxset", boxset, rnr_data)) return null;
 
          let vBuff;
          let idxBuff;
