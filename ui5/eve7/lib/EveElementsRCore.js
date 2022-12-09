@@ -1139,48 +1139,41 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
       makeCalo3D(calo3D, rnr_data)
       {
+         if (this.TestRnr("calo3D", calo3D, rnr_data)) return null;
          let body = new RC.Geometry();
-         if (rnr_data.vtxBuff) {
-            let vBuff = rnr_data.vtxBuff;
-            let protoSize = 6 * 2 * 3;
-            let protoIdcs = [0, 4, 5, 0, 5, 1, 1, 5, 6, 1, 6, 2, 2, 6, 7, 2, 7, 3, 3, 7, 4, 3, 4, 0, 1, 2, 3, 1, 3, 0, 4, 7, 6, 4, 6, 5];
-            let nBox = vBuff.length / 24;
-            let idxBuff = new Uint32Array(nBox * protoSize);
-            let p = 0;
-            for (let i = 0; i < nBox; ++i) {
-               let off = i * 8;
-               for (let c = 0; c < protoSize; c++) {
-                  idxBuff[p++] = protoIdcs[c] + off;
-               }
+         let vBuff = rnr_data.vtxBuff;
+         let protoSize = 6 * 2 * 3;
+         let protoIdcs = [0, 4, 5, 0, 5, 1, 1, 5, 6, 1, 6, 2, 2, 6, 7, 2, 7, 3, 3, 7, 4, 3, 4, 0, 1, 2, 3, 1, 3, 0, 4, 7, 6, 4, 6, 5];
+         let nBox = vBuff.length / 24;
+         let idxBuff = new Uint32Array(nBox * protoSize);
+         let p = 0;
+         for (let i = 0; i < nBox; ++i) {
+            let off = i * 8;
+            for (let c = 0; c < protoSize; c++) {
+               idxBuff[p++] = protoIdcs[c] + off;
             }
+         }
 
-            body.indices = new RC.BufferAttribute(idxBuff, 1);
-            body.vertices = new RC.BufferAttribute(rnr_data.vtxBuff, 3);
-            // body.computeVertexNormals();
+         body.indices = new RC.BufferAttribute(idxBuff, 1);
+         body.vertices = new RC.BufferAttribute(rnr_data.vtxBuff, 3);
+         // body.computeVertexNormals();
 
-            let ci = rnr_data.idxBuff;
-            let off = 0
-            let colBuff = new Float32Array(nBox*8*4);
-            for (let x = 0; x < nBox; ++x) {
-               let slice = ci[x * 2];
-               let sliceColor = calo3D.sliceColors[slice];
-               let tc = RcCol(sliceColor);
-               for (let i = 0; i < 8; ++i) {
-                  colBuff[off] = tc.r;
-                  colBuff[off + 1] = tc.g;
-                  colBuff[off + 2] = tc.b;
-                  colBuff[off + 3] = 1.0;
-                  off += 4;
-               }
+         let ci = rnr_data.idxBuff;
+         let off = 0
+         let colBuff = new Float32Array(nBox * 8 * 4);
+         for (let x = 0; x < nBox; ++x) {
+            let slice = ci[x * 2];
+            let sliceColor = calo3D.sliceColors[slice];
+            let tc = RcCol(sliceColor);
+            for (let i = 0; i < 8; ++i) {
+               colBuff[off] = tc.r;
+               colBuff[off + 1] = tc.g;
+               colBuff[off + 2] = tc.b;
+               colBuff[off + 3] = 1.0;
+               off += 4;
             }
-            body.vertColor = new RC.BufferAttribute(colBuff, 4);
          }
-         else
-         {
-            body.indices = new RC.BufferAttribute(new Uint32Array(0), 1);
-            body.vertices = new RC.BufferAttribute(new Float32Array(0), 3);
-            body.vertColor = new RC.BufferAttribute(new Float32Array, 4);
-         }
+         body.vertColor = new RC.BufferAttribute(colBuff, 4);
 
          let mat = this.RcFancyMaterial(this.ColorBlack, 1.0, { side: RC.FRONT_SIDE });
          mat.useVertexColors = true;
@@ -1195,54 +1188,47 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
 
       makeCalo2D(calo2D, rnrData)
       {
+         if (this.TestRnr("calo2D", calo2D, rnrData)) return null;
          let body = new RC.Geometry();
-         if (rnrData.vtxBuff) {
-            let nSquares = rnrData.vtxBuff.length / 12;
-            let nTriang = 2 * nSquares;
+         let nSquares = rnrData.vtxBuff.length / 12;
+         let nTriang = 2 * nSquares;
 
-            let idxBuff = new Uint32Array(nTriang * 3);
-            for (let s = 0; s < nSquares; ++s) {
-               let boff = s * 6;
-               let ioff = s * 4;
+         let idxBuff = new Uint32Array(nTriang * 3);
+         for (let s = 0; s < nSquares; ++s) {
+            let boff = s * 6;
+            let ioff = s * 4;
 
-               // first triangle
-               idxBuff[boff] = ioff;
-               idxBuff[boff + 1] = ioff + 1;
-               idxBuff[boff + 2] = ioff + 2;
+            // first triangle
+            idxBuff[boff] = ioff;
+            idxBuff[boff + 1] = ioff + 1;
+            idxBuff[boff + 2] = ioff + 2;
 
-               // second triangle
-               idxBuff[boff + 3] = ioff + 2;
-               idxBuff[boff + 4] = ioff + 3;
-               idxBuff[boff + 5] = ioff;
-            }
-
-            body.indices = new RC.BufferAttribute(idxBuff, 1);
-            body.vertices = new RC.BufferAttribute(rnrData.vtxBuff, 3);
-            // body.computeVertexNormals();
-
-            let ci = rnrData.idxBuff;
-            let colBuff = new Float32Array(nSquares * 4 * 4);
-            let off = 0;
-            for (let x = 0; x < nSquares; ++x) {
-               let slice = ci[x * 2];
-               let sliceColor = calo2D.sliceColors[slice];
-               let tc = RcCol(sliceColor);
-               for (let i = 0; i < 4; ++i) {
-                  colBuff[off] = tc.r;
-                  colBuff[off + 1] = tc.g;
-                  colBuff[off + 2] = tc.b;
-                  colBuff[off + 3] = 1.0;
-                  off += 4;
-               }
-            }
-            body.vertColor = new RC.BufferAttribute(colBuff, 4);
+            // second triangle
+            idxBuff[boff + 3] = ioff + 2;
+            idxBuff[boff + 4] = ioff + 3;
+            idxBuff[boff + 5] = ioff;
          }
-         else
-         {
-            body.indices = new RC.BufferAttribute(new Uint32Array(0), 1);
-            body.vertices = new RC.BufferAttribute(new Float32Array(0), 3);
-            body.vertColor = new RC.BufferAttribute(new Float32Array, 4);
+
+         body.indices = new RC.BufferAttribute(idxBuff, 1);
+         body.vertices = new RC.BufferAttribute(rnrData.vtxBuff, 3);
+         // body.computeVertexNormals();
+
+         let ci = rnrData.idxBuff;
+         let colBuff = new Float32Array(nSquares * 4 * 4);
+         let off = 0;
+         for (let x = 0; x < nSquares; ++x) {
+            let slice = ci[x * 2];
+            let sliceColor = calo2D.sliceColors[slice];
+            let tc = RcCol(sliceColor);
+            for (let i = 0; i < 4; ++i) {
+               colBuff[off] = tc.r;
+               colBuff[off + 1] = tc.g;
+               colBuff[off + 2] = tc.b;
+               colBuff[off + 3] = 1.0;
+               off += 4;
+            }
          }
+         body.vertColor = new RC.BufferAttribute(colBuff, 4);
 
          let mat = this.RcFlatMaterial(this.ColorBlack, 1);
          mat.useVertexColors = true;
@@ -1417,10 +1403,6 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
                p_buf[k+2] = rnr_data.vtxBuff[j+off+2];
                p_buf[k+3] = 0;
             }
-            
-            console.log("straight line set = ",p_buf );
-            console.log("eve el = ",  el.fTexX, el.fTexY);
-
             let marker = this.RcMakeZSprite(el.fMainColor, el.fMarkerSize, nPnts,
                p_buf, el.fTexX, el.fTexY,
                "star5-32a.png");
