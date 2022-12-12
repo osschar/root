@@ -162,9 +162,9 @@ sap.ui.define([
          let a_light = new RC.AmbientLight(new RC.Color(0xffffff), 0.05);
          this.lights.add(a_light);
 
-         let light_class_3d = RC.PointLight; // RC.DirectionalLight; // RC.PointLight;
-         let args_3d = { smap_size: 0 };
-         let light_class_2d = RC.DirectionalLight;
+         let light_3d_ctor = function(col, int, dist, decay, args) { return new RC.PointLight(col, int, dist, decay, args); };
+         // let light_3d_ctor = function(col, int, dist, decay, args) { return new RC.DirectionalLight(col, int); };
+         let light_2d_ctor = function(col, int) { return new RC.DirectionalLight(col, int); };
 
          if (this.controller.isEveCameraPerspective())
          {
@@ -172,12 +172,12 @@ sap.ui.define([
             this.camera.isPerspectiveCamera = true;
 
             let l_int = 1.4;
-            let l_att = { constant: 1, linear: 0, quadratic: 0 };
-            this.lights.add(new light_class_3d(0xaa8888, l_int, 0, 1, l_att)); // R
-            this.lights.add(new light_class_3d(0x88aa88, l_int, 0, 1, l_att)); // G
-            this.lights.add(new light_class_3d(0x8888aa, l_int, 0, 1, l_att)); // B
-            this.lights.add(new light_class_3d(0xaaaa66, l_int, 0, 1, l_att)); // Y
-            this.lights.add(new light_class_3d(0x666666, l_int, 0, 1, l_att)); // gray, bottom
+            let l_args = { constant: 1, linear: 0, quadratic: 0, smap_size: 0 };
+            this.lights.add(light_3d_ctor(0xaa8888, l_int, 0, 1, l_args)); // R
+            this.lights.add(light_3d_ctor(0x88aa88, l_int, 0, 1, l_args)); // G
+            this.lights.add(light_3d_ctor(0x8888aa, l_int, 0, 1, l_args)); // B
+            this.lights.add(light_3d_ctor(0xaaaa66, l_int, 0, 1, l_args)); // Y
+            this.lights.add(light_3d_ctor(0x666666, l_int, 0, 1, l_args)); // gray, bottom
 
             // Lights are positioned in resetRenderer.
 
@@ -194,8 +194,8 @@ sap.ui.define([
             this.camera.isOrthographicCamera = true;
 
             let l_int = 0.85;
-            this.lights.add(new light_class_2d( 0xffffff, l_int )); // white front
-            // this.lights.add(new light_class_2d( 0xffffff, l_int )); // white back
+            this.lights.add(light_2d_ctor(0xffffff, l_int)); // white front
+            // this.lights.add(light_2d_ctor(0xffffff, l_int)); // white back
 
             // Lights are positioned in resetRenderer.
          }
