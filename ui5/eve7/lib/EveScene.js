@@ -10,19 +10,19 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
 
    class EveScene {
 
-      constructor(mgr, scene, glctrl)
+      constructor(mgr, sceneInfo, glctrl)
       {
          this.mgr     = mgr;
-         this.scene   = scene;
-         this.id      = scene.fSceneId;
+         this.id      = sceneInfo.fSceneId;
          this.glctrl  = glctrl;
          this.creator = glctrl.viewer.creator;
          this.id2obj_map  = new Map; // base on element id
 
          this.first_time = true;
+         this.need_visibility_update = false;
 
          // register ourself for scene events
-         this.mgr.RegisterSceneReceiver(scene.fSceneId, this);
+         this.mgr.RegisterSceneReceiver(this.id, this);
 
          if(this.mgr.is_rcore) {
             this.SelectElement = this.SelectElementRCore;
@@ -31,8 +31,6 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
             this.SelectElement = this.SelectElementStd;
             this.UnselectElement = this.UnselectElementStd;
          }
-         // AMT temporary solution ... resolve with callSceneReceivers in EveManager.js
-         scene.eve_scene = this;
       }
 
       //==============================================================================
@@ -195,8 +193,15 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
 
       endChanges()
       {
-         if (this.glctrl)
+         if (this.glctrl) {
+            if (this.need_visibility_update) {
+               let p = this.mgr.GetElement(this.id);
+               this.update3DObjectsVisibility(p.childs, true);
+               this.need_visibility_update = false;
+            }
             this.glctrl.viewer.render();
+
+         }
       }
 
       elementAdded(el)
@@ -206,41 +211,36 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
          let obj3d =  this.makeGLRepresentation(el);
          if ( ! obj3d) return;
 
-         // AMT this is an overkill, temporary solution
-         let scene = this.mgr.GetElement(el.fSceneId);
-         this.update3DObjectsVisibility(scene.childs, true);
-
+         // let scene = this.mgr.GetElement(this.id);
          let container = this.glctrl.getSceneContainer("scene" + this.id);
 
          container.add(obj3d);
 
          this.id2obj_map.set(el.fElementId, obj3d);
+
+         this.need_visibility_update = true;
       }
 
       replaceElement(el) {
          if (!this.glctrl) return;
 
+         let container = this.glctrl.getSceneContainer("scene" + this.id);
+
          try {
             let obj3d = this.getObj3D(el.fElementId);
-            let all_ancestor_children_visible = obj3d.all_ancestor_children_visible;
-            let visible = obj3d.visible;
 
-            let container = this.glctrl.getSceneContainer("scene" + this.id);
-
-            container.remove(obj3d);
+            if(obj3d) container.remove(obj3d);
 
             obj3d = this.makeGLRepresentation(el);
-            obj3d.all_ancestor_children_visible = all_ancestor_children_visible;
-            obj3d.visible = visible;
-            container.add(obj3d);
-
-            this.id2obj_map.set(el.fElementId, obj3d);
-
-            this.glctrl.viewer.render();
+            if (obj3d) {
+               container.add(obj3d);
+               this.id2obj_map.set(el.fElementId, obj3d);
+            }
          }
          catch (e) {
             console.error("replace element", e);
          }
+         this.need_visibility_update = true;
       }
 
       elementsRemoved(ids)
@@ -277,21 +277,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
 
          // visibility
          if (msg.changeBit & this.mgr.EChangeBits.kCBVisibility) {
-            // self
-            if (msg.rnr_self_changed)
-            {
-               let obj3d = this.getObj3D( el.fElementId );
-               if (obj3d)
-               {
-                  obj3d.visible = obj3d.all_ancestor_children_visible && el.fRnrSelf;
-               }
-            }
-            // children
-            if (msg.rnr_children_changed && el.childs)
-            {
-               let scene = this.mgr.GetElement(el.fSceneId);
-               this.update3DObjectsVisibility(scene.childs, true);
-            }
+            this.need_visibility_update = true;
          }
 
          // other change bits
