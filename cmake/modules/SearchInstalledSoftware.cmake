@@ -2112,7 +2112,7 @@ if(webgui)
   ExternalProject_Add(
     RENDERCORE
     URL ${CMAKE_SOURCE_DIR}/builtins/rendercore/RenderCore.tar.gz
-    URL_HASH SHA256=17fa2e093cf4315ace5c784ed370f00478d248797fef1aeaec281c42e0b5d5d3
+    URL_HASH SHA256=b9c8558a3df90f8e08f013a856c495adda73f8ac900afbfe61581b9823fa2404
     CONFIGURE_COMMAND ""
     BUILD_COMMAND ""
     INSTALL_COMMAND ""
