@@ -15,11 +15,23 @@ sap.ui.define([
          super(viewer_class);
 
          const urlParams = new URLSearchParams(window.location.search);
+         if (urlParams.get('RQ_ShaderDbg')) window.__RC_SHADERDBG = urlParams.get('RQ_ShaderDbg');
 
          let mode_mm = /^(?:Direct|Simple|Full)$/.exec(urlParams.get('RQ_Mode'));
          let ssaa_mm = /^(1|2|4)$/.               exec(urlParams.get('RQ_SSAA'));
          let marker_scale = /^([\d\.]+)$/.        exec(urlParams.get('RQ_MarkerScale'));
          let line_scale = /^([\d\.]+)$/.          exec(urlParams.get('RQ_LineScale'));
+
+         // RQ_HdrStats=1 logs the dynamic range of the buffer feeding the final
+         // pass once, to judge whether the tone curve is earning its keep.
+         this.RQ_HdrStats = urlParams.get('RQ_HdrStats') == '1';
+
+         // Tone curve of the final pass. "knee" passes ROOT colours through
+         // unchanged below the knee and rolls highlights off smoothly above it;
+         // "exposure" is the old 1-exp(-2c), which lightens the whole range;
+         // "linear" clamps, which crushes lit surfaces that go over white.
+         let tm_mm = /^(knee|exposure|linear)$/.exec(urlParams.get('RQ_ToneMap'));
+         this.RQ_ToneMap = (tm_mm) ? tm_mm[0] : "knee";
 
          this.RQ_Mode = (mode_mm) ? mode_mm[0] : "Simple";
          this.RQ_SSAA = (ssaa_mm) ? ssaa_mm[0] : 2;
@@ -281,7 +293,21 @@ sap.ui.define([
 
          this.rot_center = new RC.Vector3(0,0,0);
 
-         this.rqt = new RC.RendeQuTor(this.renderer, this.scene, this.camera, this.overlay_scene);
+         // The overlay is a fixed (0,0)-(1,1) screen box, so it needs its own
+         // orthographic camera rather than the scene camera. Screen-mode ZText
+         // maps VPos to clip space itself and ignores this, but any ordinary mesh
+         // placed in the overlay -- GUI elements, frames, images -- needs it.
+         //
+         // NOTE for multi-user: this box is normalised, not aspect-corrected, so a
+         // client with a different window ratio sees the same fractions of its own
+         // viewport, not the same shape. ZText compensates by dividing x by the
+         // aspect; plain meshes would need the same treatment, or the box would
+         // have to move to NDC. Deliberately left as-is until we decide what
+         // "the same overlay" should mean across screens of different ratios.
+         this.overlay_camera = new RC.OrthographicCamera(0, 1, 1, 0, -1000, 1000);
+
+         this.rqt = new RC.RendeQuTor(this.renderer, this.scene, this.camera,
+                                      this.overlay_scene, this.overlay_camera);
          if (this.RQ_Mode == "Direct")
          {
             this.rqt.initDirectToScreen();
@@ -289,6 +315,7 @@ sap.ui.define([
          else if (this.RQ_Mode == "Simple")
          {
             this.rqt.initSimple(this.RQ_SSAA);
+            this.rqt.set_tone_mapping(this.RQ_ToneMap);
          }
          else
          {
@@ -339,6 +366,7 @@ sap.ui.define([
          });
 
          dome.addEventListener('pointerleave', function() {
+            glc.clearOverlayHover();
 
             glc.removeMouseMoveTimeout();
             glc.clearHighlight();
@@ -677,6 +705,7 @@ sap.ui.define([
          console.log("RENDER", this.scene, this.camera, this.canvas, this.renderer);
 
          this.render_requested = false;
+         this.updateOverlayPixelScale();
          if (this.render_requested_recalc_sbbox) {
             this.recalcSceneBBox();
             this.render_requested_recalc_sbbox = false;
@@ -747,14 +776,25 @@ sap.ui.define([
          // Note that rgt.render_end() releases all std textures.
 
          if (this.rqt.queue.used_fail_count == 0) {
+            // Grab first: render_tone_map_to_screen() is the pass that composites
+            // the background colour in and forces alpha to 1, so anything read
+            // after it has an opaque background baked in.
+            if (this._capture_request)
+               this.rqt.render_tone_map_to_capture();
+
             // AMT: All render passess are drawn with the black bg
             //      except of the tone map render pass
+            if (this.RQ_HdrStats) { this.RQ_HdrStats = false; this.rqt.hdr_stats(); }
+
             this.renderer.clearColor = '#' +  this.bgCol.getHexString() + '00';
             this.rqt.render_tone_map_to_screen();
             this.renderer.clearColor = "#00000000";
          }
 
          this.rqt.render_end();
+
+         if (this._capture_request)
+            this.finishCapture();
 
          if (this.rqt.queue.used_fail_count > 0) {
             if (this._logLevel >= 2)
@@ -764,6 +804,82 @@ sap.ui.define([
 
          // if (this.controller.kind === "3D")
          //    window.requestAnimationFrame(this.render.bind(this));
+      }
+
+      //==============================================================================
+      // Image capture
+      //
+      // The image is grabbed from RendeQuTor after tone mapping but before the
+      // background colour is composited in, so it carries straight alpha and can
+      // be placed over any backdrop later. Pixels come back in WebGL orientation
+      // (bottom-left origin); the receiving service is expected to flip them.
+      //==============================================================================
+
+      /** Grab the next rendered frame. cfg.scale multiplies the screen viewport
+       * (use the viewer's RQ_SSAA to get the full supersampled image).
+       * Returns a Promise of { width, height, pixels, view_name }. */
+      grabImage(cfg = {})
+      {
+         if (this._capture_request)
+            return Promise.reject(new Error("GlViewerRCore.grabImage: a capture is already pending"));
+
+         if (cfg.scale && cfg.scale != this.rqt.capture_scale)
+            this.rqt.set_capture_scale(cfg.scale);
+
+         return new Promise((resolve, reject) => {
+            this._capture_request = { cfg, resolve, reject };
+            this.request_render();
+         });
+      }
+
+      /** Called from render() once the capture pass has run. */
+      finishCapture()
+      {
+         let req = this._capture_request;
+         this._capture_request = null;
+         if (!req) return;
+
+         try {
+            let img = this.rqt.grab_image();
+            if (!img) throw new Error("RendeQuTor.grab_image() returned null");
+
+            let eveView = this.get_manager().GetElement(this.controller.eveViewerId);
+            img.view_name = eveView ? eveView.fName : "unknown_view";
+            req.resolve(img);
+         } catch (e) {
+            req.reject(e);
+         }
+      }
+
+      /** Grab and POST to an image-gator style service. cfg: { url, event_id,
+       * view_type, scale }. The buffer is sent raw; X-Flip-Y tells the service
+       * the rows still need flipping. */
+      grabAndPostImage(cfg = {})
+      {
+         const url = cfg.url || "http://localhost:3000/capture";
+
+         return this.grabImage(cfg).then(img => {
+            return fetch(url, {
+               method: "POST",
+               headers: {
+                  "Content-Type": "application/octet-stream",
+                  "X-Width":      img.width.toString(),
+                  "X-Height":     img.height.toString(),
+                  "X-Event-ID":   String(cfg.event_id ?? "unknown_event"),
+                  "X-View-Type":  String(cfg.view_type ?? img.view_name),
+                  "X-Flip-Y":     "1"
+               },
+               body: img.pixels
+            }).then(rsp => {
+               if (!rsp.ok) throw new Error("capture POST failed: " + rsp.status + " " + rsp.statusText);
+               if (this._logLevel >= 2)
+                  console.log("GlViewerRCore: posted capture", img.width + "x" + img.height, "to", url);
+               return rsp;
+            });
+         }).catch(e => {
+            console.error("GlViewerRCore.grabAndPostImage failed:", e);
+            throw e;
+         });
       }
 
       render_for_picking(x, y, detect_depth)
@@ -910,6 +1026,7 @@ sap.ui.define([
          //console.log("GlViewerRCore onResizeTimeout", w, h, "canvas=", this.canvas, this.canvas.width, this.canvas.height);
 
          this.camera.aspect = w / h;
+         this.updateOverlayPixelScale();
          this.rqt.updateViewport(w, h);
          this.controls.update();
 
@@ -1107,83 +1224,199 @@ sap.ui.define([
 
       }
 
-      handleOverlayMouseUp()
+      //==============================================================================
+      // Overlay interaction: move and resize
+      //
+      // Client-local by design -- nothing here sends a MIR, so dragging an overlay
+      // element moves it on this screen only and other clients are untouched.
+      // Making it shared later means turning the two mutations below (setOffset and
+      // fontSize) into MIRs on the owning element.
+      //==============================================================================
+
+      /** Overlay coordinates: (0,0) bottom-left to (1,1) top-right, matching the
+       * space ZText's `offset` uniform lives in. Canvas y grows downward. */
+      overlayNormCoords(event)
       {
-         // console.log("handleOverlayMouseUp");
-         if(this.firstMouseDown == false)
-         {
-            this.firstMouseDown = true;
-            //this.overlay_scene.children[0].children[0].setNewPositionOffset(this.lastOffsetX, this.lastOffsetY);
-            this.pickedOverlayObj.setNewPositionOffset(this.lastOffsetX, this.lastOffsetY);
-            this.lastOffsetX = 0;
-            this.lastOffsetY = 0;
-            this.initialMouseX = 0;
-            this.initialMouseY = 0;
-            this.scale = false;
-            this.initialSize = 0;
-            this.controls.enablePan = true;
-            this.controls.enableRotate = true;
+         let x = event.offsetX * this.canvas.pixelRatio;
+         let y = event.offsetY * this.canvas.pixelRatio;
+         return { px: x, py: y,
+                  nx: x / this.canvas.width,
+                  ny: 1.0 - y / this.canvas.height };
+      }
+
+      /** Which part of the element the cursor grabbed: the bottom-right corner
+       * resizes, anywhere else moves. Right-drag resizes from anywhere. */
+      overlayGrabZone(obj, nx, ny, button)
+      {
+         // NB: the right button is already the context menu, so resize is the
+         // corner grip only.
+         if (!obj.resizable) return "move";
+         if (typeof obj.getScreenRect !== "function") return "move";
+
+         let r = obj.getScreenRect(this.canvas.width / this.canvas.height);
+         if (!r) return "move";
+
+         // The element computed and drew its own grip square, so use that rather
+         // than recomputing it here -- the sensitive area is then exactly what the
+         // user can see, and the two cannot drift apart.
+         let gx = r.grip_x, gy = r.grip_y;
+         if (!(gx > 0) || !(gy > 0)) return "move";
+
+         let xmax = Math.max(r.x0, r.x1), ymin = Math.min(r.y0, r.y1);
+         if (nx > xmax - gx && ny < ymin + gy) return "resize";
+         return "move";
+      }
+
+      /** ZText bakes its resize grip into the vertex buffer but wants a pixel
+       * floor, so it needs to know how big a CSS pixel is in screen space.
+       * Rebuild overlay text when the factor actually changes -- a window resize
+       * or a display-scale change in system settings -- since the grip size is
+       * already in the buffer. Only a handful of elements, on the (already
+       * throttled) resize path. */
+      updateOverlayPixelScale()
+      {
+         if (!this.canvas || !this.canvas.height) return;
+         let f = (this.canvas.pixelRatio || 1) / this.canvas.height;
+         if (Math.abs(f - RC.ZText.PX_TO_SCREEN_SPACE) < 1e-9) return;
+
+         RC.ZText.PX_TO_SCREEN_SPACE = f;
+         if (this.overlay_scene) {
+            this.overlay_scene.traverse(function (o) {
+               if (o.type === "ZText" && o.geometry) o.recalcGeometry();
+            });
          }
+      }
+
+      /** Which overlay element is under the cursor.
+       *
+       * Deliberately a rectangle test rather than the GPU picking path: overlay
+       * elements are few and each knows its own screen rect, so hover costs
+       * nothing and can run on every mouse move. Mouse-down still uses real
+       * picking. Later in the traversal means drawn later, i.e. on top. */
+      overlayHoverTest(nx, ny)
+      {
+         let aspect = this.canvas.width / this.canvas.height;
+         let hit = null;
+         this.overlay_scene.traverse(function (o) {
+            if (!o.pickable || !o.visible || typeof o.getScreenRect !== "function") return;
+            let r = o.getScreenRect(aspect);
+            if (!r) return;
+            if (nx >= Math.min(r.x0, r.x1) && nx <= Math.max(r.x0, r.x1) &&
+                ny >= Math.min(r.y0, r.y1) && ny <= Math.max(r.y0, r.y1))
+               hit = o;
+         });
+         return hit;
+      }
+
+      /** Enter/leave bookkeeping, in the spirit of TGLOverlayElement's
+       * MouseEnter/MouseLeave: exactly one element is highlighted at a time. */
+      updateOverlayHover(event)
+      {
+         if (this.ovl_drag) return; // a drag owns the element until mouse-up
+
+         let c = this.overlayNormCoords(event);
+         let hit = this.overlayHoverTest(c.nx, c.ny);
+         if (hit === this.ovl_hover) return;
+
+         if (this.ovl_hover && typeof this.ovl_hover.setHighlight === "function")
+            this.ovl_hover.setHighlight(false);
+         this.ovl_hover = hit;
+         if (hit && typeof hit.setHighlight === "function")
+            hit.setHighlight(true);
+
+         this.request_render();
+      }
+
+      clearOverlayHover()
+      {
+         if (!this.ovl_hover) return;
+         if (typeof this.ovl_hover.setHighlight === "function") this.ovl_hover.setHighlight(false);
+         this.ovl_hover = null;
+         this.request_render();
       }
 
       handleOverlayMouseDown(event)
       {
-         // console.log("handleOverlayMouseDown");
-         let x = event.offsetX * this.canvas.pixelRatio;
-         let y = event.offsetY * this.canvas.pixelRatio;
-         let overlay_pstate = this.render_for_Overlay_picking(x, y, false);
+         if (this.ovl_drag) return false;
 
+         let c = this.overlayNormCoords(event);
 
+         // RCore-side pick diagnostics are gated on window.__RC_PICKDBG; see
+         // MeshRenderer._renderPickableObjects.
+         if (this._logLevel >= 3) window.__RC_PICKDBG = true;
+         let pstate = this.render_for_Overlay_picking(c.px, c.py, false);
+         window.__RC_PICKDBG = false;
+         if (this._logLevel >= 3)
+            console.log("overlay pick at " + c.px + "," + c.py +
+                        " hit=" + (!!(pstate && pstate.object)));
+         if (!pstate || !pstate.object) return false;
 
-         if(this.firstMouseDown && overlay_pstate)
-         {
-             this.initialMouseX = x;
-             this.initialMouseY = y;
-             //let c = overlay_pstate.ctrl;
-             this.pickedOverlayObj = overlay_pstate.object;
-             this.firstMouseDown = false;
+         let obj = pstate.object;
+         let rect = (typeof obj.getScreenRect === "function")
+                  ? obj.getScreenRect(this.canvas.width / this.canvas.height) : null;
 
-             if(event.button == 2)
-             {
-               this.scale = true;
-               this.controls.enablePan = false;
-               //this.initialSize = this.overlay_scene.children[0].children[0].fontSize;
-               this.initialSize = this.pickedOverlayObj.fontSize;
-             }
-             else
-               this.controls.enableRotate = false;
+         this.ovl_drag = {
+            obj:       obj,
+            zone:      this.overlayGrabZone(obj, c.nx, c.ny, event.button),
+            grab_nx:   c.nx,
+            grab_ny:   c.ny,
+            orig_x:    obj.xPos,
+            orig_y:    obj.yPos,
+            orig_size: obj.fontSize,
+            // Resize anchors on the top-left corner. The reference width is
+            // measured to the *click point*, not to the box edge, so the scale
+            // is exactly 1 at the moment of grabbing and grows smoothly from
+            // there -- clicking a few pixels inside the grip must not make the
+            // box jump before it starts following the mouse.
+            anchor_x:  rect ? Math.min(rect.x0, rect.x1) : 0,
+            grab_w:    rect ? (c.nx - Math.min(rect.x0, rect.x1)) : 0
+         };
 
-         }
+         // Stop the orbit controls from also acting on this drag.
+         this.controls.enablePan = false;
+         this.controls.enableRotate = false;
+         return true;
       }
 
       handleOverlayMouseMove(event)
       {
-         //console.log("handleOverlayMouseMove");
+         let d = this.ovl_drag;
+         if (!d) { this.updateOverlayHover(event); return; }
 
-         if(!this.firstMouseDown)
-         {
-            let x = event.offsetX * this.canvas.pixelRatio;
-            let y = event.offsetY * this.canvas.pixelRatio;
+         let c = this.overlayNormCoords(event);
 
-            if(!this.scale)
-            {
-               this.lastOffsetX = (x - this.initialMouseX)/this.canvas.width;
-               this.lastOffsetY = (this.initialMouseY - y)/this.canvas.height;
-               //this.overlay_scene.children[0].children[0].setOffset([this.lastOffsetX, this.lastOffsetY]);
-               this.pickedOverlayObj.setOffset([this.lastOffsetX, this.lastOffsetY]);
-
-            }
-            else
-            {
-               //this.overlay_scene.children[0].children[0].fontSize = this.initialSize + (x - this.initialMouseX);
-               this.pickedOverlayObj.fontSize = this.initialSize + (x - this.initialMouseX);
-
-            }
-            this.render();
-
-
-
+         if (d.zone === "move") {
+            d.obj.setOffset([ d.orig_x + (c.nx - d.grab_nx),
+                              d.orig_y + (c.ny - d.grab_ny) ]);
+         } else if (d.grab_w > 1e-4) {
+            // Cursor distance from the anchor, relative to what it was when the
+            // grip was grabbed: 1.0 at grab, then tracks the mouse smoothly.
+            let f = (c.nx - d.anchor_x) / d.grab_w;
+            d.obj.fontSize = Math.min(Math.max(d.orig_size * f, 0.004), 0.4);
          }
+
+         this.request_render();
+      }
+
+      handleOverlayMouseUp()
+      {
+         if (!this.ovl_drag) return;
+
+         this.ovl_drag = null;
+         this.controls.enablePan = true;
+         this.controls.enableRotate = true;
+         this.request_render();
+      }
+
+      /** Hide/show overlay elements flagged exclude_from_capture. Used around the
+       * grab so screen-only decoration stays out of exported images. */
+      setOverlayCaptureHidden(hide)
+      {
+         let touched = [];
+         this.overlay_scene.traverse(function (o) {
+            if (o.exclude_from_capture) { o.visible = !hide; touched.push(o); }
+         });
+         return touched;
       }
 
       timeStampAttributesAndTextures() {

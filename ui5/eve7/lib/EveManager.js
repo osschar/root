@@ -157,6 +157,9 @@ sap.ui.define([], function() {
             }
             else if (resp.content == "BrowseElement") {
                this.BrowseElement(resp.id);
+            }
+            else if (resp.content == "GrabImage") {
+               this.GrabImages(resp);
             } else {
                console.error("OnWebsocketMsg Unhandled message type: msg len=", msg.length, " txt:", msg.substr(0, 120), "...");
             }
@@ -770,6 +773,43 @@ sap.ui.define([], function() {
       }
 
       /** Method invoked from server message to browse to element elid */
+      /** Server-driven image capture.
+       *
+       * The server sends { content: "GrabImage", event_id, url, scale, viewers }
+       * and every GL viewer this client holds grabs its frame and posts it to the
+       * collector service. `viewers` is an optional array of viewer names to
+       * restrict the capture to; absent or empty means all of them.
+       *
+       * Note this is per client: in a control room each screen posts the view it
+       * is actually showing, which is the point -- one event, several views,
+       * several machines, all landing in the same collector. */
+      GrabImages(req)
+      {
+         let want = (req.viewers && req.viewers.length) ? new Set(req.viewers) : null;
+         let n = 0;
+
+         for (let ctrl of this.gl_controllers)
+         {
+            let v = ctrl.viewer;
+            if (!v || typeof v.grabAndPostImage !== "function")
+               continue; // e.g. the JSRoot/Three viewers, which have no capture path
+
+            let eveView = this.GetElement(ctrl.eveViewerId);
+            let name = eveView ? eveView.fName : "unknown_view";
+            if (want && !want.has(name))
+               continue;
+
+            v.grabAndPostImage({ url:       req.url,
+                                 event_id:  req.event_id,
+                                 view_type: name,
+                                 scale:     req.scale });
+            ++n;
+         }
+
+         if (n === 0)
+            console.warn("EveManager.GrabImages: no capable GL viewer matched", req);
+      }
+
       BrowseElement(elid) {
          let scenes = this.getSceneElements();
 

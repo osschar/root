@@ -24,6 +24,9 @@
 #include <mutex>
 #include <condition_variable>
 #include <memory>
+#include <string>
+#include <string_view>
+#include <vector>
 #include <queue>
 #include <unordered_map>
 
@@ -194,6 +197,9 @@ public:
    REveScene  *SpawnNewScene (const char *name, const char *title = "");
 
    void AllowMultipleRemoteConnections(bool loopBack = true, bool useAuthKey = true);
+
+   void GrabImages(std::string_view event_id, std::string_view url = "", int scale = 1,
+                   const std::vector<std::string> &viewers = {});
 
    void BeginChange();
    void EndChange();

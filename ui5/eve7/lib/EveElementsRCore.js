@@ -980,6 +980,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager)
          );
 
         text.position.copy(new RC.Vector3(el.fPosX, el.fPosY, el.fPosZ));
+        // Movable if pickable; resizable only if the element says so.
+        text.resizable = (el.fResizable === undefined) ? true : !!el.fResizable;
         if (el.fPickable) this.RcPickable(el, text);
         return text;
       }
