@@ -10,6 +10,7 @@
  *************************************************************************/
 
 #include <ROOT/REveProjectionManager.hxx>
+#include <ROOT/REveProjectionAxis.hxx>
 #include <ROOT/REveManager.hxx>
 #include <ROOT/REveProjectionBases.hxx>
 #include <ROOT/REveCompound.hxx>
@@ -78,6 +79,31 @@ void REveProjectionManager::RemoveDependent(REveElement *el)
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Updates name to have consistent information with projection.
+
+////////////////////////////////////////////////////////////////////////////////
+/// Step the distortion of the current projection and reproject. MIR target.
+
+void REveProjectionManager::BumpDistortion(Int_t steps)
+{
+   if (!fProjection) return;
+
+   Float_t d = fProjection->GetDistortion() + steps * 1e-4f;
+   if (d < 0.f) d = 0.f;
+   fProjection->SetDistortion(d);
+
+   UpdateName();
+   ProjectChildren();
+
+   // Refresh whatever axes are hanging off this manager. The dynamic_cast is the
+   // one piece of downward knowledge here; a general notification on REveElement
+   // would avoid it, but it is not worth a virtual on every element for this.
+   for (auto &n : fNieces) {
+      if (auto ax = dynamic_cast<REveProjectionAxis *>(n)) {
+         ax->UpdateTicks();
+         ax->UpdateDistortionLabel();
+      }
+   }
+}
 
 void REveProjectionManager::UpdateName()
 {

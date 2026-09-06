@@ -250,28 +250,6 @@ void REveProjectionAxis::BuildRenderData()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Step the distortion and reproject. MIR target for the overlay buttons.
-
-void REveProjectionAxis::BumpDistortion(Int_t steps)
-{
-   if (!fManager) return;
-   REveProjection *proj = fManager->GetProjection();
-   if (!proj) return;
-
-   Float_t d = proj->GetDistortion() + steps * 1e-4f;
-   if (d < 0.f) d = 0.f;
-   proj->SetDistortion(d);
-
-   // The manager's name carries the distortion, so it has to be refreshed for
-   // the Summary tree; then the projected geometry, then our own ticks, whose
-   // spacing is a function of the projection.
-   fManager->UpdateName();
-   fManager->ProjectChildren();
-   UpdateTicks();
-   UpdateDistortionLabel();
-}
-
-////////////////////////////////////////////////////////////////////////////////
 
 void REveProjectionAxis::SetDistortionLabel(REveText *t)
 {

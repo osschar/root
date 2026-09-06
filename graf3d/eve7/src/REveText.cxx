@@ -31,6 +31,44 @@ REveText::REveText(const Text_t* n, const Text_t* t) :
 ////////////////////////////////////////////////////////////////////////////////
 /// Fill core part of JSON representation.
 
+////////////////////////////////////////////////////////////////////////////////
+/// Make this text act as a button. `target` is held as an aunt when it can be
+/// one, so that its destruction clears the action rather than leaving a
+/// dangling id behind; a target that is not an REveAunt still works, just
+/// without that tracking.
+
+void REveText::SetClickAction(std::string_view mir, REveElement *target)
+{
+   if (fClickAunt) {
+      fClickAunt->RemoveNiece(this);
+      fClickAunt = nullptr;
+   }
+
+   fClickMir = mir;
+   fClickTargetId = target ? target->GetElementId() : 0;
+
+   if (target) {
+      if (auto au = dynamic_cast<REveAunt *>(target)) {
+         au->AddNiece(this);
+         fClickAunt = au;
+      }
+   }
+   StampObjProps();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void REveText::RemoveAunt(REveAunt *au)
+{
+   if (au == fClickAunt) {
+      fClickAunt = nullptr;
+      fClickMir.clear();
+      fClickTargetId = 0;
+      StampObjProps();
+   }
+   REveElement::RemoveAunt(au);
+}
+
 Int_t REveText::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
 {
    Int_t ret = REveShape::WriteCoreJson(j, rnr_offset);
