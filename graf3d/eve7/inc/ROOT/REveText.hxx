@@ -36,6 +36,7 @@ protected:
    Float_t     fFontHinting {1.0};
    Float_t     fExtraBorder {0.2}; // border around text in font-size units
    Int_t       fMode {1}; // default mode is in relative screen coordinates [0,1]
+   Bool_t      fResizable {true}; // can the client resize it by dragging the corner grip
    Color_t     fTextColor {kMagenta};
    // UChar_t     fTextAlpha {255}; // Better than main transparency -- to be fixed.
 
@@ -63,6 +64,13 @@ public:
 
    Int_t GetMode() const { return fMode; }
    void SetMode(Int_t mode) { fMode = mode;}
+
+   /// Whether the client may resize this element by dragging its corner grip.
+   /// Moving is governed by SetPickable(); a pickable element that is not
+   /// resizable can be repositioned but keeps its size, which is what you want
+   /// for a fixed-format label such as a run/event header.
+   Bool_t GetResizable() const { return fResizable; }
+   void SetResizable(Bool_t r) { fResizable = r; StampObjProps(); }
 
    Float_t GetFontHinting() const { return fFontHinting; }
    void SetFontHinting(Float_t fontHinting) { fFontHinting = fontHinting; StampObjProps();}
