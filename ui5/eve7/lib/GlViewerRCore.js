@@ -806,6 +806,7 @@ sap.ui.define([
 
          this.render_requested = false;
          this.updateOverlayPixelScale();
+         this.updateProjectionAxes();
          if (this.render_requested_recalc_sbbox) {
             this.recalcSceneBBox();
             this.render_requested_recalc_sbbox = false;
@@ -1380,6 +1381,31 @@ sap.ui.define([
          return "move";
       }
 
+      /** Re-lay any projection axes for the current scene camera.
+       *
+       * The axis holds its ticks in projected coordinates; the scene camera is
+       * orthographic in a 2D projected view, so the visible extent -- unprojected
+       * NDC corners -- is all that is needed to place them. Cheap, local, and it
+       * means zooming never round-trips to the server. Returns true if anything
+       * was rebuilt. */
+      updateProjectionAxes()
+      {
+         if (!this.overlay_scene || !this.camera) return false;
+
+         let p0 = new RC.Vector3(-1, -1, 0).unproject(this.camera);
+         let p1 = new RC.Vector3( 1,  1, 0).unproject(this.camera);
+         let l = Math.min(p0.x, p1.x), r = Math.max(p0.x, p1.x);
+         let b = Math.min(p0.y, p1.y), t = Math.max(p0.y, p1.y);
+         let aspect = this.canvas.width / this.canvas.height;
+
+         let rebuilt = false;
+         this.overlay_scene.traverse(function (o) {
+            if (o.type === "ZTextAxis" && o.updateForCamera(l, r, b, t, aspect))
+               rebuilt = true;
+         });
+         return rebuilt;
+      }
+
       /** ZText bakes its resize grip into the vertex buffer but wants a pixel
        * floor, so it needs to know how big a CSS pixel is in screen space.
        * Rebuild overlay text when the factor actually changes -- a window resize
@@ -1390,12 +1416,16 @@ sap.ui.define([
       {
          if (!this.canvas || !this.canvas.height) return;
          let f = (this.canvas.pixelRatio || 1) / this.canvas.height;
-         if (Math.abs(f - RC.ZText.PX_TO_SCREEN_SPACE) < 1e-9) return;
+         if (f === this._px_to_screen) return;
+         this._px_to_screen = f;
 
-         RC.ZText.PX_TO_SCREEN_SPACE = f;
+         // Per object, not on the class: several viewers of different sizes can
+         // show the same kind of element, and a shared static would have them
+         // overwriting each other.
          if (this.overlay_scene) {
+            let W = this.canvas.width, H = this.canvas.height;
             this.overlay_scene.traverse(function (o) {
-               if (o.type === "ZText" && o.geometry) o.recalcGeometry();
+               if (typeof o.setPixelScale === "function") o.setPixelScale(f, W, H);
             });
          }
       }
@@ -1465,6 +1495,7 @@ sap.ui.define([
          if (!pstate || !pstate.object) return false;
 
          let obj = pstate.object;
+         if (typeof obj.ovlGetPos !== "function") return false;   // not a movable overlay element
          let rect = (typeof obj.getScreenRect === "function")
                   ? obj.getScreenRect(this.canvas.width / this.canvas.height) : null;
 
@@ -1473,9 +1504,9 @@ sap.ui.define([
             zone:      this.overlayGrabZone(obj, c.nx, c.ny, event.button),
             grab_nx:   c.nx,
             grab_ny:   c.ny,
-            orig_x:    obj.xPos,
-            orig_y:    obj.yPos,
-            orig_size: obj.fontSize,
+            orig_x:    obj.ovlGetPos()[0],
+            orig_y:    obj.ovlGetPos()[1],
+            orig_size: obj.ovlGetSize(),
             // Resize anchors on the top-left corner. The reference width is
             // measured to the *click point*, not to the box edge, so the scale
             // is exactly 1 at the moment of grabbing and grows smoothly from
@@ -1499,13 +1530,13 @@ sap.ui.define([
          let c = this.overlayNormCoords(event);
 
          if (d.zone === "move") {
-            d.obj.setOffset([ d.orig_x + (c.nx - d.grab_nx),
-                              d.orig_y + (c.ny - d.grab_ny) ]);
+            d.obj.ovlSetPos(d.orig_x + (c.nx - d.grab_nx),
+                            d.orig_y + (c.ny - d.grab_ny));
          } else if (d.grab_w > 1e-4) {
             // Cursor distance from the anchor, relative to what it was when the
             // grip was grabbed: 1.0 at grab, then tracks the mouse smoothly.
             let f = (c.nx - d.anchor_x) / d.grab_w;
-            d.obj.fontSize = Math.min(Math.max(d.orig_size * f, 0.004), 0.4);
+            d.obj.ovlSetSize(Math.max(d.orig_size * f, 1e-4));
          }
 
          this.request_render();
