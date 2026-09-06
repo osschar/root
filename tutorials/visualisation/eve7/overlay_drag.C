@@ -20,6 +20,9 @@
 ///
 /// Interaction, once REveText::SetPickable(true) is set:
 ///
+/// The logo is the same kind of overlay element -- a screen-space image rather
+/// than text -- and moves and resizes on exactly the same handling.
+///
 ///     hover over a box             -> it lightens, and if it is resizable a small
 ///                                     square grip appears in its bottom corner
 ///     drag the box                 -> move it
@@ -41,6 +44,7 @@
 #include <ROOT/REveElement.hxx>
 #include <ROOT/REveGeoShape.hxx>
 #include <ROOT/REveJetCone.hxx>
+#include <ROOT/REveLogo.hxx>
 #include <ROOT/REveManager.hxx>
 #include <ROOT/REveScene.hxx>
 #include <ROOT/REveText.hxx>
@@ -48,6 +52,8 @@
 
 #include "TColor.h"
 #include "TGeoTube.h"
+#include "TROOT.h"
+#include "TSystem.h"
 #include "TMath.h"
 #include "TRandom.h"
 
@@ -145,6 +151,27 @@ void overlay_drag()
    REveScene *os = eveMng->SpawnNewScene("Overlay scene", "Draggable annotations");
    ((REveViewer *)(eveMng->GetViewers()->FirstChild()))->AddScene(os);
    os->SetIsOverlay(true);
+
+   // Images have to be reachable by the browser, so the directory holding them
+   // is registered as an HTTP location. Any readable directory works: an
+   // experiment would point this at its own icons -- for CMS, at
+   //   .../src/Fireworks/Core/icons
+   // Here we use the icons that ship with ROOT, so the tutorial runs anywhere:
+   // icons/ is both copied into the build tree and installed, and
+   // TROOT::GetIconPath() resolves it in either case -- unlike ${ROOTSYS}/icons,
+   // which does not survive a gnuinstall-style layout.
+   //
+   // Two other sources exist: REveLogo::kTextures for the ZSprite template
+   // textures in ui5/eve7/textures, and an absolute URL, which the browser
+   // fetches directly -- convenient, but subject to CORS, mixed content and
+   // certificate checks, so not something to rely on. See REveLogo::SetFile.
+   REveLogo::SetImageDir(TROOT::GetIconPath().Data());
+
+   auto logo = new REveLogo("Root6Icon.png", "Logo");
+   logo->SetPosition(0.88, 0.86);   // (0,1) overlay box; the image is centred here
+   logo->SetSize(110);              // height in CSS pixels; width follows the image
+   logo->SetOpacity(0.75);          // a watermark: it brightens when hovered
+   os->AddElement(logo);
 
    auto holder = new REveElement("annotations");
 

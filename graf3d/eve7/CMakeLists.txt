@@ -44,10 +44,12 @@ ROOT_STANDARD_LIBRARY_PACKAGE(ROOTEve
     ROOT/REveJetCone.hxx
     ROOT/REveEllipsoid.hxx
     ROOT/REveLine.hxx
+    ROOT/REveLogo.hxx
     ROOT/REveManager.hxx
     ROOT/REvePathMark.hxx
     ROOT/REvePointSet.hxx
     ROOT/REvePolygonSetProjected.hxx
+    ROOT/REveProjectionAxis.hxx
     ROOT/REveProjectionBases.hxx
     ROOT/REveProjectionManager.hxx
     ROOT/REveProjections.hxx
@@ -99,10 +101,12 @@ ROOT_STANDARD_LIBRARY_PACKAGE(ROOTEve
     src/REveJetCone.cxx
     src/REveEllipsoid.cxx
     src/REveLine.cxx
+    src/REveLogo.cxx
     src/REveManager.cxx
     src/REvePathMark.cxx
     src/REvePointSet.cxx
     src/REvePolygonSetProjected.cxx
+    src/REveProjectionAxis.cxx
     src/REveProjectionBases.cxx
     src/REveProjectionManager.cxx
     src/REveProjections.cxx

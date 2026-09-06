@@ -853,6 +853,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager) {
             mode: el.fMode,
             fontHinting: el.fFontHinting,
             color: RcCol(el.fTextColor),
+            alignH: el.fAlignH || 0,
+            alignV: el.fAlignV || 0,
          });
          let url_base = this.viewer.top_path + 'sdf-fonts/' + el.fFont;
          this.tex_cache.deliver_font(url_base,
@@ -873,6 +875,93 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager) {
          text.resizable = (el.fResizable === undefined) ? true : !!el.fResizable;
          if (el.fPickable) this.RcPickable(el, text);
          return text;
+      }
+
+      //==============================================================================
+      // makeLogo
+      //
+      // A screen-space image for an overlay scene, drawn as a ZSprite: constant
+      // pixel size, shape taken from the image alpha. Implements the same small
+      // interaction interface as ZText, so the viewer's move / corner-resize
+      // handling drives it with no extra code.
+      //==============================================================================
+
+      makeLogo(el, rnr_data)
+      {
+         let logo = new RC.ZLogo({
+            x:         el.fPosX,
+            y:         el.fPosY,
+            size:      el.fSize,
+            opacity:   el.fOpacity,
+            resizable: el.fResizable
+         });
+
+         // 0 a directory registered with REveLogo::SetImageDir, 1 the ZSprite
+         // template textures shipped in ui5/eve7/textures, 2 an absolute URL the
+         // browser fetches itself -- see the CORS caveats on REveLogo::SetFile.
+         let url;
+         switch (el.fSource) {
+            case 2:  url = el.fFile; break;
+            case 1:  url = this.viewer.eve_path + 'textures/' + el.fFile; break;
+            default: url = this.viewer.top_path + 'eve-images/' + el.fFile;
+         }
+         let iw = 0, ih = 0;
+
+         this.tex_cache.deliver(url,
+            (texture) => { logo.setLogoTexture(texture, iw, ih); },
+            (img) => {
+               iw = img.width; ih = img.height;
+               // RGBA, unlike ZText's single-channel SDF atlas: the logo carries
+               // its own colour and its outline comes from the alpha.
+               return new RC.Texture(img,
+                  RC.Texture.WRAPPING.ClampToEdgeWrapping, RC.Texture.WRAPPING.ClampToEdgeWrapping,
+                  RC.Texture.FILTER.LinearFilter, RC.Texture.FILTER.LinearFilter,
+                  RC.Texture.FORMAT.RGBA, RC.Texture.FORMAT.RGBA,
+                  RC.Texture.TYPE.UNSIGNED_BYTE, img.width, img.height);
+            },
+            () => this.viewer.request_render()
+         );
+
+         if (el.fPickable) this.RcPickable(el, logo);
+         return logo;
+      }
+
+      //==============================================================================
+      // makeProjectionAxis
+      //
+      // Ticks arrive in PROJECTED coordinates and deliberately over-provided --
+      // a wider range and finer subdivision than any one view needs. Mapping them
+      // to screen is affine under the orthographic camera of a 2D projected view,
+      // so GlViewerRCore recomputes the layout locally on zoom and pan; nothing
+      // goes back to the server until the projection itself changes.
+      //==============================================================================
+
+      makeProjectionAxis(el, rnr_data)
+      {
+         let axis = new RC.ZTextAxis({
+            fontSize:  el.fFontSize,
+            color:     RcCol(el.fTextColor),
+            axesMode:  el.fAxesMode,
+            fontHinting: el.fFontHinting
+         });
+
+         // Ticks use the frame line colour; no plate behind an axis.
+         axis.setupFrameStuff(1.0, false,
+                              RcCol(el.fFillColor), 0.0,
+                              RcCol(el.fLineColor), 1.0, 0.0, 0.0);
+
+         axis.setTicks({ pos: el.fTickPosH, lab: el.fTickLabH, maj: el.fTickMajH },
+                       { pos: el.fTickPosV, lab: el.fTickLabV, maj: el.fTickMajV },
+                       el.fAxesMode);
+
+         let url_base = this.viewer.top_path + 'sdf-fonts/' + el.fFont;
+         this.tex_cache.deliver_font(url_base,
+            (texture, font_metrics) => { axis.setTextureAndFont(texture, font_metrics); },
+            (img) => RC.ZText.createDefaultTexture(img),
+            () => this.viewer.request_render()
+         );
+
+         return axis;
       }
 
       //==============================================================================
