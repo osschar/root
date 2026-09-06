@@ -81,7 +81,14 @@ protected:
    ELabMode_e  fLabMode{kValue};
    EAxesMode_e fAxesMode{kAll};
 
-   Int_t   fNdivisions{510};   ///< as TAttAxis: n1 + 100*n2, major and minor divisions
+   /// As TAttAxis: n1 + 100 * n2, primary and secondary divisions. Deliberately
+   /// finer than TAttAxis's usual 510. A projected axis is laid out by the
+   /// client, which drops every label that will not fit, so asking for too few
+   /// leaves it nothing to choose from: THLimitsFinder answers 5 divisions of
+   /// [-600, 600] with a step of 500, i.e. three labels, two of which fall in
+   /// the corners against the vertical scale and are discarded. Over-provide and
+   /// let the filter decide -- the same bargain the tick range itself makes.
+   Int_t   fNdivisions{1010};
    Float_t fRangeFactor{2.0};  ///< over-provision: extend past the scene extent by this factor
    Bool_t  fDrawCenter{kFALSE};
    Bool_t  fDrawOrigin{kFALSE};
