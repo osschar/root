@@ -126,6 +126,43 @@ void REveViewer::SetBlackBackground(bool x)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// Multiplier on the client's light intensities; 1.0 is the historical look.
+
+void REveViewer::SetLightScale(Float_t s)
+{
+   fLightScale = s < 0.f ? 0.f : s;
+   StampObjProps();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// Tone curve, as EToneMapMode.
+
+void REveViewer::SetToneMapMode(Int_t m)
+{
+   fToneMapMode = m;
+   StampObjProps();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// Knee position for kToneKnee: colours below this pass through exactly, so
+/// raising it buys fidelity and spends highlight gradient.
+
+void REveViewer::SetToneMapKnee(Float_t k)
+{
+   fToneMapKnee = k < 0.f ? 0.f : (k > 0.99f ? 0.99f : k);
+   StampObjProps();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// Request a light-scale auto-tune from the clients. See the declaration.
+
+void REveViewer::AutoTuneLights()
+{
+   ++fAutoTuneSerial;
+   StampObjProps();
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// Stream Camera Info.
 /// Virtual from REveElement.
 int REveViewer::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
@@ -135,6 +172,10 @@ int REveViewer::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
    j["Mandatory"] = fMandatory;
    j["AxesType"] = fAxesType;
    j["BlackBg"] = fBlackBackground;
+   j["LightScale"] = fLightScale;
+   j["ToneMapMode"] = fToneMapMode;
+   j["ToneMapKnee"] = fToneMapKnee;
+   j["AutoTuneSerial"] = fAutoTuneSerial;
    j["fCameraId"] = fCamera ? fCamera->GetElementId() : 0;
    j["fSyncCam"] = fSyncCamera;
 

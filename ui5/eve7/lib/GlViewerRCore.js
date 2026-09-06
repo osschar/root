@@ -213,6 +213,13 @@ sap.ui.define([
          //    this.RQ_SSAA /= this.canvas.pixelRatio;
          // }
 
+         // Stable handle for the browser console and for test harnesses. There is
+         // otherwise no way to reach a viewer, its scene or its materials from
+         // outside -- which is what makes things like setting a clipping plane by
+         // hand awkward. Cheap, and in the same spirit as __RC_PICKDBG.
+         (window.__RC_VIEWERS = window.__RC_VIEWERS || []).push(this);
+         window.__RC = RC;   // the module itself, so RC.Vector3 & co. work in the console
+
          this.renderer = new RC.MeshRenderer(this.canvas, RC.WEBGL2,
                                              { antialias: false, stencil: false });
          this.renderer._logLevel = 0;
@@ -687,6 +694,8 @@ sap.ui.define([
             this.fgCol = this.creator.ColorBlack;
          }
 
+         this.applyRenderParams(eveView);
+
          this.axis.clear();
          if (eveView.AxesType > 0)
             this.makeAxis();
@@ -903,6 +912,7 @@ sap.ui.define([
             // AMT: All render passes are drawn with the black bg
             //      except of the tone map render pass
             if (this.RQ_HdrStats) { this.RQ_HdrStats = false; this.rqt.hdr_stats(); }
+            if (this._autotune_pending) { this._autotune_pending = false; this.autoTuneLights(); }
 
             this.renderer.clearColor = '#' +  this.bgCol.getHexString() + '00';
             this.rqt.render_tone_map_to_screen();
@@ -1583,6 +1593,63 @@ sap.ui.define([
          this.controls.enablePan = true;
          this.controls.enableRotate = true;
          this.request_render();
+      }
+
+      /** Apply the viewer's look parameters: light scale and tone curve.
+       *
+       * The authored intensity of each light is remembered the first time it is
+       * seen, and the scale is always applied to that -- scaling the current
+       * value would compound on every viewer update. */
+      applyRenderParams(eveView)
+      {
+         if (!eveView) return;
+
+         let scale = (eveView.LightScale === undefined) ? 1.0 : eveView.LightScale;
+         for (const l of this.lights.children) {
+            if (l._rc_base_intensity === undefined) l._rc_base_intensity = l.intensity;
+            l.intensity = l._rc_base_intensity * scale;
+         }
+
+         if (this.rqt) {
+            if (eveView.ToneMapMode !== undefined) this.rqt.set_tone_mapping(eveView.ToneMapMode);
+            if (eveView.ToneMapKnee !== undefined) this.rqt.set_tone_knee(eveView.ToneMapKnee);
+         }
+
+         // AutoTuneLights() on the server bumps this; the measurement can only
+         // happen here, against a rendered buffer, so it is deferred to render().
+         if (eveView.AutoTuneSerial !== undefined &&
+             eveView.AutoTuneSerial !== this._autotune_serial) {
+            this._autotune_serial = eveView.AutoTuneSerial;
+            if (this._autotune_serial > 0) this._autotune_pending = true;
+         }
+
+         this.request_render();
+      }
+
+      /** Pick a light scale that puts the brightest channel just under white.
+       *
+       * Reported back through SetLightScale() rather than kept locally: the
+       * parameter belongs to the viewer, so every client of it should agree, and
+       * the value survives a reload. */
+      autoTuneLights()
+      {
+         let st = this.rqt.hdr_stats();
+         if (!st || !st.covered_px || !(st.max_channel > 0)) return;
+
+         let eveView = this.controller.mgr.GetElement(this.controller.eveViewerId);
+         let cur = (eveView && eveView.LightScale !== undefined) ? eveView.LightScale : 1.0;
+
+         // Ambient is not scaled by the lights alone, so this is approximate --
+         // aim just under white and let a second request refine it if needed.
+         const target = 0.98;
+         let next = cur * target / st.max_channel;
+         next = Math.min(Math.max(next, 0.05), 8.0);
+
+         console.log("autoTuneLights: max_channel", st.max_channel.toFixed(3),
+                     "scale", cur.toFixed(3), "->", next.toFixed(3));
+         this.controller.mgr.SendMIR("SetLightScale(" + next.toFixed(4) + ")",
+                                     this.controller.eveViewerId,
+                                     "ROOT::Experimental::REveViewer");
       }
 
       /** A click on an overlay element that carries a click action sends that MIR.

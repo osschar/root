@@ -50,6 +50,14 @@ public:
       kAxesEdge
    };
 
+   /// Tone curve applied to the rendered buffer. Values match the shader.
+   enum EToneMapMode {
+      kToneReinhard = 0,
+      kToneExposure = 1,
+      kToneLinear   = 2,  ///< no curve; exact colours, but anything over 1 clips
+      kToneKnee     = 3   ///< identity below the knee, smooth roll-off above
+   };
+
 private:
    REveViewer(const REveViewer&) = delete;
    REveViewer& operator=(const REveViewer&) = delete;
@@ -58,6 +66,22 @@ private:
 
    EAxesType fAxesType{kAxesNone};
    bool      fBlackBackground{false};
+
+   /// Look of the render, per viewer. These reach the client as plain fields and
+   /// are applied there; nothing about them needs a server round trip except
+   /// that the value is shared, so every client of the viewer agrees.
+   ///
+   /// fLightScale multiplies whatever intensities the client's own light rig
+   /// uses, so 1.0 reproduces the historical look. The default is below 1
+   /// deliberately: the rig was tuned against a compositing bug that darkened
+   /// everything translucent, and once that was fixed the lights were left
+   /// pushing about a third of the image above white, where the tone curve
+   /// flattens exactly the highlights that specular lives in.
+   Float_t   fLightScale{0.65};
+   Int_t     fToneMapMode{kToneKnee};
+   Float_t   fToneMapKnee{0.95};
+   /// Bumped by AutoTuneLights(); the client re-measures when it changes.
+   Int_t     fAutoTuneSerial{0};
 
    bool fMandatory{true};
    std::string fPostStreamFlag;
@@ -88,6 +112,22 @@ public:
 
    void SetAxesType(int);
    void SetBlackBackground(bool);
+
+   Float_t GetLightScale() const { return fLightScale; }
+   void SetLightScale(Float_t s);
+
+   Int_t GetToneMapMode() const { return fToneMapMode; }
+   void SetToneMapMode(Int_t m);
+
+   Float_t GetToneMapKnee() const { return fToneMapKnee; }
+   void SetToneMapKnee(Float_t k);
+
+   /// Ask the clients to pick a light scale that keeps the brightest channel
+   /// just below white. Only the client can do this -- the dynamic range is a
+   /// property of the rendered buffer, which exists nowhere else -- so this
+   /// just requests it, and the client reports its choice back through
+   /// SetLightScale(), which then reaches every other client of this viewer.
+   void AutoTuneLights();
 
    void DisconnectClient();
    void ConnectClient();
