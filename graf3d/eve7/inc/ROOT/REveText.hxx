@@ -37,6 +37,8 @@ protected:
    Float_t     fExtraBorder {0.2}; // border around text in font-size units
    Int_t       fMode {1}; // default mode is in relative screen coordinates [0,1]
    Bool_t      fResizable {true}; // can the client resize it by dragging the corner grip
+   Int_t       fAlignH {0};       // EAlignH_e: which point of the box the position refers to
+   Int_t       fAlignV {0};       // EAlignV_e
    Color_t     fTextColor {kMagenta};
    // UChar_t     fTextAlpha {255}; // Better than main transparency -- to be fixed.
 
@@ -45,6 +47,16 @@ protected:
    static bool SetDefaultSdfFontDir();
 
 public:
+   /// Anchoring: SetPosition() says where the text goes, these say which point of
+   /// it lands there. Same model as TGLFont's ETextAlignH_e / ETextAlignV_e.
+   /// kOrigin is the default and preserves the historical behaviour -- the
+   /// position is the text origin (pen start), which sits a little inside the box
+   /// because of the frame border. The others are relative to the box, which is
+   /// what a tick label wants: kCenterH/kTop to hang under a horizontal axis,
+   /// kRight/kCenterV against a vertical one.
+   enum EAlignH_e { kOriginH = 0, kLeft, kCenterH, kRight };
+   enum EAlignV_e { kOriginV = 0, kTop, kCenterV, kBottom };
+
    REveText(const Text_t *n = "REveText", const Text_t *t = "");
    virtual ~REveText() {}
 
@@ -71,6 +83,10 @@ public:
    /// for a fixed-format label such as a run/event header.
    Bool_t GetResizable() const { return fResizable; }
    void SetResizable(Bool_t r) { fResizable = r; StampObjProps(); }
+
+   Int_t GetAlignH() const { return fAlignH; }
+   Int_t GetAlignV() const { return fAlignV; }
+   void SetTextAlign(Int_t h, Int_t v) { fAlignH = h; fAlignV = v; StampObjProps(); }
 
    Float_t GetFontHinting() const { return fFontHinting; }
    void SetFontHinting(Float_t fontHinting) { fFontHinting = fontHinting; StampObjProps();}
