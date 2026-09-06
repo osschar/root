@@ -47,6 +47,8 @@ Int_t REveText::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
    j["fResizable"] = fResizable;
    j["fAlignH"] = fAlignH;
    j["fAlignV"] = fAlignV;
+   j["fClickMir"] = fClickMir;
+   j["fClickTargetId"] = fClickTargetId;
    j["fTextColor"] = fTextColor;
 
    return ret;

@@ -1321,6 +1321,12 @@ sap.ui.define([
 
       handleMouseSelect(event)
       {
+         // A press that landed on an overlay element belongs to the overlay.
+         // pointerup runs before the compatibility mouseup that ends the overlay
+         // drag, so ovl_drag is still set here -- without this, clicking an
+         // overlay button would also clear the scene selection behind it.
+         if (this.ovl_drag) return;
+
          let x = event.offsetX * this.canvas.pixelRatio;
          let y = event.offsetY * this.canvas.pixelRatio;
          let pstate = this.render_for_picking(x, y, false);
@@ -1513,7 +1519,11 @@ sap.ui.define([
             // there -- clicking a few pixels inside the grip must not make the
             // box jump before it starts following the mouse.
             anchor_x:  rect ? Math.min(rect.x0, rect.x1) : 0,
-            grab_w:    rect ? (c.nx - Math.min(rect.x0, rect.x1)) : 0
+            grab_w:    rect ? (c.nx - Math.min(rect.x0, rect.x1)) : 0,
+            // A press that never travels far enough is a click, not a drag.
+            // Overlay elements are movable, so a button cannot be recognised on
+            // press -- only on release, once we know it stayed put.
+            moved:     false
          };
 
          // Stop the orbit controls from also acting on this drag.
@@ -1528,6 +1538,10 @@ sap.ui.define([
          if (!d) { this.updateOverlayHover(event); return; }
 
          let c = this.overlayNormCoords(event);
+
+         if (Math.abs(c.nx - d.grab_nx) > GlViewerRCore.OVL_CLICK_SLOP ||
+             Math.abs(c.ny - d.grab_ny) > GlViewerRCore.OVL_CLICK_SLOP)
+            d.moved = true;
 
          if (d.zone === "move") {
             d.obj.ovlSetPos(d.orig_x + (c.nx - d.grab_nx),
@@ -1546,10 +1560,40 @@ sap.ui.define([
       {
          if (!this.ovl_drag) return;
 
+         if (!this.ovl_drag.moved) this.overlayClick(this.ovl_drag.obj);
+
          this.ovl_drag = null;
          this.controls.enablePan = true;
          this.controls.enableRotate = true;
          this.request_render();
+      }
+
+      /** A click on an overlay element that carries a click action sends that MIR.
+       *
+       * Everything else the overlay does -- moving, resizing, hover -- is
+       * client-local by design. A button is the deliberate exception: it exists
+       * to change server state, so it goes through the normal MIR path and the
+       * result comes back to every subscribed client, not just this viewer.
+       *
+       * The action is read off the streamed element rather than the RCore
+       * object, so nothing in RenderCore needs to know that buttons exist. */
+      overlayClick(obj)
+      {
+         let el = obj ? obj.eve_el : null;
+         if (!el || !el.fClickMir) return;
+
+         let mgr = this.controller ? this.controller.mgr : null;
+         if (!mgr) return;
+
+         // fClickTargetId 0 means "this element"; anything else lets a button
+         // drive an object it is not part of, which is the usual case.
+         let tid = el.fClickTargetId || el.fElementId;
+         let tgt = mgr.GetElement(tid);
+         if (!tgt) {
+            console.error("overlayClick: no element", tid, "for MIR", el.fClickMir);
+            return;
+         }
+         mgr.SendMIR(el.fClickMir, tid, tgt._typename);
       }
 
       /** Hide/show overlay elements flagged exclude_from_capture. Used around the
@@ -1583,6 +1627,12 @@ sap.ui.define([
             console.error("Exception caught in clearAttributesAndTextures.", e);
          }
       }
+
+      /** Click/drag threshold for overlay elements, as a fraction of the canvas
+       * (nx/ny are 0..1), so roughly 3 px on a typical view. Small enough that
+       * a deliberate drag is never mistaken for a click, large enough to absorb
+       * the pointer jitter of an ordinary press. */
+      static OVL_CLICK_SLOP = 0.004;
 
       static showShaderCount = 0;
       showShaderJson(arg)
