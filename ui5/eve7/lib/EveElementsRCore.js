@@ -939,9 +939,15 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager) {
 
       makeProjectionAxis(el, rnr_data)
       {
+         // An axis is chrome: unless told otherwise it takes the viewer's
+         // foreground colour, so it stays legible when the background flips.
+         // Its own colours would leave it black on black.
+         let use_fg = (el.fUseFgColor === undefined) ? true : !!el.fUseFgColor;
+         let txt_col = use_fg ? this.viewer.fgCol : RcCol(el.fTextColor);
+
          let axis = new RC.ZTextAxis({
             fontSize:  el.fFontSize,
-            color:     RcCol(el.fTextColor),
+            color:     txt_col,
             axesMode:  el.fAxesMode,
             fontHinting: el.fFontHinting,
             fontWeight:  el.fFontWeight
@@ -950,7 +956,9 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager) {
          // Ticks use the frame line colour; no plate behind an axis.
          axis.setupFrameStuff(1.0, false,
                               RcCol(el.fFillColor), 0.0,
-                              RcCol(el.fLineColor), 1.0, 0.0, 0.0);
+                              use_fg ? this.viewer.fgCol : RcCol(el.fLineColor),
+                              1.0, 0.0, 0.0);
+         axis.use_fg_color = use_fg;   // so a later background flip can recolour it
 
          axis.setTicks({ pos: el.fTickPosH, lab: el.fTickLabH, maj: el.fTickMajH },
                        { pos: el.fTickPosV, lab: el.fTickLabV, maj: el.fTickMajV },

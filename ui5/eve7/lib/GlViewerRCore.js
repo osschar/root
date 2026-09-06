@@ -695,6 +695,7 @@ sap.ui.define([
          }
 
          this.applyRenderParams(eveView);
+         this.recolourFgElements();
 
          this.axis.clear();
          if (eveView.AxesType > 0)
@@ -1593,6 +1594,21 @@ sap.ui.define([
          this.controls.enablePan = true;
          this.controls.enableRotate = true;
          this.request_render();
+      }
+
+      /** Re-colour elements that follow the viewer's foreground colour.
+       *
+       * Chrome -- a projection axis, say -- has to stay legible when the
+       * background flips, and the flip happens long after the object was built,
+       * so the colour cannot simply be baked in at construction. */
+      recolourFgElements()
+      {
+         let fg = this.fgCol;
+         if (!fg) return;
+         let recolour = (o) => { if (o.use_fg_color && typeof o.setColors === "function")
+                                    o.setColors(fg, fg); };
+         if (this.overlay_scene) this.overlay_scene.traverse(recolour);
+         if (this.scene) this.scene.traverse(recolour);
       }
 
       /** Apply the viewer's look parameters: light scale and tone curve.
