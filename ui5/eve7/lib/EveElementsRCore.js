@@ -852,6 +852,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager) {
             fontSize: el.fFontSize,
             mode: el.fMode,
             fontHinting: el.fFontHinting,
+            fontWeight: el.fFontWeight || 0.0,
             color: RcCol(el.fTextColor),
             alignH: el.fAlignH || 0,
             alignV: el.fAlignV || 0,
@@ -942,7 +943,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager) {
             fontSize:  el.fFontSize,
             color:     RcCol(el.fTextColor),
             axesMode:  el.fAxesMode,
-            fontHinting: el.fFontHinting
+            fontHinting: el.fFontHinting,
+            fontWeight:  el.fFontWeight
          });
 
          // Ticks use the frame line colour; no plate behind an axis.
