@@ -61,7 +61,13 @@ REveProjectionAxis::REveProjectionAxis(REveProjectionManager *m, const Text_t *n
    // Inherited style defaults that make sense for tick labels rather than for a
    // free-standing text box.
    SetMode(1);          // screen space; the client places the labels itself
-   SetFontSize(0.022f);
+   // A projected view is often a small pane, where 0.022 of its height is under
+   // ten pixels of cap height and a stroke is about one pixel wide -- thin and
+   // ragged, since coverage then varies along the stroke. A little more size and
+   // a little synthetic weight cost nothing and fix both; neither needs a
+   // second, heavier atlas.
+   SetFontSize(0.028f);
+   SetFontWeight(0.06f);
    SetDrawFrame(kFALSE);
    SetTextAlign(kCenterH, kTop);
 

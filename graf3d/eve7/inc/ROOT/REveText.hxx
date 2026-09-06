@@ -37,6 +37,7 @@ protected:
    Float_t     fExtraBorder {0.2}; // border around text in font-size units
    Int_t       fMode {1}; // default mode is in relative screen coordinates [0,1]
    Bool_t      fResizable {true}; // can the client resize it by dragging the corner grip
+   Float_t     fFontWeight {0.f}; // synthetic bold; 0 is the font as authored
    Int_t       fAlignH {0};       // EAlignH_e: which point of the box the position refers to
    Int_t       fAlignV {0};       // EAlignV_e
    std::string fClickMir;         // MIR the client sends when this text is clicked; empty = not a button
@@ -108,6 +109,13 @@ public:
    }
    const std::string &GetClickMir() const { return fClickMir; }
    ElementId_t GetClickTargetId() const { return fClickTargetId; }
+
+   /// Stroke weight, applied by moving the SDF threshold rather than by loading
+   /// a heavier face -- so it is continuous and needs no second atlas. Worth a
+   /// small positive value for anything rendered only a few pixels tall, where
+   /// a one-pixel stroke otherwise reads as thin and ragged.
+   Float_t GetFontWeight() const { return fFontWeight; }
+   void SetFontWeight(Float_t w) { fFontWeight = w; StampObjProps(); }
 
    Float_t GetFontHinting() const { return fFontHinting; }
    void SetFontHinting(Float_t fontHinting) { fFontHinting = fontHinting; StampObjProps();}
