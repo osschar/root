@@ -370,6 +370,55 @@ void REveManager::BrowseElement(ElementId_t id)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// Ask every connected client to grab the image of its GL viewers and post it
+/// to an image-collector service.
+///
+/// The grab happens in the client, after tone mapping but *before* the viewer
+/// background colour is composited in, so the posted PNG keeps straight alpha
+/// and can be placed over any backdrop downstream.
+///
+/// This is deliberately per client rather than per viewer: in a control room the
+/// same event is on several screens showing different views, and each machine
+/// posts what it is actually displaying, all tagged with the same `event_id`.
+///
+/// The wire contract, so a site can implement its own collector: the client
+/// POSTs `application/octet-stream` to \p url, the body being the raw
+/// framebuffer of width*height*4 bytes, RGBA8 with straight (un-premultiplied)
+/// alpha and no background composited in. Dimensions and tags travel as headers
+/// X-Width, X-Height, X-Event-ID, X-View-Type, and X-Flip-Y which is 1 when the
+/// rows are still in WebGL bottom-left order. A reference receiver lives in
+/// RenderCore under util/image-gator.js.
+///
+/// The default endpoint is loopback on purpose: the collector is expected to run
+/// on the same machine as the client -- a console at P5, or a controlled CERN IT
+/// virtual machine -- so the image never crosses a network and needs no transport
+/// security. Pointing this at a remote host is a different proposition and wants
+/// TLS and authentication.
+///
+/// \param event_id  tag recorded with the image, e.g. run/lumi/event
+/// \param url       collector endpoint; empty takes rootrc `WebEve.ImageGatorUrl`,
+///                  which itself defaults to http://localhost:3000/capture
+/// \param scale     multiplier on the viewer viewport; 1 is what the operator sees
+/// \param viewers   restrict to these viewer names; empty means all of them
+
+void REveManager::GrabImages(std::string_view event_id, std::string_view url, int scale,
+                             const std::vector<std::string> &viewers)
+{
+   std::string dest(url);
+   if (dest.empty())
+      dest = gEnv->GetValue("WebEve.ImageGatorUrl", "http://localhost:3000/capture");
+
+   nlohmann::json msg = {};
+   msg["content"]  = "GrabImage";
+   msg["event_id"] = std::string(event_id);
+   msg["url"]      = dest;
+   msg["scale"]    = scale;
+   msg["viewers"]  = viewers;
+
+   fWebWindow->Send(0, msg.dump());
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// Called from REveElement prior to its destruction so the
 /// framework components (like object editor) can unreference it.
 
