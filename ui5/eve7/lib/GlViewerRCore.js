@@ -168,7 +168,24 @@ sap.ui.define([
          let vid = this.get_view().sId + "--rcore";
          canvasParentDOM.setAttribute("id", vid);
          canvasParentDOM.style.width = "100%";
-         canvasParentDOM.style.height = "100%";
+
+         // Height must be "what the toolbar left over", not 100%. This div is a
+         // normal-flow sibling that follows the view's toolbar, so height:100%
+         // made it as tall as the entire view while starting below the toolbar
+         // -- overhanging the view's overflow:hidden edge by exactly the
+         // toolbar's height. GL still rendered that strip, so anything drawn
+         // hard against the bottom of the viewport was painted where the layout
+         // never shows it. A projection axis is what exposed this, being the
+         // only thing deliberately placed on the bottom edge.
+         //
+         // Done with flex rather than a computed pixel height so it needs no
+         // measurement, survives a toolbar that changes size, and degrades to
+         // the full height when there is no toolbar at all. min-height:0 is
+         // required or the flex item refuses to shrink below its content.
+         this.get_view().getDomRef().style.display = "flex";
+         this.get_view().getDomRef().style.flexDirection = "column";
+         canvasParentDOM.style.flex = "1 1 0";
+         canvasParentDOM.style.minHeight = "0";
 
          // in case of openui5 rooter, the canvas element accumulates
          // destroy the old canvas element
