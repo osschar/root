@@ -114,6 +114,13 @@ static void makeProjectedView(REveManager *eveMng, REveElement *content, REvePro
    mng = new REveProjectionManager(type);
    mng->ImportElements(content, scene);
 
+   // Put the manager in the element tree. Without this it has no element id, so
+   // the client has never heard of it: it cannot be a MIR target, and the
+   // distortion the manager formats into its own name -- "RhoPhi (5.0)" -- never
+   // reaches a browser to be seen. Both matter here, since the overlay buttons
+   // address it and hold it as an aunt.
+   eveMng->GetWorld()->AddElement(mng);
+
    auto ovl = eveMng->SpawnNewScene(Form("%s Axis", name), name);
    ovl->SetIsOverlay(true);
 
@@ -129,10 +136,15 @@ static void makeProjectedView(REveManager *eveMng, REveElement *content, REvePro
    // a single element would have to hit-test which third of itself was clicked,
    // and REveText has no notion of sub-areas.
    //
-   // All three address the axis, not the projection manager: the axis already
-   // holds the manager as its aunt, and BumpDistortion() there does the whole
-   // job -- reproject, refresh the manager's name, recompute the ticks and
-   // rewrite the read-out -- in one MIR, so the client never has to sequence it.
+   // All three address the projection manager: it owns the current projection, so
+   // distortion belongs to it, and it refreshes the axes hanging off it as
+   // nieces. One MIR therefore does the whole job -- reproject, refresh the name,
+   // recompute the ticks, rewrite the read-out -- and the client never has to
+   // sequence anything.
+   //
+   // The manager is also an REveAuntAsList, so SetClickAction() holds it as an
+   // aunt: destroy it and the buttons' actions clear themselves rather than
+   // pointing at a dead element.
    {
       auto mkbtn = [&](const char *label, Float_t x, const char *mir) {
          auto b = new REveText(Form("%s %s", name, label), label);
@@ -154,7 +166,7 @@ static void makeProjectedView(REveManager *eveMng, REveElement *content, REvePro
          b->SetLineWidth(0.06);         // in units of line height
          b->SetExtraBorder(0.18);       // padding, in font-size units
          b->SetResizable(false);        // a control is not a resizable annotation
-         if (mir) b->SetClickAction(mir, axis);
+         if (mir) b->SetClickAction(mir, mng);
          ovl->AddElement(b);
          return b;
       };

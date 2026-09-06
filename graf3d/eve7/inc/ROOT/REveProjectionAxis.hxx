@@ -135,15 +135,6 @@ public:
    /// changes; the client needs no update on mere camera motion.
    void UpdateTicks();
 
-   /// Step the projection's distortion and reproject. Public and in the
-   /// dictionary because it is a MIR target: it is what the overlay's
-   /// distortion buttons call.
-   ///
-   /// The step is additive in units of 1e-4, which is what the manager's own
-   /// name formatting implies by reporting distortion * 1000, and it is
-   /// clamped at zero -- a negative distortion is not meaningful and the
-   /// projections divide by 1 + |x| * distortion.
-   void BumpDistortion(Int_t steps);
 
    /// Attach a text element to display the current distortion. Not owned; the
    /// axis only rewrites its string, so the label can live anywhere.

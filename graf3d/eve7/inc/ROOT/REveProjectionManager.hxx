@@ -58,6 +58,17 @@ public:
 
    virtual void UpdateName();
 
+   /// Step the current projection's distortion and reproject. Public and in the
+   /// dictionary because it is a MIR target -- the overlay's distortion buttons
+   /// call it. It lives here rather than on the axis because the manager is what
+   /// owns the projection; the axes are its nieces and are refreshed from here.
+   ///
+   /// Additive in units of 1e-4, matching the distortion * 1000 this class
+   /// already reports in its own name, and clamped at zero: a negative
+   /// distortion is not meaningful, and the projections divide by
+   /// 1 + |x| * distortion.
+   void BumpDistortion(Int_t steps);
+
    void SetCenter(Float_t x, Float_t y, Float_t z);
    REveVector &GetCenter() { return fCenter; }
 

@@ -42,6 +42,7 @@ protected:
    Int_t       fAlignV {0};       // EAlignV_e
    std::string fClickMir;         // MIR the client sends when this text is clicked; empty = not a button
    ElementId_t fClickTargetId{0}; // element the MIR is addressed to; 0 means this element
+   REveAunt   *fClickAunt{nullptr}; //! target held as an aunt, so its death is noticed
    Color_t     fTextColor {kMagenta};
    // UChar_t     fTextAlpha {255}; // Better than main transparency -- to be fixed.
 
@@ -101,14 +102,14 @@ public:
    /// the click is dispatched by the viewer that owns the overlay, while the
    /// effect arrives back through the normal scene stream, so every subscribed
    /// client sees it -- a button in one view is not private to that view.
-   void SetClickAction(std::string_view mir, REveElement *target = nullptr)
-   {
-      fClickMir = mir;
-      fClickTargetId = target ? target->GetElementId() : 0;
-      StampObjProps();
-   }
+   void SetClickAction(std::string_view mir, REveElement *target = nullptr);
    const std::string &GetClickMir() const { return fClickMir; }
    ElementId_t GetClickTargetId() const { return fClickTargetId; }
+
+   /// Clears the click action when the target dies. The id alone carries no
+   /// lifetime relationship, so without this a button would keep pointing at a
+   /// destroyed element -- and at an id free to be reused by an unrelated one.
+   void RemoveAunt(REveAunt *au) override;
 
    /// Stroke weight, applied by moving the SDF threshold rather than by loading
    /// a heavier face -- so it is continuous and needs no second atlas. Worth a
