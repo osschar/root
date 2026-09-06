@@ -216,6 +216,7 @@ Int_t REveProjectionAxis::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
 
    j["fLabMode"] = (int)fLabMode;
    j["fAxesMode"] = (int)fAxesMode;
+   j["fUseFgColor"] = fUseFgColor;
    j["fDrawCenter"] = fDrawCenter;
    j["fDrawOrigin"] = fDrawOrigin;
 

@@ -90,6 +90,10 @@ protected:
    /// let the filter decide -- the same bargain the tick range itself makes.
    Int_t   fNdivisions{1010};
    Float_t fRangeFactor{2.0};  ///< over-provision: extend past the scene extent by this factor
+   /// Take the viewer's foreground colour instead of fTextColor/fLineColor. On by
+   /// default: an axis is chrome, and chrome has to stay legible when the
+   /// background flips. Its own colours are ignored while this is set.
+   Bool_t  fUseFgColor{kTRUE};
    Bool_t  fDrawCenter{kFALSE};
    Bool_t  fDrawOrigin{kFALSE};
 
@@ -117,6 +121,9 @@ public:
 
    Float_t GetRangeFactor() const { return fRangeFactor; }
    void SetRangeFactor(Float_t f) { fRangeFactor = f; StampObjProps(); }
+
+   Bool_t GetUseFgColor() const { return fUseFgColor; }
+   void SetUseFgColor(Bool_t x) { fUseFgColor = x; StampObjProps(); }
 
    Bool_t GetDrawCenter() const { return fDrawCenter; }
    void SetDrawCenter(Bool_t x) { fDrawCenter = x; StampObjProps(); }

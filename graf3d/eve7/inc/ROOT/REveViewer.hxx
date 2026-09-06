@@ -77,7 +77,7 @@ private:
    /// everything translucent, and once that was fixed the lights were left
    /// pushing about a third of the image above white, where the tone curve
    /// flattens exactly the highlights that specular lives in.
-   Float_t   fLightScale{0.65};
+   Float_t   fLightScale{0.85};
    Int_t     fToneMapMode{kToneKnee};
    Float_t   fToneMapKnee{0.95};
    /// Bumped by AutoTuneLights(); the client re-measures when it changes.

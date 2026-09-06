@@ -67,8 +67,14 @@ void pa_distortion(float d)
       mng->UpdateName();
       mng->ProjectChildren();
    }
-   if (gPaAxisRPhi) gPaAxisRPhi->UpdateTicks();
-   if (gPaAxisRhoZ) gPaAxisRhoZ->UpdateTicks();
+   // Ticks and the read-out both follow the projection, so keep them together --
+   // BumpDistortion() from the overlay buttons does the same, and it would be
+   // confusing for the two routes to leave the display in different states.
+   for (auto ax : {gPaAxisRPhi, gPaAxisRhoZ}) {
+      if (!ax) continue;
+      ax->UpdateTicks();
+      ax->UpdateDistortionLabel();
+   }
 }
 
 //------------------------------------------------------------------------------
