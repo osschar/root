@@ -118,6 +118,51 @@ static void makeProjectedView(REveManager *eveMng, REveElement *content, REvePro
    axis->SetFont("LiberationSans-Regular");
    ovl->AddElement(axis);
 
+   // Distortion controls: three overlay texts in the same overlay scene, laid
+   // out as [ <<< | value | >>> ]. Buttons rather than one compound widget --
+   // a single element would have to hit-test which third of itself was clicked,
+   // and REveText has no notion of sub-areas.
+   //
+   // All three address the axis, not the projection manager: the axis already
+   // holds the manager as its aunt, and BumpDistortion() there does the whole
+   // job -- reproject, refresh the manager's name, recompute the ticks and
+   // rewrite the read-out -- in one MIR, so the client never has to sequence it.
+   {
+      auto mkbtn = [&](const char *label, Float_t x, const char *mir) {
+         auto b = new REveText(Form("%s %s", name, label), label);
+         b->SetText(label);
+         b->SetFont("LiberationSans-Regular");
+         // These views are short, so the controls need a larger font than the
+         // tick labels to stay legible, and enough clearance from the bottom
+         // edge that the frame is not clipped by the pane.
+         b->SetFontSize(0.034);
+         b->SetMode(1);                 // relative screen coordinates
+         b->SetPosition(REveVector(x, 0.10f, 0.f));
+         b->SetTextAlign(REveText::kCenterH, REveText::kBottom);
+         b->SetTextColor(TColor::GetColor("#1f2d36"));
+         b->SetDrawFrame(true);
+         b->SetFillColor(TColor::GetColor("#dfe6ea"));
+         b->SetFillAlpha(210);
+         b->SetLineColor(TColor::GetColor("#6b8290"));
+         b->SetLineAlpha(255);
+         b->SetLineWidth(0.06);         // in units of line height
+         b->SetExtraBorder(0.18);       // padding, in font-size units
+         b->SetResizable(false);        // a control is not a resizable annotation
+         if (mir) b->SetClickAction(mir, axis);
+         ovl->AddElement(b);
+         return b;
+      };
+
+      // Spacing is tuned rather than computed: only the client knows the glyph
+      // metrics, so the server cannot lay these out without a round trip. Wide
+      // enough here that the three do not collide in a narrow projected pane.
+      mkbtn("<<<", 0.26f, "BumpDistortion(-1)");
+      auto val = mkbtn("0.0", 0.50f, nullptr);   // read-out, not a button
+      mkbtn(">>>", 0.74f, "BumpDistortion(1)");
+
+      axis->SetDistortionLabel(val);
+   }
+
    auto view = eveMng->SpawnNewViewer(Form("%s View", name), "");
    view->SetCameraType(REveViewer::kCameraOrthoXOY);
    view->AddScene(scene);

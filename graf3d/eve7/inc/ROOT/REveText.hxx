@@ -39,6 +39,8 @@ protected:
    Bool_t      fResizable {true}; // can the client resize it by dragging the corner grip
    Int_t       fAlignH {0};       // EAlignH_e: which point of the box the position refers to
    Int_t       fAlignV {0};       // EAlignV_e
+   std::string fClickMir;         // MIR the client sends when this text is clicked; empty = not a button
+   ElementId_t fClickTargetId{0}; // element the MIR is addressed to; 0 means this element
    Color_t     fTextColor {kMagenta};
    // UChar_t     fTextAlpha {255}; // Better than main transparency -- to be fixed.
 
@@ -87,6 +89,25 @@ public:
    Int_t GetAlignH() const { return fAlignH; }
    Int_t GetAlignV() const { return fAlignV; }
    void SetTextAlign(Int_t h, Int_t v) { fAlignH = h; fAlignV = v; StampObjProps(); }
+
+   /// Make this text act as a button: a click that does not turn into a drag
+   /// makes the client send `mir` to `target` (to this element if null).
+   ///
+   /// This is the one place where an overlay element is deliberately not
+   /// client-local. Moving and resizing stay local because they are pure
+   /// presentation, but a button exists to change server state, so the round
+   /// trip is the point rather than a cost. Note the asymmetry it introduces:
+   /// the click is dispatched by the viewer that owns the overlay, while the
+   /// effect arrives back through the normal scene stream, so every subscribed
+   /// client sees it -- a button in one view is not private to that view.
+   void SetClickAction(std::string_view mir, REveElement *target = nullptr)
+   {
+      fClickMir = mir;
+      fClickTargetId = target ? target->GetElementId() : 0;
+      StampObjProps();
+   }
+   const std::string &GetClickMir() const { return fClickMir; }
+   ElementId_t GetClickTargetId() const { return fClickTargetId; }
 
    Float_t GetFontHinting() const { return fFontHinting; }
    void SetFontHinting(Float_t fontHinting) { fFontHinting = fontHinting; StampObjProps();}
