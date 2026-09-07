@@ -36,8 +36,6 @@
 #include <ROOT/REveTrack.hxx>
 #include <ROOT/REveTrackPropagator.hxx>
 
-#include "TSystem.h"
-
 namespace REX = ROOT::Experimental;
 
 // globals
@@ -344,9 +342,6 @@ void event_demo()
       createProjectionStuff();
       projectScenes(true, true);
    }
-
-   std::string rf = gSystem->ExpandPathName("${ROOTSYS}/fonts/");
-   REX::REveText::AssertSdfFont("LiberationSerif-Regular", rf + "LiberationSerif-Regular.ttf");
 
    for (auto vp : eveMng->GetViewers()->RefChildren()) {
       auto &v = *(REX::REveViewer*)vp;
