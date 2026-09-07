@@ -37,8 +37,8 @@
 #include <ROOT/REveText.hxx>
 #include <ROOT/REveViewer.hxx>
 
+#include "TROOT.h"
 #include "TColor.h"
-#include "TSystem.h"
 #include "TGeoTube.h"
 #include "TMath.h"
 #include "TRandom.h"
@@ -47,7 +47,7 @@ using namespace ROOT::Experimental;
 
 REveProjectionManager *gPaRPhi = nullptr;
 REveProjectionManager *gPaRhoZ = nullptr;
-/// Ships with ROOT in ${ROOTSYS}/fonts -- see texts.C, which uses the same two
+/// Ships with ROOT in the data dir's fonts/ -- see texts.C, which uses the same two
 /// Liberation faces. Stroke weight rather than a bold face does the emphasising.
 static const char *kAxisFont = "LiberationSerif-Regular";
 
@@ -197,11 +197,11 @@ void projection_axes()
    auto eveMng = REveManager::Create();
    eveMng->AllowMultipleRemoteConnections(false, false);
 
-   // From ${ROOTSYS}/fonts, which is where texts.C takes its fonts from and the only
+   // From TROOT::GetDataDir()/fonts, which is the only
    // portable choice: LiberationSerif-Regular ships with ROOT. A
    // /usr/share/fonts/liberation-sans path would tie the tutorial to one distribution's
    // layout, and ROOT ships no Liberation Sans to fall back on.
-   std::string rf = gSystem->ExpandPathName("${ROOTSYS}/fonts/");
+   std::string rf = std::string(TROOT::GetDataDir().Data()) + "/fonts/";
    REveText::AssertSdfFont(kAxisFont, rf + kAxisFont + ".ttf");
 
    auto content = makeSceneContent(eveMng);

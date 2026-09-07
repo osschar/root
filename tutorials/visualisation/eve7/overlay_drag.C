@@ -53,13 +53,12 @@
 #include "TColor.h"
 #include "TGeoTube.h"
 #include "TROOT.h"
-#include "TSystem.h"
 #include "TMath.h"
 #include "TRandom.h"
 
 using namespace ROOT::Experimental;
 
-/// Ships with ROOT in ${ROOTSYS}/fonts -- see texts.C.
+/// Ships with ROOT in the data dir's fonts/ -- see texts.C.
 static const char *kOvlFont = "LiberationSerif-Regular";
 
 const Double_t kR_min = 240;
@@ -146,11 +145,11 @@ void overlay_drag()
 
    // SDF fonts are generated on demand into ui5/eve7/sdf-fonts/ and reused after
    // that; this is a no-op once the .png and .js.gz for the font are present.
-   // ${ROOTSYS}/fonts, as texts.C does. ROOT ships no Liberation Sans and no bold
+   // TROOT::GetDataDir()/fonts. ROOT ships no Liberation Sans and no bold
    // Liberation at all, so the weight comes from REveText::SetFontWeight() instead --
    // the SDF threshold gives synthetic bold from the one atlas, which is exactly the
    // case it exists for.
-   std::string rf = gSystem->ExpandPathName("${ROOTSYS}/fonts/");
+   std::string rf = std::string(TROOT::GetDataDir().Data()) + "/fonts/";
    REveText::AssertSdfFont(kOvlFont, rf + kOvlFont + ".ttf");
 
    makeSceneContent(eveMng);
