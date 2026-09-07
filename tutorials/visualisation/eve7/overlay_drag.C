@@ -59,6 +59,9 @@
 
 using namespace ROOT::Experimental;
 
+/// Ships with ROOT in ${ROOTSYS}/fonts -- see texts.C.
+static const char *kOvlFont = "LiberationSerif-Regular";
+
 const Double_t kR_min = 240;
 const Double_t kR_max = 250;
 const Double_t kZ_d = 300;
@@ -72,7 +75,8 @@ REveText *makeAnnotation(REveElement *holder, const char *name, const char *text
 {
    auto t = new REveText(name);
    t->SetText(text);
-   t->SetFont("LiberationSans-Bold");
+   t->SetFont(kOvlFont);
+   t->SetFontWeight(0.05f);   // stands in for the bold face ROOT does not ship
    t->SetMode(1); // 1 = screen mode: position is in the (0,1) overlay box
    t->SetFontSize(size);
    t->SetPosition(REveVector(x, y, 0.0));
@@ -142,7 +146,12 @@ void overlay_drag()
 
    // SDF fonts are generated on demand into ui5/eve7/sdf-fonts/ and reused after
    // that; this is a no-op once the .png and .js.gz for the font are present.
-   REveText::AssertSdfFont("LiberationSans-Bold", "/usr/share/fonts/liberation-sans/LiberationSans-Bold.ttf");
+   // ${ROOTSYS}/fonts, as texts.C does. ROOT ships no Liberation Sans and no bold
+   // Liberation at all, so the weight comes from REveText::SetFontWeight() instead --
+   // the SDF threshold gives synthetic bold from the one atlas, which is exactly the
+   // case it exists for.
+   std::string rf = gSystem->ExpandPathName("${ROOTSYS}/fonts/");
+   REveText::AssertSdfFont(kOvlFont, rf + kOvlFont + ".ttf");
 
    makeSceneContent(eveMng);
 
