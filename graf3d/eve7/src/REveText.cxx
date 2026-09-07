@@ -37,7 +37,7 @@ REveText::REveText(const Text_t* n, const Text_t* t) :
 /// dangling id behind; a target that is not an REveAunt still works, just
 /// without that tracking.
 
-void REveText::SetClickAction(std::string_view mir, REveElement *target)
+void REveText::SetClickAction(const std::string &mir, REveElement *target)
 {
    if (fClickAunt) {
       fClickAunt->RemoveNiece(this);
@@ -128,7 +128,7 @@ std::string REveText::sSdfFontDir;
 /// REveManager needs to be created before calling this function.
 /// Static function.
 
-bool REveText::SetSdfFontDir(std::string_view dir, bool require_write_access)
+bool REveText::SetSdfFontDir(const std::string &dir, bool require_write_access)
 {
    static const char* tpfx = "REveText::SetSdfFontDir";
 
@@ -194,7 +194,7 @@ bool REveText::SetDefaultSdfFontDir()
 /// Returns true if font files are present, false otherwise.
 /// Static function.
 
-bool REveText::AssertSdfFont(std::string_view font_name, std::string_view ttf_font)
+bool REveText::AssertSdfFont(const std::string &font_name, const std::string &ttf_font)
 {
    static const char* tpfx = "REveText::AssertSdfFont";
 

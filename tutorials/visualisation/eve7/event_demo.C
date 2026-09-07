@@ -36,6 +36,8 @@
 #include <ROOT/REveTrack.hxx>
 #include <ROOT/REveTrackPropagator.hxx>
 
+#include "TSystem.h"
+
 namespace REX = ROOT::Experimental;
 
 // globals
@@ -341,6 +343,16 @@ void event_demo()
    if (true) {
       createProjectionStuff();
       projectScenes(true, true);
+   }
+
+   std::string rf = gSystem->ExpandPathName("${ROOTSYS}/fonts/");
+   REX::REveText::AssertSdfFont("LiberationSerif-Regular", rf + "LiberationSerif-Regular.ttf");
+
+   for (auto vp : eveMng->GetViewers()->RefChildren()) {
+      auto &v = *(REX::REveViewer*)vp;
+      v.SetAxesType(REX::REveViewer::kAxesEdge);
+      //v.SetCameraType(REX::REveViewer::kCameraOrthoXOY);
+      //v.SetCameraType(REX::REveViewer::kCameraPerspXOZ);
    }
 
    eveMng->Show();
