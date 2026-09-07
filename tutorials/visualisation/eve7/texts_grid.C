@@ -41,8 +41,8 @@
 #include <ROOT/REveText.hxx>
 #include <ROOT/REveViewer.hxx>
 
+#include "TROOT.h"
 #include "TMath.h"
-#include "TSystem.h"
 
 #include <map>
 #include <string>
@@ -57,7 +57,7 @@ using namespace ROOT::Experimental;
 //                                                 smoothstep is too wide
 const char *kRuler = "Ill1 OQ08 //\\\\ ..";
 
-// Every one of these ships in $ROOTSYS/fonts. ROOT carries Liberation Mono and Serif
+// Every one of these ships in ROOT's data dir. ROOT carries Liberation Mono and Serif
 // but no Liberation Sans, so a Sans entry would only work where the distribution
 // happens to provide it. Bold is demonstrated with REveText::SetFontWeight() rather
 // than a second atlas -- see panel B.
@@ -213,7 +213,7 @@ void texts_grid(const char *panels = "ABCDE")
    // Fonts are expected to be pre-generated in ui5/eve7/sdf-fonts/. AssertSdfFont
    // is a no-op when both the .png and the .js.gz are there; it only needs a GL
    // context (and hence a display) when it actually has to build one.
-   std::string rf = gSystem->ExpandPathName("${ROOTSYS}/fonts/");
+   std::string rf = std::string(TROOT::GetDataDir().Data()) + "/fonts/";
    for (int i = 0; i < kNFonts; ++i)
       REveText::AssertSdfFont(kFonts[i], rf + kFonts[i] + ".ttf");
 

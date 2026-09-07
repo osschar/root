@@ -15,7 +15,7 @@
 #include <ROOT/REveJetCone.hxx>
 #include <ROOT/REveText.hxx>
 
-#include "TSystem.h"
+#include "TROOT.h"
 
 using namespace ROOT::Experimental;
 const Double_t kR_min = 240;
@@ -116,7 +116,7 @@ void overlay_test()
    // up and AssertSdfFont() quietly does nothing. Generating an atlas also needs a
    // GL context, so a first run cannot be done in batch mode.
    {
-      std::string rf = gSystem->ExpandPathName("${ROOTSYS}/fonts/");
+      std::string rf = std::string(TROOT::GetDataDir().Data()) + "/fonts/";
       REveText::AssertSdfFont("LiberationSerif-Regular", rf + "LiberationSerif-Regular.ttf");
    }
 
