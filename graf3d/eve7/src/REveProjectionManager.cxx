@@ -94,9 +94,10 @@ void REveProjectionManager::BumpDistortion(Int_t steps)
    UpdateName();
    ProjectChildren();
 
-   // Refresh whatever axes are hanging off this manager. The dynamic_cast is the
-   // one piece of downward knowledge here; a general notification on REveElement
-   // would avoid it, but it is not worth a virtual on every element for this.
+   // Refresh whatever axes are hanging off this manager. Nieces are held as
+   // pointers to base, so the type is established with dynamic_cast at use time --
+   // either it is enforced when the pointer is set or the collection joined, or it
+   // is checked on each use, and aunts do the latter by design.
    for (auto &n : fNieces) {
       if (auto ax = dynamic_cast<REveProjectionAxis *>(n)) {
          ax->UpdateTicks();
