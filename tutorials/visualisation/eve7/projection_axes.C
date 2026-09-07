@@ -38,6 +38,7 @@
 #include <ROOT/REveViewer.hxx>
 
 #include "TColor.h"
+#include "TSystem.h"
 #include "TGeoTube.h"
 #include "TMath.h"
 #include "TRandom.h"
@@ -46,6 +47,10 @@ using namespace ROOT::Experimental;
 
 REveProjectionManager *gPaRPhi = nullptr;
 REveProjectionManager *gPaRhoZ = nullptr;
+/// Ships with ROOT in ${ROOTSYS}/fonts -- see texts.C, which uses the same two
+/// Liberation faces. Stroke weight rather than a bold face does the emphasising.
+static const char *kAxisFont = "LiberationSerif-Regular";
+
 REveProjectionAxis *gPaAxisRPhi = nullptr;
 REveProjectionAxis *gPaAxisRhoZ = nullptr;
 
@@ -128,7 +133,7 @@ static void makeProjectedView(REveManager *eveMng, REveElement *content, REvePro
    axis->SetFontSize(0.022);
    axis->SetTextColor(TColor::GetColor("#1f2d36"));
    axis->SetLineColor(TColor::GetColor("#6b8290"));
-   axis->SetFont("LiberationSans-Regular");
+   axis->SetFont(kAxisFont);
    ovl->AddElement(axis);
 
    // Distortion controls: three overlay texts in the same overlay scene, laid
@@ -149,7 +154,7 @@ static void makeProjectedView(REveManager *eveMng, REveElement *content, REvePro
       auto mkbtn = [&](const char *label, Float_t x, const char *mir) {
          auto b = new REveText(Form("%s %s", name, label), label);
          b->SetText(label);
-         b->SetFont("LiberationSans-Regular");
+         b->SetFont(kAxisFont);
          // These views are short, so the controls need a larger font than the
          // tick labels to stay legible, and enough clearance from the bottom
          // edge that the frame is not clipped by the pane.
@@ -192,8 +197,12 @@ void projection_axes()
    auto eveMng = REveManager::Create();
    eveMng->AllowMultipleRemoteConnections(false, false);
 
-   REveText::AssertSdfFont("LiberationSans-Regular",
-                           "/usr/share/fonts/liberation-sans/LiberationSans-Regular.ttf");
+   // From ${ROOTSYS}/fonts, which is where texts.C takes its fonts from and the only
+   // portable choice: LiberationSerif-Regular ships with ROOT. A
+   // /usr/share/fonts/liberation-sans path would tie the tutorial to one distribution's
+   // layout, and ROOT ships no Liberation Sans to fall back on.
+   std::string rf = gSystem->ExpandPathName("${ROOTSYS}/fonts/");
+   REveText::AssertSdfFont(kAxisFont, rf + kAxisFont + ".ttf");
 
    auto content = makeSceneContent(eveMng);
 
