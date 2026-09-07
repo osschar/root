@@ -871,7 +871,10 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager) {
             () => this.viewer.request_render()
          );
 
-         text.position.copy(new RC.Vector3(el.fPosX, el.fPosY, el.fPosZ));
+         // No position here: a text with a transform gets its matrix by the ordinary
+         // route -- REveElement::BuildRenderData writes fMainTrans into the render
+         // data and EveScene applies it with setMatrixFromArray. Writing .position
+         // did nothing, since GlViewerRCore turns quaternions and auto-update off.
          // Movable if pickable; resizable only if the element says so.
          text.resizable = (el.fResizable === undefined) ? true : !!el.fResizable;
          if (el.fPickable) this.RcPickable(el, text);
