@@ -30,7 +30,11 @@ private:
 
 protected:
    std::string fText {"<no-text>"};
-   std::string fFont {"LiberationSans-Regular"};
+   /// Default must be a face ROOT ships, or an REveText left at the default asks for
+   /// something no installation has: only Liberation Mono and Serif are in
+   /// $ROOTSYS/fonts, not Sans. Serif is also what REveViewer and GlViewerRCore
+   /// already hardcode for the viewer axes, so the default now agrees with them.
+   std::string fFont {"LiberationSerif-Regular"};
    REveVector  fPosition {0, 0, 0};
    Float_t     fFontSize {80};
    Float_t     fFontHinting {1.0};
