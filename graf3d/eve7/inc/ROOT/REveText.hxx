@@ -74,10 +74,10 @@ public:
    void ComputeBBox() override;
 
    std::string GetText() const { return fText; }
-   void SetText(std::string_view text) { fText = text; StampObjProps(); }
+   void SetText(const std::string &text) { fText = text; StampObjProps(); }
 
    std::string GetFont() const { return fFont; }
-   void SetFont(std::string_view font) { fFont = font; StampObjProps();}
+   void SetFont(const std::string &font) { fFont = font; StampObjProps();}
 
    Float_t GetFontSize() const { return fFontSize; }
    void SetFontSize(float size) { fFontSize = size; StampObjProps();}
@@ -106,7 +106,7 @@ public:
    /// the click is dispatched by the viewer that owns the overlay, while the
    /// effect arrives back through the normal scene stream, so every subscribed
    /// client sees it -- a button in one view is not private to that view.
-   void SetClickAction(std::string_view mir, REveElement *target = nullptr);
+   void SetClickAction(const std::string &mir, REveElement *target = nullptr);
    const std::string &GetClickMir() const { return fClickMir; }
    ElementId_t GetClickTargetId() const { return fClickTargetId; }
 
@@ -140,8 +140,8 @@ public:
    // UChar_t GetTextAlpha() const { return fTextAlpha; }
    // void SetTextAlpha(UChar_t c) { fTextAlpha = c; StampObjProps(); }
 
-   static bool SetSdfFontDir(std::string_view dir, bool require_write_access = true);
-   static bool AssertSdfFont(std::string_view font_name, std::string_view ttf_font);
+   static bool SetSdfFontDir(const std::string &dir, bool require_write_access = true);
+   static bool AssertSdfFont(const std::string &font_name, const std::string &ttf_font);
 };
 
 } // namespace Experimental
