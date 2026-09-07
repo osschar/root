@@ -57,9 +57,13 @@ using namespace ROOT::Experimental;
 //                                                 smoothstep is too wide
 const char *kRuler = "Ill1 OQ08 //\\\\ ..";
 
-const char *kFonts[] = {"LiberationSans-Regular", "LiberationSans-Bold", "LiberationSerif-Regular",
-                        "LiberationMono-Regular", "verdana",             "georgia",
-                        "comic"};
+// Every one of these ships in $ROOTSYS/fonts. ROOT carries Liberation Mono and Serif
+// but no Liberation Sans, so a Sans entry would only work where the distribution
+// happens to provide it. Bold is demonstrated with REveText::SetFontWeight() rather
+// than a second atlas -- see panel B.
+const char *kFonts[] = {"LiberationSerif-Regular", "LiberationMono-Regular", "verdana",
+                        "georgia",                 "comic",                  "comicbd",
+                        "BlackChancery"};
 const int kNFonts = sizeof(kFonts) / sizeof(char *);
 
 // Geometric ladder straddling cap_height (0.033 in viewport-height units).
@@ -210,10 +214,7 @@ void texts_grid(const char *panels = "ABCDE")
    // is a no-op when both the .png and the .js.gz are there; it only needs a GL
    // context (and hence a display) when it actually has to build one.
    std::string rf = gSystem->ExpandPathName("${ROOTSYS}/fonts/");
-   const char *lib = "/usr/share/fonts/liberation-sans/";
-   REveText::AssertSdfFont("LiberationSans-Regular", std::string(lib) + "LiberationSans-Regular.ttf");
-   REveText::AssertSdfFont("LiberationSans-Bold", std::string(lib) + "LiberationSans-Bold.ttf");
-   for (int i = 2; i < kNFonts; ++i)
+   for (int i = 0; i < kNFonts; ++i)
       REveText::AssertSdfFont(kFonts[i], rf + kFonts[i] + ".ttf");
 
    // One scene per mode, so a mode can be switched off in the browser tree; one

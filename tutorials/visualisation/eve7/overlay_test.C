@@ -15,6 +15,8 @@
 #include <ROOT/REveJetCone.hxx>
 #include <ROOT/REveText.hxx>
 
+#include "TSystem.h"
+
 using namespace ROOT::Experimental;
 const Double_t kR_min = 240;
 const Double_t kR_max = 250;
@@ -96,7 +98,11 @@ void makeTexts(REveElement *textHolder)
       REveVector pos(0.5, 0.5, 0.2);
       text->SetPosition(pos);
       text->SetFontSize(0.1);
-      text->SetFont(2);
+      // SetFont takes a face name; the integer here dated from when fonts were
+      // numeric ids and had stopped compiling. LiberationSerif-Regular ships with
+      // ROOT and is what the viewer axes use, so it is also REveText's default --
+      // named explicitly for clarity.
+      text->SetFont("LiberationSerif-Regular");
       text->SetText(text->GetCName());
       textHolder->AddElement(text);
    }
@@ -105,6 +111,14 @@ void makeTexts(REveElement *textHolder)
 void overlay_test()
 {
    auto gEve = REveManager::Create();
+
+   // Must follow REveManager::Create(): without it the font directory is not set
+   // up and AssertSdfFont() quietly does nothing. Generating an atlas also needs a
+   // GL context, so a first run cannot be done in batch mode.
+   {
+      std::string rf = gSystem->ExpandPathName("${ROOTSYS}/fonts/");
+      REveText::AssertSdfFont("LiberationSerif-Regular", rf + "LiberationSerif-Regular.ttf");
+   }
 
    TRandom &r = *gRandom;
 
