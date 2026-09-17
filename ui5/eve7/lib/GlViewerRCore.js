@@ -709,8 +709,12 @@ sap.ui.define([
 
          // AxesType is REveViewer::EAxesType -- kAxesNone/kAxesOrigin/kAxesEdge.
          // Passed through whole rather than collapsed to a bool, so origin and
-         // box styles can finally be told apart.
+         // box styles can finally be told apart. Attenuation rides along as a
+         // plain field: applied here, but held on the server so every client of
+         // the viewer agrees and it survives a reload.
          this.axis3d.setStyle(eveView.AxesType);
+         if (eveView.AxesAtten !== undefined)
+            this.axis3d.setAttenuation(eveView.AxesAtten);
 
 
          // compare cam base matrices

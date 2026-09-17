@@ -118,6 +118,16 @@ void REveViewer::SetAxesType(int at)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// Distance attenuation of the 3D axis labels, clamped to [0, 1]. See the
+/// declaration; 0 is a constant pixel size, 1 shrinks like geometry.
+
+void REveViewer::SetAxesAtten(Float_t a)
+{
+   fAxesAtten = a < 0.f ? 0.f : (a > 1.f ? 1.f : a);
+   StampObjProps();
+}
+
+////////////////////////////////////////////////////////////////////////////////
 //
 void REveViewer::SetBlackBackground(bool x)
 {
@@ -171,6 +181,7 @@ int REveViewer::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
 
    j["Mandatory"] = fMandatory;
    j["AxesType"] = fAxesType;
+   j["AxesAtten"] = fAxesAtten;
    j["BlackBg"] = fBlackBackground;
    j["LightScale"] = fLightScale;
    j["ToneMapMode"] = fToneMapMode;

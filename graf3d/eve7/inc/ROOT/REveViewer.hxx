@@ -67,6 +67,18 @@ private:
    EAxesType fAxesType{kAxesNone};
    bool      fBlackBackground{false};
 
+   /// How much the 3D axis labels shrink with distance, in [0, 1]. The client
+   /// scales each label's screen offset by pow(w_ref / w, fAxesAtten): 0 keeps
+   /// a constant pixel size at any distance, 1 shrinks exactly like geometry,
+   /// and in between is the readable compromise. Like the look parameters
+   /// below it is applied entirely on the client -- it is here so that every
+   /// client of the viewer agrees on it and it survives a reload.
+   ///
+   /// It is not a perceptual scale: how much it reads depends on the scene's
+   /// depth spread against the camera distance, so on a small scene viewed
+   /// from outside even 1 is barely visible. Default 0, the safe look.
+   Float_t   fAxesAtten{0.f};
+
    /// Look of the render, per viewer. These reach the client as plain fields and
    /// are applied there; nothing about them needs a server round trip except
    /// that the value is shared, so every client of the viewer agrees.
@@ -112,6 +124,9 @@ public:
 
    void SetAxesType(int);
    void SetBlackBackground(bool);
+
+   Float_t GetAxesAtten() const { return fAxesAtten; }
+   void SetAxesAtten(Float_t a);
 
    Float_t GetLightScale() const { return fLightScale; }
    void SetLightScale(Float_t s);
