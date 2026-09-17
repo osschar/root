@@ -344,12 +344,14 @@ void event_demo()
       projectScenes(true, true);
    }
 
-   for (auto vp : eveMng->GetViewers()->RefChildren()) {
-      auto &v = *(REX::REveViewer*)vp;
-      v.SetAxesType(REX::REveViewer::kAxesEdge);
-      //v.SetCameraType(REX::REveViewer::kCameraOrthoXOY);
-      //v.SetCameraType(REX::REveViewer::kCameraPerspXOZ);
-   }
+   // The 3D viewer only. A projected view gets its scales from
+   // REveProjectionAxis: the projection is non-linear, so a box of evenly
+   // spaced world ticks drawn over it would be actively misleading, quite apart
+   // from landing on top of the projection axis. This used to loop over every
+   // viewer, which was invisible only for as long as kAxesEdge drew nothing.
+   eveMng->GetDefaultViewer()->SetAxesType(REX::REveViewer::kAxesEdge);
+   //eveMng->GetDefaultViewer()->SetCameraType(REX::REveViewer::kCameraOrthoXOY);
+   //eveMng->GetDefaultViewer()->SetCameraType(REX::REveViewer::kCameraPerspXOZ);
 
    eveMng->Show();
 }
