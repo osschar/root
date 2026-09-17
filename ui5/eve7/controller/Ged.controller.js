@@ -843,37 +843,41 @@ sap.ui.define([
          let gedFrame = this.getView().byId("GED");
          let gcm = this;
 
-         let axesTypes = [
-            { key: 0, text: "None" },
-            { key: 1, text: "Origin" },
-            { key: 2, text: "Box" }
-         ];
-
          let current = viewer.AxesType ? viewer.AxesType : 0;
 
-         let model = new sap.ui.model.json.JSONModel({ types: axesTypes });
-
-         let comboBox = new sap.m.ComboBox({
+         // sap.m.Select, NOT sap.m.ComboBox. A ComboBox is a free-text input
+         // with a dropdown attached: for a closed set of three values there is
+         // nothing to type, and its editable `value` is a second piece of state
+         // that can disagree with selectedKey. Constructed the way
+         // makeCameraTypeSelector does it -- selectedKey set before the model is
+         // attached -- it renders with getValue() === "", and once the user has
+         // been round the list the field can end up showing the texts run
+         // together ("BoxOriginOrigin"). Select has no such field.
+         //
+         // The items are a plain array rather than an aggregation binding, so
+         // there is no model to attach late and no synchronisation step to get
+         // wrong.
+         let sel = new sap.m.Select({
             width: "100%",
+            items: [
+               new sap.ui.core.Item({ key: "0", text: "None" }),
+               new sap.ui.core.Item({ key: "1", text: "Origin" }),
+               new sap.ui.core.Item({ key: "2", text: "Box" })
+            ],
             selectedKey: current.toString(),
-            items: {
-               path: "/types",
-               template: new sap.ui.core.ListItem({ key: "{key}", text: "{text}" })
-            },
-            selectionChange: function(oEvent) {
+            change: function(oEvent) {
                let item = oEvent.getParameter("selectedItem");
                if (item)
                   gcm.mgr.SendMIR("SetAxesType(" + parseInt(item.getKey()) + ")",
                                   viewer.fElementId, viewer._typename);
             }
          });
-         comboBox.setModel(model);
 
          let labelWidget = new mText({ text: "Axes" });
          labelWidget.addStyleClass("sapUiTinyMargin");
 
          gedFrame.addContent(new HorizontalLayout({
-            content: [labelWidget, comboBox]
+            content: [labelWidget, sel]
          }));
       },
 
