@@ -106,6 +106,13 @@ sap.ui.define([], function() {
          this.ticks = new TickSource();
          this.bbox = null;
          this.labels_obj = null;
+
+         /** Cached once delivered. The box style rebuilds whenever the camera
+          * crosses a face plane, which is far too often to re-request a font. */
+         this._font = null;
+         /** Which back faces and which labelled edges the current geometry was
+          * built for; see _octantKey(). Null means "not built for any camera". */
+         this._octant = null;
       }
 
       /** Origin, box, or nothing. */
@@ -143,13 +150,17 @@ sap.ui.define([], function() {
 
       rebuild() {
          this.clear();
+         this._octant = null;
          if (this.style === STYLE.NONE || !this.bbox) return;
 
          // Both the tick generator and the font arrive asynchronously. Chain
          // rather than nest: whichever is slower gates the build, and a second
-         // rebuild while one is in flight is harmless because build() starts by
-         // clearing.
-         this.ticks.init().then(() => this._withFont(font => this._build(font)));
+         // rebuild while one is in flight is harmless because _build() starts
+         // by clearing.
+         this.ticks.init().then(() => {
+            if (this._font) return this._build();
+            this._withFont(f => { this._font = f; this._build(); });
+         });
       }
 
       _withFont(cb) {
@@ -165,18 +176,24 @@ sap.ui.define([], function() {
          );
       }
 
-      _build(font) {
+      _build() {
          this.clear();
-         if (this.style === STYLE.NONE || !this.bbox) return;
+         const font = this._font;
+         if (this.style === STYLE.NONE || !this.bbox || !font) return;
 
          const RC = this.RC;
          const lines = [];    // flat [x0,y0,z0, x1,y1,z1] runs, one per segment
          const labels = [];   // for Z3DAxis
 
-         if (this.style === STYLE.ORIGIN)
+         if (this.style === STYLE.ORIGIN) {
             this._buildOrigin(lines, labels);
-         else
-            console.warn("Axis3D: box style not implemented yet, drawing nothing");
+         } else {
+            this._buildBox(lines, labels);
+            // Record what this geometry was built for, so the camera check does
+            // not immediately rebuild the very thing it just triggered.
+            if (this.viewer.camera)
+               this._octant = this._octantKey(this.viewer.camera);
+         }
 
          // ---- lines and ticks ------------------------------------------------
          // Stripes, not the label buffer: a 3D line of constant *pixel* width
@@ -288,6 +305,198 @@ sap.ui.define([], function() {
          }
       }
 
+      //-----------------------------------------------------------------------
+      // Box style (kAxesEdge)
+      //-----------------------------------------------------------------------
+
+      /** Camera position in world space, derived from the VIEW matrix.
+       *
+       * Deliberately not camera.matrixWorld: the viewer runs with
+       * Object3D.sDefaultQuaternionsAndAutoUpdate off and manages matrices
+       * itself, so a camera's matrixWorld is only as fresh as the last
+       * updateMatrixWorld() that happened to reach it. matrixWorldInverse is
+       * the VMat handed to every shader each frame, so it cannot be stale.
+       *
+       * For V = [R|t], the camera sits at -R^T t; with column-major elements
+       * that is minus the dot of each of R's columns with t.
+       *
+       * Orthographic cameras have no eye point in the projective sense, but
+       * theirs still lies on the view axis on the near side, which is all the
+       * back-face test asks of it. */
+      _camPos(camera) {
+         const e = camera.matrixWorldInverse.elements;
+         const tx = e[12], ty = e[13], tz = e[14];
+         return [-(e[0]*tx + e[1]*ty + e[2] *tz),
+                 -(e[4]*tx + e[5]*ty + e[6] *tz),
+                 -(e[8]*tx + e[9]*ty + e[10]*tz)];
+      }
+
+      /** Which half of each axis the camera is on, as a 3-character key.
+       *
+       * For an axis-aligned box the visibility of a face is decided by one
+       * comparison: the face further from the camera along that axis is the one
+       * pointing away. So the whole back-face set -- and with it the panels, the
+       * labelled edges and the tick directions -- changes only when the camera
+       * crosses a face plane. That is what makes rebuilding on the key, rather
+       * than every frame, correct and cheap. */
+      _octantKey(camera) {
+         const c = this._camPos(camera), b = this.bbox;
+         const mid = [0.5 * (b.min.x + b.max.x),
+                      0.5 * (b.min.y + b.max.y),
+                      0.5 * (b.min.z + b.max.z)];
+         let k = "";
+         for (let a = 0; a < 3; ++a) k += (c[a] > mid[a]) ? "+" : "-";
+         return k;
+      }
+
+      /** A box round the scene: the three faces pointing away from the camera,
+       * ruled at the tick values, with numbers along three of the silhouette
+       * edges.
+       *
+       * Only the far faces are drawn, so the panels are always behind the
+       * geometry rather than in front of it. The set flips as the camera orbits;
+       * that flip is what makes the box readable, not an artefact to suppress. */
+      _buildBox(lines, labels) {
+         const RC = this.RC;
+         const b = this.bbox;
+         const mn = [b.min.x, b.min.y, b.min.z];
+         const mx = [b.max.x, b.max.y, b.max.z];
+         const camera = this.viewer.camera;
+         if (!camera) return;
+
+         const diag = Math.hypot(mx[0]-mn[0], mx[1]-mn[1], mx[2]-mn[2]);
+         if (!(diag > 0)) return;
+
+         const cam = this._camPos(camera);
+         const mid = [0.5*(mn[0]+mx[0]), 0.5*(mn[1]+mx[1]), 0.5*(mn[2]+mx[2])];
+
+         // back[a] is the coordinate of the face pointing away from the camera
+         // along axis a; front[a] is the near one.
+         const back = [], front = [];
+         for (let a = 0; a < 3; ++a) {
+            const camOnMaxSide = cam[a] > mid[a];
+            back[a]  = camOnMaxSide ? mn[a] : mx[a];
+            front[a] = camOnMaxSide ? mx[a] : mn[a];
+         }
+
+         const col  = new RC.Color(0.55, 0.55, 0.55);
+         const gcol = new RC.Color(0.75, 0.75, 0.75);
+         const at = (a, v, j, jv, k, kv) => {
+            const p = [0, 0, 0];
+            p[a] = v; p[j] = jv; p[k] = kv;
+            return p;
+         };
+
+         const tick_sets = [];
+         for (let a = 0; a < 3; ++a)
+            tick_sets.push(this.ticks.ticks(mn[a], mx[a], this.n_ticks));
+
+         // ---- the three back panels: border plus grid ------------------------
+         // Grid lines come from the same tick array as the numbers, so a grid
+         // line IS a tick extended across the panel. That alignment is the whole
+         // point of the panels; a generic grid would not have it.
+         for (let a = 0; a < 3; ++a) {
+            const j = (a + 1) % 3, k = (a + 2) % 3;
+            const v = back[a];
+
+            // border
+            const corners = [
+               at(a, v, j, mn[j], k, mn[k]),
+               at(a, v, j, mx[j], k, mn[k]),
+               at(a, v, j, mx[j], k, mx[k]),
+               at(a, v, j, mn[j], k, mx[k])
+            ];
+            for (let i = 0; i < 4; ++i)
+               lines.push({ pts: [...corners[i], ...corners[(i+1)%4]],
+                            width: 1.5, color: col });
+
+            // grid, ruled in both in-plane directions
+            for (const t of tick_sets[j].values) {
+               if (t <= mn[j] || t >= mx[j]) continue;
+               lines.push({ pts: [...at(a, v, j, t, k, mn[k]),
+                                  ...at(a, v, j, t, k, mx[k])],
+                            width: 1, color: gcol });
+            }
+            for (const t of tick_sets[k].values) {
+               if (t <= mn[k] || t >= mx[k]) continue;
+               lines.push({ pts: [...at(a, v, j, mn[j], k, t),
+                                  ...at(a, v, j, mx[j], k, t)],
+                            width: 1, color: gcol });
+            }
+         }
+
+         // ---- numbers, on three silhouette edges -----------------------------
+         // For each axis there are two candidate edges on the boundary of the
+         // drawn panels: one back / one front in each of the other two axes.
+         // Take whichever projects further from the box centre on screen, so the
+         // numbers sit on the OUTSIDE of the silhouette rather than in the inner
+         // crease where the panels meet -- there they would read as being inside
+         // the scene, and geometry would cross them.
+         const scr = (p) => {
+            const v = new RC.Vector3(p[0], p[1], p[2]);
+            v.project(camera);
+            return [v.x, v.y];
+         };
+         const midScr = scr(mid);
+
+         const tick_len = 0.018 * diag;
+         const px = (this.viewer._px_to_screen || RC.ZText.PX_TO_SCREEN_SPACE);
+         const gap = 5 * px;
+
+         for (let a = 0; a < 3; ++a) {
+            const j = (a + 1) % 3, k = (a + 2) % 3;
+
+            // `out` is the axis the tick runs along. Each candidate edge sits
+            // ON one back panel (the axis held at its back coordinate) and at
+            // the far rim of it (the axis held at its front coordinate). The
+            // tick therefore has to step along the FRONT one: that keeps it in
+            // the plane of its own panel and takes it out past the silhouette.
+            // Stepping along both would send it diagonally out of the corner,
+            // in the plane of neither.
+            const cands = [
+               { jv: back[j],  kv: front[k], out: k },
+               { jv: front[j], kv: back[k],  out: j }
+            ];
+            let best = null, bestD = -1;
+            for (const c of cands) {
+               const m = scr(at(a, 0.5*(mn[a]+mx[a]), j, c.jv, k, c.kv));
+               const d = Math.hypot(m[0]-midScr[0], m[1]-midScr[1]);
+               if (d > bestD) { bestD = d; best = c; }
+            }
+
+            const o = best.out;
+            const ov = (o === j) ? best.jv : best.kv;
+            const dir = (Math.sign(ov - mid[o]) || 1) * tick_len;
+            // Offset a point on the edge outward along `out`.
+            const step = (p, f) => { const q = p.slice(); q[o] += f * dir; return q; };
+
+            const t = tick_sets[a];
+            for (const val of t.values) {
+               if (val < mn[a] || val > mx[a]) continue;
+
+               const p0 = at(a, val, j, best.jv, k, best.kv);
+               const p1 = step(p0, 1);
+               lines.push({ pts: [...p0, ...p1], width: 1.2, color: col });
+
+               labels.push({
+                  text: t.format(val),
+                  pos: p1,
+                  px: 0, py: -gap,
+                  ah: RC.ZText.ALIGN_H.CENTER,
+                  av: RC.ZText.ALIGN_V.TOP
+               });
+            }
+
+            // Axis name, past the far end of the labelled edge.
+            const nm = ["x", "y", "z"][a];
+            const e = step(at(a, mx[a], j, best.jv, k, best.kv), 2);
+            labels.push({
+               text: nm, pos: e, px: gap, py: gap,
+               ah: RC.ZText.ALIGN_H.LEFT, av: RC.ZText.ALIGN_V.BOTTOM
+            });
+         }
+      }
+
       /** Per-frame camera work.
        *
        * Today only the attenuation reference: the clip-space w of the box
@@ -315,6 +524,19 @@ sap.ui.define([], function() {
          v.applyMatrix4(camera.matrixWorldInverse);
          v.applyMatrix4(camera.projectionMatrix);
          this.labels_obj.setReferenceW(v.w);
+
+         // The box is the only style whose geometry depends on where the camera
+         // is, and it depends on it only through the octant -- so this rebuilds
+         // when the camera crosses a face plane and not otherwise. Orbiting
+         // within one octant costs the comparison above and nothing else.
+         if (this.style === STYLE.BOX) {
+            const k = this._octantKey(camera);
+            if (k !== this._octant) {
+               this._octant = k;
+               this._build();
+               return true;
+            }
+         }
          return false;
       }
    }

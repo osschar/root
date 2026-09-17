@@ -323,7 +323,18 @@ sap.ui.define([
 
       buildREveViewerSetter: function(el)
       {
-         this.makeBoolSetter(Boolean(el.AxesType), "ShowAxes", "SetAxesType");
+         // Axes are a three-value enum (REveViewer::EAxesType), not a flag. A
+         // checkbox could only ever send 0 or 1, which left kAxesEdge -- the
+         // box style -- unreachable from the GUI even after the client learned
+         // to draw it.
+         this.makeAxesTypeSelector(el);
+         // Shown unconditionally: the panel is built when the viewer is
+         // selected, not when AxesType changes, so hiding it while the axes are
+         // off would leave it missing after they are switched on.
+         // Rounded for display only: the field is a Float_t, so 0.6 arrives as
+         // 0.6000000238418579 and the input would show all of it.
+         this.makeNumberSetter(Math.round(el.AxesAtten * 1000) / 1000,
+                               "AxesAtten", "SetAxesAtten");
          this.makeBoolSetter(el.BlackBg, "BlackBackground");
 
          // camera type selector
@@ -825,6 +836,47 @@ sap.ui.define([
          gedFrame.addContent(frame);
       },
       
+      /** Axis style: none, from the origin, or a box round the scene.
+       * Mirrors REveViewer::EAxesType -- keys are the enum values and go
+       * straight to SetAxesType(int). Modelled on makeCameraTypeSelector. */
+      makeAxesTypeSelector: function(viewer) {
+         let gedFrame = this.getView().byId("GED");
+         let gcm = this;
+
+         let axesTypes = [
+            { key: 0, text: "None" },
+            { key: 1, text: "Origin" },
+            { key: 2, text: "Box" }
+         ];
+
+         let current = viewer.AxesType ? viewer.AxesType : 0;
+
+         let model = new sap.ui.model.json.JSONModel({ types: axesTypes });
+
+         let comboBox = new sap.m.ComboBox({
+            width: "100%",
+            selectedKey: current.toString(),
+            items: {
+               path: "/types",
+               template: new sap.ui.core.ListItem({ key: "{key}", text: "{text}" })
+            },
+            selectionChange: function(oEvent) {
+               let item = oEvent.getParameter("selectedItem");
+               if (item)
+                  gcm.mgr.SendMIR("SetAxesType(" + parseInt(item.getKey()) + ")",
+                                  viewer.fElementId, viewer._typename);
+            }
+         });
+         comboBox.setModel(model);
+
+         let labelWidget = new mText({ text: "Axes" });
+         labelWidget.addStyleClass("sapUiTinyMargin");
+
+         gedFrame.addContent(new HorizontalLayout({
+            content: [labelWidget, comboBox]
+         }));
+      },
+
       onCameraTypeChange: function(viewer, newCameraType) {
       let mir = "SetCameraType(" + newCameraType + ")";
       this.mgr.SendMIR(mir, viewer.fElementId, viewer._typename);
