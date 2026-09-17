@@ -98,6 +98,16 @@ sap.ui.define([], function() {
           * take to make them a fixed number of pixels instead. */
          this.tick_frac = 0.02;
 
+         /** Where the axis NAME sits along its axis, as a fraction of the span,
+          * and how far out it stands compared with a tick.
+          *
+          * Not at the end: that is precisely where the three axes converge on a
+          * corner, so the names land on each other and on the end numbers. At
+          * four fifths they are clear of the corner, and standing further out
+          * radially than the ticks keeps them off the row of numbers too. */
+         this.name_frac = 0.8;
+         this.name_out  = 2.5;
+
          /** Label size, as a fraction of viewport height -- the units ZText
           * uses in every screen-space mode. */
          this.font_size = 0.018;
@@ -294,13 +304,17 @@ sap.ui.define([], function() {
                });
             }
 
-            // The axis name, past the end of the line.
+            // The axis name: four fifths of the way out, and standing clear of
+            // the tick row radially. At the very end it collided with the other
+            // axes' names and with the last number.
+            const np = pt(i, lo + this.name_frac * (hi - lo));
+            np[j] += this.name_out * tick_len;
             labels.push({
                text: ax.name,
-               pos: pt(i, hi),
-               px: gap, py: gap,
-               ah: RC.ZText.ALIGN_H.LEFT,
-               av: RC.ZText.ALIGN_V.BOTTOM
+               pos: np,
+               px: 0, py: 0,
+               ah: RC.ZText.ALIGN_H.CENTER,
+               av: RC.ZText.ALIGN_V.MIDDLE
             });
          }
       }
@@ -487,12 +501,15 @@ sap.ui.define([], function() {
                });
             }
 
-            // Axis name, past the far end of the labelled edge.
+            // Axis name: four fifths along the labelled edge rather than at its
+            // end, where the three edges converge on a corner and the names
+            // landed on each other, and standing further out than the ticks.
             const nm = ["x", "y", "z"][a];
-            const e = step(at(a, mx[a], j, best.jv, k, best.kv), 2);
+            const nv = mn[a] + this.name_frac * (mx[a] - mn[a]);
+            const e = step(at(a, nv, j, best.jv, k, best.kv), this.name_out);
             labels.push({
-               text: nm, pos: e, px: gap, py: gap,
-               ah: RC.ZText.ALIGN_H.LEFT, av: RC.ZText.ALIGN_V.BOTTOM
+               text: nm, pos: e, px: 0, py: 0,
+               ah: RC.ZText.ALIGN_H.CENTER, av: RC.ZText.ALIGN_V.MIDDLE
             });
          }
       }
