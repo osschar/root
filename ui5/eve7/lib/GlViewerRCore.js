@@ -1,7 +1,8 @@
 sap.ui.define([
    'rootui5/eve7/lib/GlViewer',
-   'rootui5/eve7/lib/EveElementsRCore'
-], function(GlViewer, EveElements) {
+   'rootui5/eve7/lib/EveElementsRCore',
+   'rootui5/eve7/lib/Axis3D'
+], function(GlViewer, EveElements, Axis3D) {
 
    "use strict";
 
@@ -305,11 +306,12 @@ sap.ui.define([
          // let light_3d_ctor = function(col, int, dist, decay, args) { return new RC.DirectionalLight(col, int); };
          let light_2d_ctor = function(col, int) { return new RC.DirectionalLight(col, int); };
 
-         // guides
-         this.axis = new RC.Group();
-         this.axis.name = "Axis";
-         // this.overlay_scene.add(this.axis); // looks worse for now put to scene
-         this.scene.add(this.axis);
+         // guides. The axis goes in the scene, not the overlay: it is 3D, and
+         // the overlay has its own depth buffer and always draws in front,
+         // which would put an axis line through the detector rather than
+         // behind it.
+         this.axis3d = new Axis3D(this, RC);
+         this.scene.add(this.axis3d.group);
 
          let w = this.canvas.width;
          let h = this.canvas.height;
@@ -584,7 +586,14 @@ sap.ui.define([
 
       recalcSceneBBox()
       {
+         // The axis is built FROM the bounding box, so it must not contribute
+         // TO it: its ticks reach past the box and every rebuild would push the
+         // box further out. Its labels would be worse -- their vertices are
+         // screen-space vec2, which expandByObject reads as 3D points at z=0.
+         const ax = this.axis3d ? this.axis3d.group : null;
+         if (ax) this.scene.remove(ax);
          this.scene_bbox.setFromObject( this.scene );
+         if (ax) this.scene.add(ax);
          if (this.scene_bbox.isEmpty())
          {
             console.error("GlViewerRenderCore.positionCameraAndLights scene bbox empty", this.scene_bbox);
@@ -592,6 +601,7 @@ sap.ui.define([
             this.scene_bbox.expandByPoint(new RC.Vector3(-ext,-ext,-ext));
             this.scene_bbox.expandByPoint(new RC.Vector3( ext, ext, ext));
          }
+         if (this.axis3d) this.axis3d.setBBox(this.scene_bbox);
       }
 
       positionCameraAndLights()
@@ -697,9 +707,10 @@ sap.ui.define([
          this.applyRenderParams(eveView);
          this.recolourFgElements();
 
-         this.axis.clear();
-         if (eveView.AxesType > 0)
-            this.makeAxis();
+         // AxesType is REveViewer::EAxesType -- kAxesNone/kAxesOrigin/kAxesEdge.
+         // Passed through whole rather than collapsed to a bool, so origin and
+         // box styles can finally be told apart.
+         this.axis3d.setStyle(eveView.AxesType);
 
 
          // compare cam base matrices
@@ -737,83 +748,6 @@ sap.ui.define([
          this.request_render();
       }
 
-      makeAxis()
-      {
-         function formatFloat(val) {
-            let lg = Math.log10(Math.abs(val));
-            let fs = "undef";
-
-            if (lg < 0) {
-                if (lg > -1) {
-                    fs = val.toFixed(2);
-                }
-                else if (lg > -2) {
-                    fs = val.toFixed(3);
-                }
-                else {
-                    fs = val.toExponential(2);
-                }
-            }
-            else {
-                if (lg < 2)
-                    fs = val.toFixed(1);
-                else if (lg < 4)
-                    fs = Math.round(val);
-                else
-                    fs = val.toExponential(2);
-            }
-            return val > 0 ? "+" + fs : fs;
-         }
-
-         let bb = new RC.Box3();
-         bb.setFromObject(this.scene);
-
-         let lines = [];
-         lines.push({ "p": new RC.Vector3(bb.min.x, 0, 0), "c": new RC.Color(1, 0, 0), "text": "x " + formatFloat(bb.min.x) });
-         lines.push({ "p": new RC.Vector3(bb.max.x, 0, 0), "c": new RC.Color(1, 0, 0), "text": "x " + formatFloat(bb.max.x) });
-         lines.push({ "p": new RC.Vector3(0, bb.min.y, 0), "c": new RC.Color(0, 1, 0), "text": "y " + formatFloat(bb.min.y) });
-         lines.push({ "p": new RC.Vector3(0, bb.max.y, 0), "c": new RC.Color(0, 1, 0), "text": "y " + formatFloat(bb.max.y) });
-         if (this.controller.isEveCameraPerspective()) {
-            lines.push({ "p": new RC.Vector3(0, 0, bb.min.z), "c": new RC.Color(0, 0, 1), "text": "z " + formatFloat(bb.min.z) });
-            lines.push({ "p": new RC.Vector3(0, 0, bb.max.z), "c": new RC.Color(0, 0, 1), "text": "z " + formatFloat(bb.max.z) });
-         }
-
-         for (const ax of lines) {
-            let geom = new RC.Geometry();
-            let buf = new Float32Array([0, 0, 0, ax.p.x, ax.p.y, ax.p.z]);
-            geom.vertices = new RC.Float32Attribute(buf, 3);
-            let ss = this.creator.RcMakeStripes(geom, 2, ax.c);
-            this.axis.add(ss);
-         }
-
-         let url_base = this.eve_path + 'sdf-fonts/LiberationSerif-Regular';
-         this.tex_cache.deliver_font(url_base,
-            (texture, font_metrics) => {
-               let diag = new RC.Vector3;
-               bb.getSize(diag);
-               diag = diag.length() / 100;
-               let ag = this.axis;
-               for (const ax of lines) {
-                  const text = new RC.ZText({
-                     text: ax.text,
-                     fontTexture: texture,
-                     xPos: 0.0,
-                     yPos: 0.0,
-                     fontSize: 0.01,
-                     mode: RC.TEXT2D_SPACE_MIXED,
-                     fontHinting: 1.0,
-                     color: this.fgCol,
-                     font: font_metrics,
-                  });
-                  text.matrix.setPosition(ax.p);
-                  text.matrixChanged();
-                  text.material.side = RC.FRONT_SIDE;
-                  ag.add(text);
-               }
-            },
-            (img) => RC.ZText.createDefaultTexture(img)
-         );
-      };
 
       //==============================================================================
 
@@ -834,6 +768,7 @@ sap.ui.define([
          this.render_requested = false;
          this.updateOverlayPixelScale();
          this.updateProjectionAxes();
+         if (this.axis3d) this.axis3d.updateForCamera(this.camera);
          if (this.render_requested_recalc_sbbox) {
             this.recalcSceneBBox();
             this.render_requested_recalc_sbbox = false;
