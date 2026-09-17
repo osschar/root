@@ -103,9 +103,13 @@ sap.ui.define([], function() {
           *
           * Not at the end: that is precisely where the three axes converge on a
           * corner, so the names land on each other and on the end numbers. At
-          * four fifths they are clear of the corner, and standing further out
-          * radially than the ticks keeps them off the row of numbers too. */
-         this.name_frac = 0.8;
+          * nine tenths they are clear of the corner, and standing further out
+          * radially than the ticks keeps them off the row of numbers too.
+          *
+          * Both are WORLD-space: name_frac is a fraction of the axis EXTENT,
+          * name_out a multiple of the tick length (itself 1.8% of the bounding
+          * box diagonal). Neither has anything to do with the font size. */
+         this.name_frac = 0.9;
          this.name_out  = 2.5;
 
          /** Label size, as a fraction of viewport height -- the units ZText
@@ -304,7 +308,7 @@ sap.ui.define([], function() {
                });
             }
 
-            // The axis name: four fifths of the way out, and standing clear of
+            // The axis name: nine tenths of the way out, and standing clear of
             // the tick row radially. At the very end it collided with the other
             // axes' names and with the last number.
             const np = pt(i, lo + this.name_frac * (hi - lo));
@@ -501,7 +505,7 @@ sap.ui.define([], function() {
                });
             }
 
-            // Axis name: four fifths along the labelled edge rather than at its
+            // Axis name: nine tenths along the labelled edge rather than at its
             // end, where the three edges converge on a corner and the names
             // landed on each other, and standing further out than the ticks.
             const nm = ["x", "y", "z"][a];
