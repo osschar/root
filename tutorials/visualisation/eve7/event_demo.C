@@ -324,6 +324,7 @@ void event_demo()
    gRandom->SetSeed(0); // make random seed
 
    eveMng = REX::REveManager::Create();
+   eveMng->AllowMultipleRemoteConnections(false, false);
 
    auto eventMng = new EventManager();
    eventMng->SetName("EventManager");
