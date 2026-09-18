@@ -80,6 +80,32 @@ sap.ui.define([], function() {
          return a;
       }
 
+      /** Keep an annotation with given text at a canvas position, independent of
+       * whether a tooltip is showing. This is the context-menu path: by the time
+       * the menu is up the tooltip has been hidden by pointerleave, so the menu
+       * supplies its own text from its own pick. */
+      keepAt(text, x, y) {
+         if (!text) return null;
+         if (!this._font) {
+            // Font not in yet -- ask for it and place the annotation when it
+            // lands, rather than dropping the request on the floor.
+            this._ensureFont();
+            this._keep_pending = { text: text, x: x, y: y };
+            return null;
+         }
+         return this._keepAtNow(text, x, y);
+      }
+
+      _keepAtNow(text, x, y) {
+         const W = this.viewer.canvas.width, H = this.viewer.canvas.height;
+         const px = (this.viewer.canvas.pixelRatio || 1);
+         const pos = [(x * px) / W, 1.0 - (y * px) / H];
+         const a = new Annotation(this, text, pos, this.font_size);
+         this._kept.push(a);
+         this.viewer.request_render();
+         return a;
+      }
+
       _forget(a) {
          const i = this._kept.indexOf(a);
          if (i >= 0) this._kept.splice(i, 1);
@@ -158,6 +184,11 @@ sap.ui.define([], function() {
                   const p = this._pending;
                   this._pending = null;
                   this._apply(p.text, p.x, p.y);
+               }
+               if (this._keep_pending) {
+                  const k = this._keep_pending;
+                  this._keep_pending = null;
+                  this._keepAtNow(k.text, k.x, k.y);
                }
             },
             (img) => this.RC.ZText.createDefaultTexture(img),
