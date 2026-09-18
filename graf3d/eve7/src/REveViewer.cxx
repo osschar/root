@@ -138,13 +138,13 @@ void REveViewer::SetAxesAtten(Float_t a)
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Label size for the 3D axis, as a fraction of viewport height. 0.018 is the
-/// default and about the smallest that stays crisp; the top of the range is far
-/// past useful on purpose, so the control can be pushed somewhere absurd on
-/// demand rather than only somewhere sensible.
+/// default and about the smallest that stays crisp; 0.05 is already large
+/// enough that the labels of a box axis start to meet, which is the point where
+/// a bigger number stops telling you anything new.
 
 void REveViewer::SetAxesFontSize(Float_t s)
 {
-   fAxesFontSize = s < 0.004f ? 0.004f : (s > 0.15f ? 0.15f : s);
+   fAxesFontSize = s < 0.004f ? 0.004f : (s > 0.05f ? 0.05f : s);
    StampObjProps();
 }
 
