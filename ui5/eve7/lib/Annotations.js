@@ -46,6 +46,12 @@ sap.ui.define([], function() {
          this.btn_scale = 0.8;
          this.btn_gap   = 0.004;
 
+         /** How far outside the annotation the pointer still counts as "on"
+          * it. Has to exceed btn_gap, or the gap between the plate and its
+          * buttons is a dead strip: crossing it takes the pointer off
+          * everything, the buttons hide, and they can never be reached. */
+         this.hover_margin = 0.012;
+
          /** Frame line width, as a fraction of the line height. ZText's own
           * default of 0.06 is sub-pixel at these font sizes and rasterises away
           * edge by edge, so a box loses its top rule first and reads as broken
@@ -123,11 +129,12 @@ sap.ui.define([], function() {
          // the tile is entered". The test is over the whole GROUP, not the box
          // alone: moving onto a button leaves the box, and if that hid the
          // buttons they could never be clicked.
-         const h = this.viewer.ovl_hover;
          const dragged = this.viewer.ovl_drag ? this.viewer.ovl_drag.obj : null;
+         const nx = this.viewer.ovl_nx, ny = this.viewer.ovl_ny;
          for (const a of this._kept) {
-            a.setButtonsVisible(a.owns(h) || a.owns(dragged));
+            // Geometry first: the test below is against the laid-out rects.
             a.layout();
+            a.setButtonsVisible(a.owns(dragged) || a.containsPointer(nx, ny));
          }
       }
 
@@ -411,8 +418,18 @@ sap.ui.define([], function() {
          const r = this.text_obj.getScreenRect(aspect);
          if (!r) return;
 
-         const xmax = Math.max(r.x0, r.x1), ymax = Math.max(r.y0, r.y1);
+         const xmin = Math.min(r.x0, r.x1), ymax = Math.max(r.y0, r.y1);
          const gap  = this.owner.btn_gap;
+
+         // Buttons track the plate's size. Resizing the annotation has to carry
+         // its furniture with it -- text, frame and buttons are one object as
+         // far as the user is concerned. Guarded, because assigning fontSize
+         // rebuilds the glyph geometry and this runs every frame.
+         const want = this.text_obj.fontSize * this.owner.btn_scale;
+         if (Math.abs(this.btn_close.fontSize - want) > 1e-9) {
+            this.btn_close.fontSize = want;
+            this.btn_edit.fontSize  = want;
+         }
 
          // Each button is measured on its own. Using one width for both put
          // them on top of each other: "X" and "E" are different widths in a
@@ -420,17 +437,38 @@ sap.ui.define([], function() {
          const rc = this.btn_close.getScreenRect(aspect);
          const re = this.btn_edit.getScreenRect(aspect);
          const wc = rc ? Math.abs(rc.x1 - rc.x0) : 0.02;
-         const we = re ? Math.abs(re.x1 - re.x0) : 0.02;
 
-         // Laid out right to left from the box's right edge, so the rightmost
-         // button keeps its place when the other changes width.
-         this.btn_close.setOffset([xmax - wc,                  ymax + gap]);
-         this.btn_edit .setOffset([xmax - wc - gap - we,       ymax + gap]);
+         // Top-LEFT, laid out left to right from the box's left edge, so X
+         // keeps its place when E changes width.
+         this.btn_close.setOffset([xmin,                 ymax + gap]);
+         this.btn_edit .setOffset([xmin + wc + gap,      ymax + gap]);
       }
 
       /** Is `o` one of this annotation's three objects? */
       owns(o) {
          return !!o && (o === this.text_obj || o === this.btn_close || o === this.btn_edit);
+      }
+
+      /** Is the pointer on this annotation, counting its buttons and the gap
+       * between them as part of it? Union of the three rects plus a margin --
+       * a plain "is ovl_hover one of mine" test fails in the gap, which is
+       * exactly where the pointer is while travelling towards a button. */
+      containsPointer(nx, ny) {
+         if (!(nx >= -1) || !(ny >= -1)) return false;   // no pointer seen yet
+         const v = this.owner.viewer;
+         if (!v.canvas || !v.canvas.width) return false;
+         const aspect = v.canvas.width / v.canvas.height;
+         const m = this.owner.hover_margin;
+
+         let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+         for (const o of [this.text_obj, this.btn_close, this.btn_edit]) {
+            const r = o.getScreenRect(aspect);
+            if (!r) continue;
+            x0 = Math.min(x0, r.x0, r.x1); x1 = Math.max(x1, r.x0, r.x1);
+            y0 = Math.min(y0, r.y0, r.y1); y1 = Math.max(y1, r.y0, r.y1);
+         }
+         if (!(x1 > x0)) return false;
+         return nx >= x0 - m && nx <= x1 + m && ny >= y0 - m && ny <= y1 + m;
       }
 
       setButtonsVisible(on) {

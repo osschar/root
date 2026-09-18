@@ -1515,6 +1515,12 @@ sap.ui.define([
          if (this.ovl_drag) return; // a drag owns the element until mouse-up
 
          let c = this.overlayNormCoords(event);
+         // Remembered so an overlay element can run its own hit test against a
+         // region wider than itself -- an annotation has to treat its buttons,
+         // and the gap between them and the plate, as part of the same target.
+         this.ovl_nx = c.nx;
+         this.ovl_ny = c.ny;
+
          let hit = this.overlayHoverTest(c.nx, c.ny);
          if (hit === this.ovl_hover) return;
 
