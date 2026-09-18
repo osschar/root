@@ -437,9 +437,32 @@ sap.ui.define([
                {
                   EVE.JSR.createMenu(event2, glc).then(menu => glc.showContextMenu(event2, menu));
                }
+
             }
 
             this.addEventListener('pointerup', glc.mouseup_listener);
+         });
+
+         // Re-run the hover pick once a pointer interaction ends.
+         //
+         // Nothing else does: pointermove only arms the hover timeout while no
+         // button is held, so after a rotation what sits under the cursor has
+         // changed and nothing has noticed. It cannot live in mouseup_listener
+         // either -- pointermove calls removeMouseupListener(), so that listener
+         // survives only a click that never moved, which is precisely not a
+         // drag. A plain pointerup handler is the one thing that always runs.
+         //
+         // At the END of the interaction, deliberately, never during it.
+         // elementHighlighted() reaches the server through
+         // elementSelectedSendMIR(), so re-picking while the camera moves would
+         // send a MIR per frame as the scene sweeps under a stationary cursor.
+         // The idle delay also means a drag that stops and immediately resumes
+         // costs nothing at all.
+         dome.addEventListener('pointerup', function(event) {
+            glc.removeMouseMoveTimeout();
+            glc.mousemove_timeout = setTimeout(
+               glc.onMouseMoveTimeout.bind(glc, event.offsetX, event.offsetY),
+               glc.controller.htimeout);
          });
 
          dome.addEventListener('dblclick', function() {
@@ -1266,11 +1289,25 @@ sap.ui.define([
 
             let data = { "p": pstate, "v": this, "cctrl": this.controls};
             menu.add("Set Camera Center", data, this.setCameraCenter.bind(data));
-         }
 
-         if (this.annotations && this.annotations.canKeep()) {
-            menu.add("Keep annotation", this.annotations,
-                     function(a) { a.keepCurrent(); });
+            // Built from THIS pick, not from the live hover tooltip.
+            //
+            // The tooltip is already gone by now: the menu's DOM opens over the
+            // canvas, the canvas gets pointerleave, and that clears the
+            // highlight and hides the tooltip -- so an entry gated on the
+            // tooltip being visible could never be reached. This pick has
+            // everything the tooltip had anyway, and depth besides.
+            if (this.annotations) {
+               const idx = pstate.ctrl ? pstate.ctrl.extractIndex(pstate.instance) : null;
+               const txt = (pstate.ctrl && typeof pstate.ctrl.getTooltipText === "function")
+                         ? pstate.ctrl.getTooltipText(idx) : "";
+               if (txt) {
+                  const d = { a: this.annotations, txt: txt,
+                              ox: event.offsetX, oy: event.offsetY };
+                  menu.add("Keep annotation", d,
+                           function(q) { q.a.keepAt(q.txt, q.ox, q.oy); });
+               }
+            }
          }
 
          menu.add("Reset camera", this.resetCamera);
