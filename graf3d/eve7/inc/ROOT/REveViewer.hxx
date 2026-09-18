@@ -76,8 +76,18 @@ private:
    ///
    /// It is not a perceptual scale: how much it reads depends on the scene's
    /// depth spread against the camera distance, so on a small scene viewed
-   /// from outside even 1 is barely visible. Default 0, the safe look.
+   /// from outside even 1 is barely visible. Which is why the setter clamps to
+   /// [-4, 8] rather than [0, 1]: 1 is the physically honest value, past it is
+   /// exaggeration, and below 0 is inverse perspective with the far labels
+   /// largest. Default 0, the safe look.
    Float_t   fAxesAtten{0.f};
+
+   /// Label size for the 3D axis, as a fraction of viewport height -- the units
+   /// ZText uses in every screen-space mode. Client-applied like fAxesAtten and
+   /// here for the same reason. Unlike attenuation this one is baked into the
+   /// glyph geometry, so a change costs a rebuild on the client; it is a knob to
+   /// set, not one to drag continuously.
+   Float_t   fAxesFontSize{0.018f};
 
    /// Look of the render, per viewer. These reach the client as plain fields and
    /// are applied there; nothing about them needs a server round trip except
@@ -127,6 +137,9 @@ public:
 
    Float_t GetAxesAtten() const { return fAxesAtten; }
    void SetAxesAtten(Float_t a);
+
+   Float_t GetAxesFontSize() const { return fAxesFontSize; }
+   void SetAxesFontSize(Float_t s);
 
    Float_t GetLightScale() const { return fLightScale; }
    void SetLightScale(Float_t s);

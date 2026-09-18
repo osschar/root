@@ -712,9 +712,15 @@ sap.ui.define([
          // box styles can finally be told apart. Attenuation rides along as a
          // plain field: applied here, but held on the server so every client of
          // the viewer agrees and it survives a reload.
+         // Font size before style: it is baked into the glyph geometry, so
+         // setting it after a rebuild would throw that geometry away again.
+         if (eveView.AxesFontSize !== undefined)
+            this.axis3d.font_size = eveView.AxesFontSize;
          this.axis3d.setStyle(eveView.AxesType);
          if (eveView.AxesAtten !== undefined)
             this.axis3d.setAttenuation(eveView.AxesAtten);
+         if (eveView.AxesFontSize !== undefined)
+            this.axis3d.setFontSize(eveView.AxesFontSize);
 
 
          // compare cam base matrices

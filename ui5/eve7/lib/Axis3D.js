@@ -153,6 +153,30 @@ sap.ui.define([], function() {
 
       getAttenuation() { return this.atten; }
 
+      /** Label size, as a fraction of viewport height. Baked into the glyph
+       * quads, so this rebuilds the label geometry -- but only that: the lines,
+       * ticks and panels are untouched, which is why it does not go through
+       * rebuild(). */
+      setFontSize(sz) {
+         if (!(sz > 0)) return;
+         this.font_size = sz;
+         // Deliberately NOT short-circuited on sz === this.font_size. The
+         // viewer assigns font_size directly before setStyle(), so that a
+         // rebuild picks up the new size at build time -- which made an
+         // equality test here always true and this method a no-op. The label
+         // object then kept the old size until something else forced a rebuild,
+         // and in box style the only thing that does is the camera crossing a
+         // face plane. It looked like "the font size only updates when I rotate
+         // far enough". Z3DAxis.setFontSize does the real comparison, against
+         // the size its geometry was actually built with.
+         if (this.labels_obj) {
+            this.labels_obj.setFontSize(sz);
+            this.viewer.request_render();
+         }
+      }
+
+      getFontSize() { return this.font_size; }
+
       /** The scene extent the axis describes. Rebuilds only on a real change:
        * recalcSceneBBox runs often and an identical box must not throw the
        * geometry away. */
