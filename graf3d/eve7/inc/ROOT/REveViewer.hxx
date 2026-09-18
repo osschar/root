@@ -89,6 +89,12 @@ private:
    /// set, not one to drag continuously.
    Float_t   fAxesFontSize{0.018f};
 
+   /// Label size for the hover tooltip, same units and same reasoning as
+   /// fAxesFontSize. Separate from it because the two are read at different
+   /// distances and for different lengths of time: an axis number is glanced at
+   /// in passing, a tooltip is read.
+   Float_t   fTooltipFontSize{0.017f};
+
    /// Look of the render, per viewer. These reach the client as plain fields and
    /// are applied there; nothing about them needs a server round trip except
    /// that the value is shared, so every client of the viewer agrees.
@@ -146,6 +152,9 @@ public:
 
    Float_t GetAxesFontSize() const { return fAxesFontSize; }
    void SetAxesFontSize(Float_t s);
+
+   Float_t GetTooltipFontSize() const { return fTooltipFontSize; }
+   void SetTooltipFontSize(Float_t s);
 
    Float_t GetLightScale() const { return fLightScale; }
    void SetLightScale(Float_t s);

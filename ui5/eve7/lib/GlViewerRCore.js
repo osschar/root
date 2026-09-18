@@ -749,6 +749,8 @@ sap.ui.define([
             this.axis3d.setAttenuation(eveView.AxesAtten);
          if (eveView.AxesFontSize !== undefined)
             this.axis3d.setFontSize(eveView.AxesFontSize);
+         if (eveView.TooltipFontSize !== undefined && this.annotations)
+            this.annotations.setFontSize(eveView.TooltipFontSize);
          // The axis style decides how far outside scene_bbox anything is drawn,
          // so the clip-plane box has to follow it -- not only the scene extent.
          this.updateRenderBBox();
@@ -809,6 +811,10 @@ sap.ui.define([
          this.render_requested = false;
          this.updateOverlayPixelScale();
          this.updateProjectionAxes();
+         // Annotation buttons hang off their box's laid-out rect, and a drag
+         // moves that box through ovlSetPos without announcing it, so there is
+         // nothing to hook -- re-place them per frame instead.
+         if (this.annotations) this.annotations.layout();
          if (this.axis3d) this.axis3d.updateForCamera(this.camera);
          if (this.render_requested_recalc_sbbox) {
             this.recalcSceneBBox();
@@ -1262,6 +1268,11 @@ sap.ui.define([
             menu.add("Set Camera Center", data, this.setCameraCenter.bind(data));
          }
 
+         if (this.annotations && this.annotations.canKeep()) {
+            menu.add("Keep annotation", this.annotations,
+                     function(a) { a.keepCurrent(); });
+         }
+
          menu.add("Reset camera", this.resetCamera);
 
          if (RC.REveDevelMode) {
@@ -1639,6 +1650,10 @@ sap.ui.define([
        * object, so nothing in RenderCore needs to know that buttons exist. */
       overlayClick(obj)
       {
+         // A local handler wins: annotation buttons act entirely on the client
+         // and have no server element behind them, so there is no MIR to send.
+         if (obj && typeof obj._ovl_click === "function") { obj._ovl_click(); return; }
+
          let el = obj ? obj.eve_el : null;
          if (!el || !el.fClickMir) return;
 
