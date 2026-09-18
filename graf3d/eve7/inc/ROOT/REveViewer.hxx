@@ -95,6 +95,13 @@ private:
    /// in passing, a tooltip is read.
    Float_t   fTooltipFontSize{0.017f};
 
+   /// Opacity of the plate behind the tooltip and behind kept annotations, in
+   /// [0, 1]. Unlike the font size this DOES reach annotations already placed:
+   /// size is baked into their geometry and is part of what one is, where
+   /// opacity is pure appearance and wanting it changed means wanting it
+   /// changed everywhere.
+   Float_t   fTooltipAlpha{0.85f};
+
    /// Look of the render, per viewer. These reach the client as plain fields and
    /// are applied there; nothing about them needs a server round trip except
    /// that the value is shared, so every client of the viewer agrees.
@@ -155,6 +162,9 @@ public:
 
    Float_t GetTooltipFontSize() const { return fTooltipFontSize; }
    void SetTooltipFontSize(Float_t s);
+
+   Float_t GetTooltipAlpha() const { return fTooltipAlpha; }
+   void SetTooltipAlpha(Float_t a);
 
    Float_t GetLightScale() const { return fLightScale; }
    void SetLightScale(Float_t s);

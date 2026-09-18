@@ -774,6 +774,8 @@ sap.ui.define([
             this.axis3d.setFontSize(eveView.AxesFontSize);
          if (eveView.TooltipFontSize !== undefined && this.annotations)
             this.annotations.setFontSize(eveView.TooltipFontSize);
+         if (eveView.TooltipAlpha !== undefined && this.annotations)
+            this.annotations.setPlateAlpha(eveView.TooltipAlpha);
          // The axis style decides how far outside scene_bbox anything is drawn,
          // so the clip-plane box has to follow it -- not only the scene extent.
          this.updateRenderBBox();
@@ -1074,29 +1076,42 @@ sap.ui.define([
             return null;
          }
 
+         // Walk up to the owning REve element -- but STOP at the root.
+         //
+         // Every overlay object used to be streamed from the server and so had
+         // an eve_el somewhere above it, and this loop relied on that: it ran
+         // off the top of the hierarchy and threw on null.parent for anything
+         // else. Client-local overlay elements -- kept annotations and their
+         // buttons -- have no eve_el at all and are exactly that case, so the
+         // pick threw before handleOverlayMouseDown could set up a drag. That
+         // is why they could not be moved or resized.
          let top_obj = state_overlay.object;
-            while (top_obj.eve_el === undefined)
-               top_obj = top_obj.parent;
+         while (top_obj && top_obj.eve_el === undefined)
+            top_obj = top_obj.parent;
 
-            state_overlay.top_object = top_obj;
-            state_overlay.eve_el = top_obj.eve_el;
+         state_overlay.top_object = top_obj || state_overlay.object;
+         state_overlay.eve_el = top_obj ? top_obj.eve_el : undefined;
 
-            if (state_overlay.eve_el.fSecondarySelect)
-               this.rqt.pick_instance_overlay(state_overlay);
+         if (state_overlay.eve_el && state_overlay.eve_el.fSecondarySelect)
+            this.rqt.pick_instance_overlay(state_overlay);
 
-            this.rqt.pick_end();
+         this.rqt.pick_end();
 
-            state_overlay.w = this.canvas.width;
-            state_overlay.h = this.canvas.height;
-            state_overlay.mouse = new RC.Vector2( ((x + 0.5) / state_overlay.w) * 2 - 1,
-                                         -((y + 0.5) / state_overlay.h) * 2 + 1 );
+         state_overlay.w = this.canvas.width;
+         state_overlay.h = this.canvas.height;
+         state_overlay.mouse = new RC.Vector2( ((x + 0.5) / state_overlay.w) * 2 - 1,
+                                      -((y + 0.5) / state_overlay.h) * 2 + 1 );
 
-            let ctrl_obj = state_overlay.object;
-            while (ctrl_obj.get_ctrl === undefined)
-               ctrl_obj = ctrl_obj.parent;
+         // Same for the control: a client-local element has none, and needs
+         // none -- dragging and resizing go through ovlGetPos/ovlSetPos.
+         let ctrl_obj = state_overlay.object;
+         while (ctrl_obj && ctrl_obj.get_ctrl === undefined)
+            ctrl_obj = ctrl_obj.parent;
 
-            state_overlay.ctrl = ctrl_obj.get_ctrl(ctrl_obj, top_obj);
-            return state_overlay;
+         state_overlay.ctrl = ctrl_obj
+                            ? ctrl_obj.get_ctrl(ctrl_obj, state_overlay.top_object)
+                            : null;
+         return state_overlay;
       }
 
       //==============================================================================
