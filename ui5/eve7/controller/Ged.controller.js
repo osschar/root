@@ -771,16 +771,37 @@ sap.ui.define([
                                            gcm.editorElement.fElementId,
                                            gcm.editorElement._typename);
 
-         let slider = new sap.m.Slider({
-            width: "160px",
-            tooltip: opts.tip,   // may be hidden by the advanced tooltip below
+         const min  = (opts.min  !== undefined) ? opts.min  : 0;
+         const max  = (opts.max  !== undefined) ? opts.max  : 1;
+         const step = (opts.step !== undefined) ? opts.step : 0.05;
 
-            min: (opts.min !== undefined) ? opts.min : 0,
-            max: (opts.max !== undefined) ? opts.max : 1,
-            step: (opts.step !== undefined) ? opts.step : 0.05,
+         // Decimals to show, taken from the step: 0.2 wants one, 0.001 wants
+         // three. Deriving it means a range change cannot leave the readout
+         // rounding away the very digits the step can reach.
+         const dec = Math.max(0, -Math.floor(Math.log10(step)));
+
+         // A readout beside the slider, not above it. showAdvancedTooltip puts
+         // the value in a chip over the handle, but UI5 leaves that chip up
+         // after the drag ends, so it both obscures the row and lies about
+         // whether anything is being dragged. A plain Text is always there,
+         // never moves, and is legible while the pointer is elsewhere.
+         let readout = new mText({
+            text: Number(val).toFixed(dec),
+            width: "42px",
+            textAlign: "End"
+         });
+         readout.addStyleClass("sapUiTinyMarginBegin");
+
+         let slider = new sap.m.Slider({
+            width: "150px",
+            tooltip: opts.tip,
+
+            min: min,
+            max: max,
+            step: step,
             value: val,
             enableTickmarks: !!opts.tickmarks,
-            showAdvancedTooltip: true,
+            showAdvancedTooltip: false,
 
             // Live, but only once the drag has paused. Sending on every
             // liveChange is a round trip per pixel, and for the font size a
@@ -791,6 +812,9 @@ sap.ui.define([
             liveChange: function(event) {
                const v = event.getParameter("value");
                const sl = event.getSource();
+               // The readout is local and immediate -- it must track the handle
+               // even while the MIR is still being held back.
+               readout.setText(Number(v).toFixed(dec));
                if (sl._ged_idle) clearTimeout(sl._ged_idle);
                sl._ged_idle = setTimeout(() => { delete sl._ged_idle; send(v); }, idle);
             },
@@ -799,8 +823,10 @@ sap.ui.define([
             // final value cannot be overtaken by a stale one still in flight.
             change: function(event) {
                const sl = event.getSource();
+               const v = event.getParameter("value");
+               readout.setText(Number(v).toFixed(dec));
                if (sl._ged_idle) { clearTimeout(sl._ged_idle); delete sl._ged_idle; }
-               send(event.getParameter("value"));
+               send(v);
             }
          });
 
@@ -809,7 +835,10 @@ sap.ui.define([
          // slider needs, since there is otherwise nowhere to read the number --
          // and that bubble can take the place of the plain hover tooltip. The
          // label is the one hover target certain to carry the prose.
-         this.makeGedRow(labelName, slider, opts.tip, gedFrame);
+         this.makeGedRow(labelName,
+                         new sap.m.HBox({ alignItems: "Center",
+                                          items: [slider, readout] }),
+                         opts.tip, gedFrame);
       },
 
       makeNumberSetter : function(val, labelName, funcName, gedFrame)
