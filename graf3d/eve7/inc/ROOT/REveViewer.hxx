@@ -132,7 +132,13 @@ public:
    void SyncCamera(bool s) {fSyncCamera = s;}
    bool GetSyncCamera() const {return fSyncCamera;}
 
+   /// Note the getters return the stored value; every one of these properties
+   /// is applied on the client, so a getter says what the clients were told,
+   /// not what any of them is currently showing.
+   EAxesType GetAxesType() const { return fAxesType; }
    void SetAxesType(int);
+
+   bool GetBlackBackground() const { return fBlackBackground; }
    void SetBlackBackground(bool);
 
    Float_t GetAxesAtten() const { return fAxesAtten; }
