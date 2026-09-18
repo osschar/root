@@ -103,14 +103,21 @@ sap.ui.define([], function() {
           *
           * Not at the end: that is precisely where the three axes converge on a
           * corner, so the names land on each other and on the end numbers. At
-          * nine tenths they are clear of the corner, and standing further out
-          * radially than the ticks keeps them off the row of numbers too.
+          * the middle of the axis it is as far from both ends -- and so from both
+          * corners -- as it can get.
           *
-          * Both are WORLD-space: name_frac is a fraction of the axis EXTENT,
-          * name_out a multiple of the tick length (itself 1.8% of the bounding
-          * box diagonal). Neither has anything to do with the font size. */
-         this.name_frac = 0.9;
-         this.name_out  = 2.5;
+          * All three are WORLD-space multiples of the tick length (itself 1.8%
+          * of the bounding box diagonal); name_frac alone is a fraction of the
+          * axis EXTENT. None of them has anything to do with the font size.
+          *
+          * The numbers and the name are pushed out along BOTH axes
+          * perpendicular to their own, not just one: a single perpendicular
+          * leaves them lying in the plane of a panel, on top of its grid. Going
+          * diagonally takes them off the box entirely. The name then has to
+          * stand further out again than the numbers it shares an edge with. */
+         this.name_frac = 0.5;
+         this.num_out   = 2.2;
+         this.name_out  = 5.0;
 
          /** Label size, as a fraction of viewport height -- the units ZText
           * uses in every screen-space mode. */
@@ -269,11 +276,6 @@ sap.ui.define([], function() {
             { i: 2, name: "z", col: new RC.Color(0.4, 0.5, 1.0) }
          ];
 
-         // Label offset from the tick, in the shader's screen units -- a few
-         // CSS pixels, converted the same way ZText converts its own.
-         const px = (this.viewer._px_to_screen || RC.ZText.PX_TO_SCREEN_SPACE);
-         const gap = 6 * px;
-
          const pt = (i, v) => { const p = [0, 0, 0]; p[i] = v; return p; };
 
          for (const ax of AX) {
@@ -290,7 +292,19 @@ sap.ui.define([], function() {
             // along y, y along z, z along x. Any fixed choice is arbitrary, but
             // cycling keeps the three from all landing in one plane, where two
             // of them would overlap edge-on from the commonest viewpoints.
-            const j = (i + 1) % 3;
+            const j = (i + 1) % 3, k = (i + 2) % 3;
+
+            // Numbers and name step away along BOTH perpendicular axes, so they
+            // do not lie in the plane the tick marks occupy. An origin axis runs
+            // through the middle of the scene, so there is no "outward" to
+            // follow -- a consistent diagonal is the best available, and it is
+            // at least the same one for every tick on the axis.
+            const away = (p, f) => {
+               const q = p.slice();
+               q[j] += f * tick_len;
+               q[k] += f * tick_len;
+               return q;
+            };
 
             for (const v of t.values) {
                if (Math.abs(v) < 1e-12) continue;    // the origin needs no tick
@@ -301,18 +315,16 @@ sap.ui.define([], function() {
 
                labels.push({
                   text: t.format(v),
-                  pos: p1,
-                  px: 0, py: -gap,
+                  pos: away(p0, this.num_out),
+                  px: 0, py: 0,
                   ah: RC.ZText.ALIGN_H.CENTER,
-                  av: RC.ZText.ALIGN_V.TOP
+                  av: RC.ZText.ALIGN_V.MIDDLE
                });
             }
 
-            // The axis name: nine tenths of the way out, and standing clear of
-            // the tick row radially. At the very end it collided with the other
-            // axes' names and with the last number.
-            const np = pt(i, lo + this.name_frac * (hi - lo));
-            np[j] += this.name_out * tick_len;
+            // The axis name: at the middle of the axis, as far from either end
+            // as it gets, and standing further out again than the numbers.
+            const np = away(pt(i, lo + this.name_frac * (hi - lo)), this.name_out);
             labels.push({
                text: ax.name,
                pos: np,
@@ -458,8 +470,6 @@ sap.ui.define([], function() {
          const midScr = scr(mid);
 
          const tick_len = 0.018 * diag;
-         const px = (this.viewer._px_to_screen || RC.ZText.PX_TO_SCREEN_SPACE);
-         const gap = 5 * px;
 
          for (let a = 0; a < 3; ++a) {
             const j = (a + 1) % 3, k = (a + 2) % 3;
@@ -485,32 +495,44 @@ sap.ui.define([], function() {
             const o = best.out;
             const ov = (o === j) ? best.jv : best.kv;
             const dir = (Math.sign(ov - mid[o]) || 1) * tick_len;
-            // Offset a point on the edge outward along `out`.
+            // The tick mark itself: short, and along `out` only, so it stays in
+            // the plane of its own panel and reads as attached to the edge.
             const step = (p, f) => { const q = p.slice(); q[o] += f * dir; return q; };
+
+            // The numbers go further, and diagonally -- away from the box along
+            // BOTH perpendicular axes. Along one only they would sit in the
+            // plane of a panel, over its grid lines, which is where they were.
+            const dj = (Math.sign(best.jv - mid[j]) || 1) * tick_len;
+            const dk = (Math.sign(best.kv - mid[k]) || 1) * tick_len;
+            const away = (p, f) => {
+               const q = p.slice();
+               q[j] += f * dj;
+               q[k] += f * dk;
+               return q;
+            };
 
             const t = tick_sets[a];
             for (const val of t.values) {
                if (val < mn[a] || val > mx[a]) continue;
 
                const p0 = at(a, val, j, best.jv, k, best.kv);
-               const p1 = step(p0, 1);
-               lines.push({ pts: [...p0, ...p1], width: 1.2, color: col });
+               lines.push({ pts: [...p0, ...step(p0, 1)], width: 1.2, color: col });
 
                labels.push({
                   text: t.format(val),
-                  pos: p1,
-                  px: 0, py: -gap,
+                  pos: away(p0, this.num_out),
+                  px: 0, py: 0,
                   ah: RC.ZText.ALIGN_H.CENTER,
-                  av: RC.ZText.ALIGN_V.TOP
+                  av: RC.ZText.ALIGN_V.MIDDLE
                });
             }
 
-            // Axis name: nine tenths along the labelled edge rather than at its
-            // end, where the three edges converge on a corner and the names
-            // landed on each other, and standing further out than the ticks.
+            // Axis name: at the middle of the labelled edge, which is as far
+            // from both corners as it gets, and standing further out again than
+            // the numbers along the same diagonal.
             const nm = ["x", "y", "z"][a];
             const nv = mn[a] + this.name_frac * (mx[a] - mn[a]);
-            const e = step(at(a, nv, j, best.jv, k, best.kv), this.name_out);
+            const e = away(at(a, nv, j, best.jv, k, best.kv), this.name_out);
             labels.push({
                text: nm, pos: e, px: 0, py: 0,
                ah: RC.ZText.ALIGN_H.CENTER, av: RC.ZText.ALIGN_V.MIDDLE
