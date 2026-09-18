@@ -193,6 +193,33 @@ sap.ui.define([], function() {
 
       getFontSize() { return this.font_size; }
 
+      /** How far outside the bounding box this axis needs the camera's frustum
+       * widened, in world units.
+       *
+       * Near and far are fitted tightly to the scene's bounding box, which is
+       * the right thing to do -- it spends the whole z-buffer on the scene --
+       * and that box deliberately excludes this axis, since the axis is built
+       * from it. So anything the axis draws outside the box would be clipped.
+       *
+       * The margin covers the TICK STUBS only, one tick length. It does not
+       * have to cover the numbers or the names, which stand much further out
+       * (num_out and name_out tick lengths): those are ZText glyphs, and the
+       * anchor shader clamps their depth into the frustum instead of letting
+       * them clip. Sizing this to the names instead would be a tenth of the
+       * diagonal on every side, and that much wasted depth range is paid for by
+       * every surface in the scene, not just by the chrome that asked for it.
+       *
+       * The tick stubs are RC.Stripes, ordinary world geometry with no such
+       * trick available, which is why they still need the room. */
+      getRenderMargin() {
+         if (!this.bbox || this.style === STYLE.NONE) return 0;
+         const b = this.bbox;
+         const diag = Math.hypot(b.max.x - b.min.x,
+                                 b.max.y - b.min.y,
+                                 b.max.z - b.min.z);
+         return this.tick_frac * diag;
+      }
+
       /** The scene extent the axis describes. Rebuilds only on a real change:
        * recalcSceneBBox runs often and an identical box must not throw the
        * geometry away. */
@@ -589,7 +616,7 @@ sap.ui.define([], function() {
          };
          const midScr = scr(mid);
 
-         const tick_len = 0.018 * diag;
+         const tick_len = this.tick_frac * diag;
 
          for (let a = 0; a < 3; ++a) {
             if (this._degen[a]) continue;   // edge-on: no scale to draw

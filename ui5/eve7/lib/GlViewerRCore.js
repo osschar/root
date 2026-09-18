@@ -602,6 +602,29 @@ sap.ui.define([
             this.scene_bbox.expandByPoint(new RC.Vector3( ext, ext, ext));
          }
          if (this.axis3d) this.axis3d.setBBox(this.scene_bbox);
+
+         this.updateRenderBBox();
+      }
+
+      /** The box the camera's near and far planes are fitted to.
+       *
+       * Not scene_bbox: the axis is excluded from that one on purpose, since it
+       * is built from it and would otherwise inflate itself every rebuild. But
+       * the axis DRAWS ticks, numbers and names outside the box, and
+       * optimizeNearFar fits the eight corners with 0.1% slack -- so anything
+       * beyond them is clipped, and as the camera turns a different part of the
+       * axis is beyond them. That is what decorations flickering in and out of
+       * existence during a slow rotation actually is.
+       *
+       * Recomputed whenever either input can have changed: the scene extent, or
+       * the axis style (which decides whether there is a margin at all). */
+      updateRenderBBox()
+      {
+         this.render_bbox = this.scene_bbox.clone();
+         if (this.axis3d) {
+            const m = this.axis3d.getRenderMargin();
+            if (m > 0) this.render_bbox.expandByScalar(m);
+         }
       }
 
       positionCameraAndLights()
@@ -721,6 +744,9 @@ sap.ui.define([
             this.axis3d.setAttenuation(eveView.AxesAtten);
          if (eveView.AxesFontSize !== undefined)
             this.axis3d.setFontSize(eveView.AxesFontSize);
+         // The axis style decides how far outside scene_bbox anything is drawn,
+         // so the clip-plane box has to follow it -- not only the scene extent.
+         this.updateRenderBBox();
 
 
          // compare cam base matrices
@@ -784,7 +810,7 @@ sap.ui.define([
             this.render_requested_recalc_sbbox = false;
          }
          if (this.camera.isPerspectiveCamera) {
-            this.camera.optimizeNearFar(this.scene_bbox);
+            this.camera.optimizeNearFar(this.render_bbox || this.scene_bbox);
          }
 
          if (this.canvas.width <= 0 || this.canvas.height <= 0) return;
