@@ -319,10 +319,21 @@ sap.ui.define([], function() {
          const tick_len = this.tick_frac * diag;
          if (!(diag > 0)) return;
 
+         // One neutral grey for all three, the same as the box style uses.
+         //
+         // These were red / green / blue per axis, which is a way of telling
+         // the axes apart when nothing else does -- and nothing else did, back
+         // when the names never rendered at all because the font was fetched
+         // from the wrong path. Now that every ray is labelled at both ends the
+         // colour is carrying no information, and three saturated primaries
+         // through the middle of a scene compete with the data for attention.
+         // Chrome should look like chrome.
+         const col = new RC.Color(0.55, 0.55, 0.55);
+
          const AX = [
-            { i: 0, name: "x", col: new RC.Color(0.9, 0.3, 0.3) },
-            { i: 1, name: "y", col: new RC.Color(0.3, 0.9, 0.3) },
-            { i: 2, name: "z", col: new RC.Color(0.4, 0.5, 1.0) }
+            { i: 0, name: "x" },
+            { i: 1, name: "y" },
+            { i: 2, name: "z" }
          ];
 
          const pt = (i, v) => { const p = [0, 0, 0]; p[i] = v; return p; };
@@ -334,7 +345,7 @@ sap.ui.define([], function() {
             if (!(hi > lo)) continue;
 
             // The axis line itself.
-            lines.push({ pts: [...pt(i, lo), ...pt(i, hi)], width: 2, color: ax.col });
+            lines.push({ pts: [...pt(i, lo), ...pt(i, hi)], width: 1.5, color: col });
 
             const t = this.ticks.ticks(lo, hi, this.n_ticks);
 
@@ -361,7 +372,7 @@ sap.ui.define([], function() {
 
                const p0 = pt(i, v);
                const p1 = pt(i, v); p1[j] += tick_len;
-               lines.push({ pts: [...p0, ...p1], width: 1, color: ax.col });
+               lines.push({ pts: [...p0, ...p1], width: 1.2, color: col });
 
                labels.push({
                   text: t.format(v),
