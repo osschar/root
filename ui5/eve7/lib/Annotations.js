@@ -44,13 +44,12 @@ sap.ui.define([], function() {
          /** Button size, as a fraction of the annotation's own font size, and
           * the gap between the box and its buttons in screen fractions. */
          this.btn_scale = 0.8;
-         this.btn_gap   = 0.004;
 
          /** How far outside the annotation the pointer still counts as "on"
-          * it. Has to exceed btn_gap, or the gap between the plate and its
-          * buttons is a dead strip: crossing it takes the pointer off
-          * everything, the buttons hide, and they can never be reached. */
-         this.hover_margin = 0.012;
+          * it. The buttons now share frames with the plate, so there is no gap
+          * to cross -- this is only slack against the pointer sitting exactly
+          * on an outer edge. */
+         this.hover_margin = 0.008;
 
          /** Frame line width, as a fraction of the line height. ZText's own
           * default of 0.06 is sub-pixel at these font sizes and rasterises away
@@ -227,11 +226,16 @@ sap.ui.define([], function() {
          obj.setPixelScale(v._px_to_screen, v.canvas.width, v.canvas.height);
       }
 
-      _plate(obj) {
+      /** @param line_frac frame width as a fraction of the object's OWN line
+       * height. Defaults to the plate's value; a button passes a bigger
+       * fraction so that its absolute frame comes out the same -- see
+       * Annotation._frameFrac(). */
+      _plate(obj, line_frac) {
          const RC = this.RC;
          obj.setupFrameStuff(1.0, true,
                              new RC.Color(1.0, 1.0, 1.0), this.plate_alpha,
-                             this.viewer.fgCol, 1.0, 0.25, this.frame_line);
+                             this.viewer.fgCol, 1.0, 0.25,
+                             (line_frac === undefined) ? this.frame_line : line_frac);
          obj.use_fg_color = true;
          this._fixPixelScale(obj);
       }
@@ -400,7 +404,7 @@ sap.ui.define([], function() {
          // Not resizable: a button with a resize grip would hand over half its
          // own hit area to the grip, and there is nothing to resize.
          b.resizable = false;
-         this.owner._plate(b);
+         this.owner._plate(b, this.owner.frame_line / this.owner.btn_scale);
          b._ovl_click = onclick;
          return b;
       }
@@ -418,35 +422,90 @@ sap.ui.define([], function() {
          const r = this.text_obj.getScreenRect(aspect);
          if (!r) return;
 
-         const xmin = Math.min(r.x0, r.x1), ymax = Math.max(r.y0, r.y1);
-         const gap  = this.owner.btn_gap;
-
          // Buttons track the plate's size. Resizing the annotation has to carry
          // its furniture with it -- text, frame and buttons are one object as
-         // far as the user is concerned. Guarded, because assigning fontSize
-         // rebuilds the glyph geometry and this runs every frame.
+         // far as anyone using it is concerned. Guarded, because assigning
+         // fontSize rebuilds glyph geometry and this runs every frame.
          const want = this.text_obj.fontSize * this.owner.btn_scale;
          if (Math.abs(this.btn_close.fontSize - want) > 1e-9) {
             this.btn_close.fontSize = want;
             this.btn_edit.fontSize  = want;
+            // The frame fraction is relative to each object's OWN line height,
+            // so a smaller button needs a bigger fraction to draw the same
+            // absolute width. Without this the three frames differ and nothing
+            // below can make them line up.
+            this.owner._plate(this.btn_close, this._frameFrac());
+            this.owner._plate(this.btn_edit,  this._frameFrac());
          }
 
-         // Each button is measured on its own. Using one width for both put
-         // them on top of each other: "X" and "E" are different widths in a
-         // proportional face, and the narrower one decided the spacing.
-         const rc = this.btn_close.getScreenRect(aspect);
-         const re = this.btn_edit.getScreenRect(aspect);
-         const wc = rc ? Math.abs(rc.x1 - rc.x0) : 0.02;
+         // Frames SHARE pixels rather than stacking:
+         //   - X's left frame continues the plate's left frame;
+         //   - the buttons' bottom frames land exactly on the plate's top
+         //     frame;
+         //   - E's left frame IS X's right frame, so there is no double rule
+         //     between them.
+         //
+         // All of this is in OUTER edges, and getScreenRect does NOT give those.
+         // It reads the first quad of the geometry, and setText2D writes the
+         // inner fill first -- fill_rect(verts, 0, l+frame, r-frame, ...) -- so
+         // the rect it returns is inset by one frame width on every side.
+         // Working in it directly put every edge out by a frame, which showed up
+         // as four vertical rules between X and E instead of three.
+         const P = this._outer(this.text_obj, aspect);
+         if (!P) return;
+         const wf  = this._frameWidthOf(this.text_obj);   // == screen y units
+         const wfx = wf / aspect;                         // x is aspect-divided
 
-         // Top-LEFT, laid out left to right from the box's left edge, so X
-         // keeps its place when E changes width.
-         this.btn_close.setOffset([xmin,                 ymax + gap]);
-         this.btn_edit .setOffset([xmin + wc + gap,      ymax + gap]);
+         // Measure, then correct. The offset means different things for
+         // different alignH/alignV; a measured rect does not.
+         const place = (obj, out_l, out_b) => {
+            const o = this._outer(obj, aspect);
+            if (!o) return null;
+            const p = obj.ovlGetPos();
+            obj.setOffset([p[0] + (out_l - o.l), p[1] + (out_b - o.b)]);
+            return this._outer(obj, aspect);
+         };
+
+         // The plate's top frame bar spans [P.t - wf, P.t]; a button's bottom
+         // bar spans [out_b, out_b + wf]. Coincident means out_b = P.t - wf.
+         const bottom = P.t - wf;
+         const oc = place(this.btn_close, P.l, bottom);
+         if (oc) place(this.btn_edit, oc.r - wfx, bottom);
       }
 
       /** Is `o` one of this annotation's three objects? */
       owns(o) {
          return !!o && (o === this.text_obj || o === this.btn_close || o === this.btn_edit);
+      }
+
+      /** Frame width as a fraction of a BUTTON's line height, chosen so the
+       * absolute width matches the plate's. The frame is line_width *
+       * line_height and line_height scales with the font, so a button at
+       * btn_scale of the plate's size needs the fraction divided by it. */
+      _frameFrac() { return this.owner.frame_line / this.owner.btn_scale; }
+
+      /** An object's frame width, in ZText geometry units -- screen fractions
+       * in y, aspect-divided in x. Mirrors setText2D: line_width * line_height,
+       * floored at MIN_FRAME_LINE_PX. Per object, not per annotation: the floor
+       * can bite on a small button while leaving the plate alone, and then the
+       * two frames genuinely differ. */
+      _frameWidthOf(obj) {
+         const RC = this.owner.RC;
+         const f = this.owner._font;
+         if (!f) return 0;
+         const fm = RC.ZText._fontMetrics(f.metrics, obj.fontSize, 0.0);
+         const w  = obj.line_width * fm.line_height;
+         return Math.max(w, RC.ZText.MIN_FRAME_LINE_PX * obj._pxToScreen);
+      }
+
+      /** Outer edges of an object's box: what getScreenRect reports, grown by
+       * one frame width, since that rect is the inner fill. */
+      _outer(obj, aspect) {
+         const r = obj.getScreenRect(aspect);
+         if (!r) return null;
+         const wf = this._frameWidthOf(obj), wfx = wf / aspect;
+         return { l: Math.min(r.x0, r.x1) - wfx, r: Math.max(r.x0, r.x1) + wfx,
+                  b: Math.min(r.y0, r.y1) - wf,  t: Math.max(r.y0, r.y1) + wf };
       }
 
       /** Is the pointer on this annotation, counting its buttons and the gap
@@ -462,10 +521,10 @@ sap.ui.define([], function() {
 
          let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
          for (const o of [this.text_obj, this.btn_close, this.btn_edit]) {
-            const r = o.getScreenRect(aspect);
+            const r = this._outer(o, aspect);
             if (!r) continue;
-            x0 = Math.min(x0, r.x0, r.x1); x1 = Math.max(x1, r.x0, r.x1);
-            y0 = Math.min(y0, r.y0, r.y1); y1 = Math.max(y1, r.y0, r.y1);
+            x0 = Math.min(x0, r.l); x1 = Math.max(x1, r.r);
+            y0 = Math.min(y0, r.b); y1 = Math.max(y1, r.t);
          }
          if (!(x1 > x0)) return false;
          return nx >= x0 - m && nx <= x1 + m && ny >= y0 - m && ny <= y1 + m;
