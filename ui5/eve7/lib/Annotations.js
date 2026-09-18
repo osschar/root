@@ -36,14 +36,61 @@ sap.ui.define([], function() {
          /** Size and placement of the hover tooltip. font_size is a fraction of
           * viewport height, as everywhere in ZText's screen modes; the gap is in
           * CSS pixels and keeps the box clear of the cursor itself. */
-         this.font_size = 0.022;
+         this.font_size = 0.017;
          this.cursor_gap_px = 14;
 
          this.font_name = "LiberationSerif-Regular";
 
+         /** Button size, as a fraction of the annotation's own font size, and
+          * the gap between the box and its buttons in screen fractions. */
+         this.btn_scale = 0.8;
+         this.btn_gap   = 0.004;
+
+         /** Frame line width, as a fraction of the line height. ZText's own
+          * default of 0.06 is sub-pixel at these font sizes and rasterises away
+          * edge by edge, so a box loses its top rule first and reads as broken
+          * rather than as small. */
+         this.frame_line = 0.14;
+
          this._font = null;      // {texture, metrics}, cached once delivered
          this._tip = null;       // the hover tooltip ZText
          this._pending = null;   // text asked for before the font arrived
+         this._kept = [];        // Annotation instances
+      }
+
+      //-----------------------------------------------------------------------
+      // Kept annotations
+      //-----------------------------------------------------------------------
+
+      /** Is there something to keep? The context menu asks before offering. */
+      canKeep() { return !!(this._tip && this._tip.visible && this._tip.text); }
+
+      /** Turn the current hover tooltip into a kept annotation: a copy of it
+       * that stays put, can be moved and resized, and carries its own buttons.
+       *
+       * A copy rather than a handover -- the tooltip goes on being the tooltip.
+       * Keeping twice in a row should give two annotations, not move one. */
+      keepCurrent() {
+         if (!this.canKeep()) return null;
+         const a = new Annotation(this, this._tip.text, this._tip.ovlGetPos(),
+                                  this._tip.fontSize);
+         this._kept.push(a);
+         this.hideTooltip();
+         this.viewer.request_render();
+         return a;
+      }
+
+      _forget(a) {
+         const i = this._kept.indexOf(a);
+         if (i >= 0) this._kept.splice(i, 1);
+         this.viewer.request_render();
+      }
+
+      /** Buttons sit on the box, so they have to be re-placed whenever it moves
+       * or resizes. Called from the viewer's render loop: a drag moves the box
+       * through ovlSetPos without telling anyone, so there is nothing to hook. */
+      layout() {
+         for (const a of this._kept) a.layout();
       }
 
       //-----------------------------------------------------------------------
@@ -65,6 +112,22 @@ sap.ui.define([], function() {
          }
          this._apply(text, x, y);
       }
+
+      /** Tooltip label size, as a fraction of viewport height. Streamed from
+       * REveViewer::fTooltipFontSize, so every client of the viewer agrees and
+       * it survives a reload -- the same arrangement as the axis font size.
+       * Kept annotations keep the size they were made at: a size change should
+       * not reach back and rewrite annotations already placed. */
+      setFontSize(sz) {
+         if (!(sz > 0) || sz === this.font_size) return;
+         this.font_size = sz;
+         if (this._tip) {
+            this._tip.fontSize = sz;
+            this.viewer.request_render();
+         }
+      }
+
+      getFontSize() { return this.font_size; }
 
       hideTooltip() {
          this._pending = null;
@@ -102,6 +165,27 @@ sap.ui.define([], function() {
          );
       }
 
+      /** ZText floors its frame line and resize grip at a number of CSS pixels,
+       * which it can only do if it knows how big a CSS pixel is. The viewer
+       * sets that by traversing the overlay scene -- but only when the factor
+       * CHANGES, so an object added afterwards keeps the 1/900 class default
+       * for ever. Everything created here is created afterwards. */
+      _fixPixelScale(obj) {
+         const v = this.viewer;
+         if (typeof obj.setPixelScale !== "function") return;
+         if (!(v._px_to_screen > 0)) return;
+         obj.setPixelScale(v._px_to_screen, v.canvas.width, v.canvas.height);
+      }
+
+      _plate(obj) {
+         const RC = this.RC;
+         obj.setupFrameStuff(1.0, true,
+                             new RC.Color(1.0, 1.0, 1.0), 0.85,
+                             this.viewer.fgCol, 1.0, 0.25, this.frame_line);
+         obj.use_fg_color = true;
+         this._fixPixelScale(obj);
+      }
+
       _build() {
          const RC = this.RC;
 
@@ -126,10 +210,7 @@ sap.ui.define([], function() {
 
          // A plate behind the text, so it stays readable over busy geometry --
          // the one thing the DOM tooltip got for free from CSS.
-         this._tip.setupFrameStuff(1.0, true,
-                                   new RC.Color(1.0, 1.0, 1.0), 0.85,
-                                   this.viewer.fgCol, 1.0, 0.25, 0.06);
-         this._tip.use_fg_color = true;
+         this._plate(this._tip);
          this._tip.visible = false;
 
          this.viewer.overlay_scene.add(this._tip);
@@ -178,6 +259,167 @@ sap.ui.define([], function() {
       updateText(text) {
          if (!this._last) return;
          this.showTooltip(text, this._last.x, this._last.y);
+      }
+   }
+
+   /** One kept annotation: the text box plus its X and E buttons.
+    *
+    * All three are ordinary overlay ZTexts, so they get picking, dragging,
+    * resizing and hover highlight from the machinery that already exists. The
+    * only thing added is a local click handler -- `_ovl_click` -- because
+    * GlViewerRCore.overlayClick() otherwise only knows how to send a server MIR,
+    * and these buttons act entirely on the client.
+    */
+   class Annotation {
+
+      constructor(owner, text, pos, font_size) {
+         this.owner = owner;
+         const RC = owner.RC, f = owner._font;
+
+         this.text_obj = new RC.ZText({
+            text: text,
+            fontTexture: f.texture, font: f.metrics,
+            fontSize: font_size,
+            mode: RC.TEXT2D_SPACE_SCREEN,
+            fontHinting: 1.0,
+            color: owner.viewer.fgCol,
+            alignH: RC.ZText.ALIGN_H.LEFT,
+            alignV: RC.ZText.ALIGN_V.TOP
+         });
+         this.text_obj.setOffset(pos.slice());
+         // Movable AND resizable: this is the point of keeping it.
+         this.text_obj.pickable  = true;
+         this.text_obj.resizable = true;
+         owner._plate(this.text_obj);
+         this.text_obj._ovl_click = () => {};   // a click on the body does nothing
+
+         this.btn_close = this._makeButton("X", () => this.remove());
+         this.btn_edit  = this._makeButton("E", () => this.edit());
+
+         const os = owner.viewer.overlay_scene;
+         os.add(this.text_obj);
+         os.add(this.btn_close);
+         os.add(this.btn_edit);
+
+         this.layout();
+      }
+
+      _makeButton(label, onclick) {
+         const RC = this.owner.RC, f = this.owner._font;
+         const b = new RC.ZText({
+            text: label,
+            fontTexture: f.texture, font: f.metrics,
+            fontSize: this.text_obj.fontSize * this.owner.btn_scale,
+            mode: RC.TEXT2D_SPACE_SCREEN,
+            fontHinting: 1.0,
+            color: this.owner.viewer.fgCol,
+            alignH: RC.ZText.ALIGN_H.LEFT,
+            alignV: RC.ZText.ALIGN_V.BOTTOM
+         });
+         b.pickable  = true;
+         // Not resizable: a button with a resize grip would hand over half its
+         // own hit area to the grip, and there is nothing to resize.
+         b.resizable = false;
+         this.owner._plate(b);
+         b._ovl_click = onclick;
+         return b;
+      }
+
+      /** Place the buttons above the box's top-right corner.
+       *
+       * Above rather than inside: inside would cover text, and the bottom-right
+       * corner is already the resize grip's. Recomputed from the box's actual
+       * laid-out rect, so it follows both a move and a resize without either
+       * having to report itself. */
+      layout() {
+         const v = this.owner.viewer;
+         if (!v.canvas || !v.canvas.width) return;
+         const aspect = v.canvas.width / v.canvas.height;
+         const r = this.text_obj.getScreenRect(aspect);
+         if (!r) return;
+
+         const xmax = Math.max(r.x0, r.x1), ymax = Math.max(r.y0, r.y1);
+         const gap  = this.owner.btn_gap;
+
+         // Each button is measured on its own. Using one width for both put
+         // them on top of each other: "X" and "E" are different widths in a
+         // proportional face, and the narrower one decided the spacing.
+         const rc = this.btn_close.getScreenRect(aspect);
+         const re = this.btn_edit.getScreenRect(aspect);
+         const wc = rc ? Math.abs(rc.x1 - rc.x0) : 0.02;
+         const we = re ? Math.abs(re.x1 - re.x0) : 0.02;
+
+         // Laid out right to left from the box's right edge, so the rightmost
+         // button keeps its place when the other changes width.
+         this.btn_close.setOffset([xmax - wc,                  ymax + gap]);
+         this.btn_edit .setOffset([xmax - wc - gap - we,       ymax + gap]);
+      }
+
+      setText(t) {
+         this.text_obj.text = t;
+         this.layout();
+         this.owner.viewer.request_render();
+      }
+
+      remove() {
+         const os = this.owner.viewer.overlay_scene;
+         os.remove(this.text_obj);
+         os.remove(this.btn_close);
+         os.remove(this.btn_edit);
+         this.owner._forget(this);
+      }
+
+      /** Edit the text in an HTML textarea floating over the canvas.
+       *
+       * HTML because text entry is a DOM problem -- caret, selection, IME,
+       * clipboard -- and none of that belongs in GL. The textarea only produces
+       * a string; what renders it is still ZText, still plain text. When these
+       * become real REveElements the editor should move to the side panel,
+       * which is the same split, better placed.
+       */
+      edit() {
+         if (this._editor) return;
+         const v = this.owner.viewer;
+         const dom = v.canvas.parentDOM;
+         if (!dom) return;
+
+         const ta = document.createElement('textarea');
+         ta.value = this.text_obj.text;
+         ta.style.position = "absolute";
+         ta.style.zIndex = 1000;
+         ta.style.font = "13px monospace";
+         ta.style.minWidth = "220px";
+         ta.style.minHeight = "70px";
+
+         // Over the annotation itself: the thing being edited should not be
+         // somewhere else on the screen while it is edited.
+         const aspect = v.canvas.width / v.canvas.height;
+         const r = this.text_obj.getScreenRect(aspect);
+         const px = (v.canvas.pixelRatio || 1);
+         if (r) {
+            ta.style.left = (Math.min(r.x0, r.x1) * v.canvas.width / px) + "px";
+            ta.style.top  = ((1 - Math.max(r.y0, r.y1)) * v.canvas.height / px) + "px";
+         }
+
+         const close = (apply) => {
+            if (apply) this.setText(ta.value);
+            ta.remove();
+            this._editor = null;
+         };
+         ta.addEventListener('keydown', (e) => {
+            // Esc abandons; Ctrl/Cmd-Enter applies. Plain Enter must stay a
+            // newline -- these strings are multi-line by nature.
+            if (e.key === "Escape") { e.stopPropagation(); close(false); }
+            else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+               e.stopPropagation(); close(true);
+            }
+         });
+         ta.addEventListener('blur', () => close(true));
+
+         dom.appendChild(ta);
+         this._editor = ta;
+         ta.focus();
+         ta.select();
       }
    }
 

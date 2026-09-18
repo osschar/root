@@ -356,6 +356,13 @@ sap.ui.define([
                                     + "0.018 is the default and about the smallest "
                                     + "that stays crisp; by 0.05 the labels of a "
                                     + "box axis start to meet." });
+         this.makeSliderSetter(el.TooltipFontSize, "TooltipFontSize",
+                               "SetTooltipFontSize",
+                               { min: 0.004, max: 0.05, step: 0.001,
+                                 tip: "Hover-tooltip label height, as a fraction "
+                                    + "of the viewport. Separate from the axis "
+                                    + "size because a tooltip is read, where an "
+                                    + "axis number is only glanced at." });
          this.makeBoolSetter(el.BlackBg, "BlackBackground");
 
          // camera type selector

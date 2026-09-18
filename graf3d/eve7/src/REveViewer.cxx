@@ -149,6 +149,16 @@ void REveViewer::SetAxesFontSize(Float_t s)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// Label size for the hover tooltip, as a fraction of viewport height. Same
+/// range as the axis labels; see SetAxesFontSize.
+
+void REveViewer::SetTooltipFontSize(Float_t s)
+{
+   fTooltipFontSize = s < 0.004f ? 0.004f : (s > 0.05f ? 0.05f : s);
+   StampObjProps();
+}
+
+////////////////////////////////////////////////////////////////////////////////
 //
 void REveViewer::SetBlackBackground(bool x)
 {
@@ -204,6 +214,7 @@ int REveViewer::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
    j["AxesType"] = fAxesType;
    j["AxesAtten"] = fAxesAtten;
    j["AxesFontSize"] = fAxesFontSize;
+   j["TooltipFontSize"] = fTooltipFontSize;
    j["BlackBg"] = fBlackBackground;
    j["LightScale"] = fLightScale;
    j["ToneMapMode"] = fToneMapMode;
