@@ -60,6 +60,21 @@ sap.ui.define([], function() {
          /** Plate opacity, streamed from REveViewer::fTooltipAlpha. */
          this.plate_alpha = 0.85;
 
+         /** Synthetic bold for small text, and the size below which it starts.
+          *
+          * An SDF glyph a few pixels tall has strokes about one pixel wide, so
+          * its coverage never reaches 1 and the letter DARKENS what is behind
+          * it instead of replacing it -- over a magenta jet the text comes out
+          * magenta, over green it comes out green. Lowering the SDF threshold
+          * dilates the glyph until the coverage saturates, which is exactly
+          * what `weight` is for.
+          *
+          * Ramped by size rather than applied flat: a large label does not need
+          * it and would merely look overweight. */
+         this.weight_max    = 0.16;
+         this.weight_px_lo  = 7;    ///< full weight at or below this cap height
+         this.weight_px_hi  = 17;   ///< no weight at or above it
+
          this._font = null;      // {texture, metrics}, cached once delivered
          this._tip = null;       // the hover tooltip ZText
          this._pending = null;   // text asked for before the font arrived
@@ -132,6 +147,7 @@ sap.ui.define([], function() {
          const nx = this.viewer.ovl_nx, ny = this.viewer.ovl_ny;
          for (const a of this._kept) {
             // Geometry first: the test below is against the laid-out rects.
+            a.syncWeight();
             a.layout();
             a.setButtonsVisible(a.owns(dragged) || a.containsPointer(nx, ny));
          }
@@ -167,6 +183,7 @@ sap.ui.define([], function() {
          this.font_size = sz;
          if (this._tip) {
             this._tip.fontSize = sz;
+            this._tip.fontWeight = this.weightFor(sz);
             this.viewer.request_render();
          }
       }
@@ -226,6 +243,22 @@ sap.ui.define([], function() {
          obj.setPixelScale(v._px_to_screen, v.canvas.width, v.canvas.height);
       }
 
+      /** Synthetic bold for a given font size, in ZText's `weight` units.
+       *
+       * The size is a fraction of viewport height; dividing by the CSS-pixel
+       * scale turns it into pixels, which is the unit the problem is actually
+       * in -- the same 0.012 is fine on a tall canvas and far too thin on a
+       * short one. */
+      weightFor(font_size) {
+         const px_scale = this.viewer._px_to_screen ||
+                          this.RC.ZText.PX_TO_SCREEN_SPACE;
+         const px = font_size / px_scale;
+         const t = Math.min(1, Math.max(0,
+                     (this.weight_px_hi - px) /
+                     (this.weight_px_hi - this.weight_px_lo)));
+         return this.weight_max * t;
+      }
+
       /** @param line_frac frame width as a fraction of the object's OWN line
        * height. Defaults to the plate's value; a button passes a bigger
        * fraction so that its absolute frame comes out the same -- see
@@ -238,6 +271,7 @@ sap.ui.define([], function() {
                              (line_frac === undefined) ? this.frame_line : line_frac);
          obj.use_fg_color = true;
          this._fixPixelScale(obj);
+         obj.fontWeight = this.weightFor(obj.fontSize);
       }
 
       /** Plate opacity, applied live to the tooltip and to every kept
@@ -430,6 +464,10 @@ sap.ui.define([], function() {
          if (Math.abs(this.btn_close.fontSize - want) > 1e-9) {
             this.btn_close.fontSize = want;
             this.btn_edit.fontSize  = want;
+            // Buttons are smaller than the plate, so they cross the
+            // thin-stroke threshold sooner and need their own weight.
+            this.btn_close.fontWeight = this.owner.weightFor(want);
+            this.btn_edit.fontWeight  = this.owner.weightFor(want);
             // The frame fraction is relative to each object's OWN line height,
             // so a smaller button needs a bigger fraction to draw the same
             // absolute width. Without this the three frames differ and nothing
@@ -536,6 +574,14 @@ sap.ui.define([], function() {
          this.btn_close.visible = on;
          this.btn_edit.visible  = on;
          this.owner.viewer.request_render();
+      }
+
+      /** Re-weight after a resize: the drag changes fontSize directly through
+       * ovlSetSize, so nothing else would notice it crossing the threshold. */
+      syncWeight() {
+         const w = this.owner.weightFor(this.text_obj.fontSize);
+         if (Math.abs(this.text_obj.fontWeight - w) > 1e-6)
+            this.text_obj.fontWeight = w;
       }
 
       setText(t) {
