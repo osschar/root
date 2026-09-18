@@ -1,8 +1,9 @@
 sap.ui.define([
    'rootui5/eve7/lib/GlViewer',
    'rootui5/eve7/lib/EveElementsRCore',
-   'rootui5/eve7/lib/Axis3D'
-], function(GlViewer, EveElements, Axis3D) {
+   'rootui5/eve7/lib/Axis3D',
+   'rootui5/eve7/lib/Annotations'
+], function(GlViewer, EveElements, Axis3D, Annotations) {
 
    "use strict";
 
@@ -313,6 +314,11 @@ sap.ui.define([
          this.axis3d = new Axis3D(this, RC);
          this.scene.add(this.axis3d.group);
 
+         // The hover tooltip and, later, annotations kept from it. Lives in the
+         // overlay scene, so it is in the framebuffer and therefore in every
+         // screen capture -- which the DOM tooltip it replaces never was.
+         this.annotations = new Annotations(this, RC);
+
          let w = this.canvas.width;
          let h = this.canvas.height;
 
@@ -378,12 +384,11 @@ sap.ui.define([
       {
          let dome = this.canvas.canvasDOM;
 
-         // Setup tooltip
-         this.ttip = document.createElement('div');
-         this.ttip.setAttribute('class', 'eve_tooltip');
-         this.ttip_text = document.createElement('div');
-         this.ttip.appendChild(this.ttip_text);
-         this.canvas.parentDOM.appendChild(this.ttip)
+         // The tooltip used to be a div.eve_tooltip appended here. It is now a
+         // ZText in the overlay scene (see Annotations), so that it is in the
+         // framebuffer and therefore in screen captures, and so that it can
+         // later be kept, moved and resized by the machinery every other
+         // floating element already uses.
 
 
          // Setup some event pre-handlers
@@ -1150,8 +1155,7 @@ sap.ui.define([
          {
             this.highlighted_top_object.scene.clearHighlight(); // XXXX should go through manager
             this.highlighted_top_object = null;
-
-            this.ttip.style.display = "none";
+            if (this.annotations) this.annotations.hideTooltip();
          }
       }
 
@@ -1179,44 +1183,29 @@ sap.ui.define([
          c.elementHighlighted(idx, null, pstate.object)
 
          if (this.highlighted_top_object !== pstate.top_object)
-         {
-            if (pstate.object && pstate.eve_el)
-               this.ttip_text.innerHTML = c.getTooltipText(idx);
-            else
-               this.ttip_text.innerHTML = "";
-         }
+            this._ttip_text = (pstate.object && pstate.eve_el) ? c.getTooltipText(idx) : "";
          this.highlighted_top_object = pstate.top_object;
 
-         let dome  = this.controller.getView().getDomRef();
-         let mouse = pstate.mouse;
-         let offs  = (mouse.x > 0 || mouse.y < 0) ? this.getRelativeOffsets(dome) : null;
-
-         if (mouse.x <= 0) {
-            this.ttip.style.left  = (x + dome.offsetLeft + 10) + "px";
-            this.ttip.style.right = null;
-         } else {
-            this.ttip.style.right = (this.canvas.canvasDOM.clientWidth - x + offs.right + 10) + "px";
-            this.ttip.style.left  = null;
-         }
-         if (mouse.y >= 0) {
-            this.ttip.style.top    = (y + dome.offsetTop + 10) + "px";
-            this.ttip.style.bottom = null;
-         } else {
-            this.ttip.style.bottom = (this.canvas.canvasDOM.clientHeight - y + offs.bottom + 10) + "px";
-            this.ttip.style.top = null;
-         }
-
-         this.ttip.style.display= "block";
+         // Position and edge-flipping now belong to the tooltip itself: it is a
+         // ZText in the overlay scene, so it knows its own laid-out box and does
+         // not need the DOM offset arithmetic this used to do against the view.
+         this.annotations.showTooltip(this._ttip_text, x, y);
       }
 
       remoteToolTip(msg)
       {
-         if (this.ttip_text)
-            this.ttip_text.innerHTML = msg;
-         if (this.highlighted_top_object && this.ttip)
-            this.ttip.style.display = "block";
+         // Server-pushed text for the element already under the pointer. It
+         // carries no position, so the tooltip keeps the one it has.
+         this._ttip_text = msg;
+         if (this.highlighted_top_object && this.annotations)
+            this.annotations.updateText(msg);
       }
 
+      /** Only the three.js viewer still needs this: its tooltip is a DOM div
+       * positioned against the view, which is what these offsets are for. The
+       * RCore tooltip is a ZText in the overlay scene and positions itself in
+       * screen fractions, so it needs none of it. Kept because the method is
+       * still reachable, not because this file uses it. */
       getRelativeOffsets(elem)
       {
          // Based on:
