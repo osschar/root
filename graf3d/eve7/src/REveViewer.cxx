@@ -118,12 +118,33 @@ void REveViewer::SetAxesType(int at)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Distance attenuation of the 3D axis labels, clamped to [0, 1]. See the
-/// declaration; 0 is a constant pixel size, 1 shrinks like geometry.
+/// Distance attenuation of the 3D axis labels. See the declaration.
+///
+/// The meaningful range is [0, 1] -- 0 a constant pixel size, 1 shrinking
+/// exactly like geometry -- but the clamp is deliberately much wider than that.
+/// Inside [0, 1] the effect is nearly invisible on a scene viewed from outside,
+/// because the spread of clip-space w across such a scene is small; it takes
+/// several times 1 before the eye can see what the knob does at all. Past 1 is
+/// exaggeration rather than physics, and below 0 is inverse perspective, where
+/// the FAR labels are the big ones. Neither is right, both are useful: one for
+/// seeing what the control does, the other for a picture that makes the depth
+/// ordering unmissable.
 
 void REveViewer::SetAxesAtten(Float_t a)
 {
-   fAxesAtten = a < 0.f ? 0.f : (a > 1.f ? 1.f : a);
+   fAxesAtten = a < -4.f ? -4.f : (a > 8.f ? 8.f : a);
+   StampObjProps();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// Label size for the 3D axis, as a fraction of viewport height. 0.018 is the
+/// default and about the smallest that stays crisp; the top of the range is far
+/// past useful on purpose, so the control can be pushed somewhere absurd on
+/// demand rather than only somewhere sensible.
+
+void REveViewer::SetAxesFontSize(Float_t s)
+{
+   fAxesFontSize = s < 0.004f ? 0.004f : (s > 0.15f ? 0.15f : s);
    StampObjProps();
 }
 
@@ -182,6 +203,7 @@ int REveViewer::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
    j["Mandatory"] = fMandatory;
    j["AxesType"] = fAxesType;
    j["AxesAtten"] = fAxesAtten;
+   j["AxesFontSize"] = fAxesFontSize;
    j["BlackBg"] = fBlackBackground;
    j["LightScale"] = fLightScale;
    j["ToneMapMode"] = fToneMapMode;
