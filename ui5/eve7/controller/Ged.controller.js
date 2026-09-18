@@ -329,12 +329,32 @@ sap.ui.define([
          // to draw it.
          this.makeAxesTypeSelector(el);
          // Shown unconditionally: the panel is built when the viewer is
-         // selected, not when AxesType changes, so hiding it while the axes are
-         // off would leave it missing after they are switched on.
-         // Rounded for display only: the field is a Float_t, so 0.6 arrives as
-         // 0.6000000238418579 and the input would show all of it.
-         this.makeNumberSetter(Math.round(el.AxesAtten * 1000) / 1000,
-                               "AxesAtten", "SetAxesAtten");
+         // selected, not when AxesType changes, so hiding these while the axes
+         // are off would leave them missing after they are switched on.
+         //
+         // Both are sliders because both are bounded and clamped server-side --
+         // see makeSliderSetter. The ranges mirror those clamps exactly:
+         // REveViewer::SetAxesAtten takes [-4, 8] and SetAxesFontSize
+         // [0.004, 0.15]. If a clamp moves, move these with it.
+         //
+         // Both ranges run well past the sensible value on purpose, so the
+         // tooltip has to say where sensible IS -- otherwise the control
+         // implies that its midpoint is the neutral choice, and for
+         // attenuation the midpoint is 2, which is nothing of the kind.
+         this.makeSliderSetter(el.AxesAtten, "AxesAtten", "SetAxesAtten",
+                               { min: 0, max: 4, step: 0.2, tickmarks: false,
+                                 tip: "Label shrink with distance. 0 = constant "
+                                    + "pixel size, 1 = realistic (shrinks exactly "
+                                    + "like geometry), above that exaggerates. The "
+                                    + "setter clamps to [-4, 8], so inverse "
+                                    + "perspective -- far labels largest -- is "
+                                    + "reachable from a macro or a MIR, just not "
+                                    + "from this slider." });
+         this.makeSliderSetter(el.AxesFontSize, "AxesFontSize", "SetAxesFontSize",
+                               { min: 0.004, max: 0.15, step: 0.002,
+                                 tip: "Label height as a fraction of the viewport. "
+                                    + "0.018 is the default and about the smallest "
+                                    + "that stays crisp." });
          this.makeBoolSetter(el.BlackBg, "BlackBackground");
 
          // camera type selector
@@ -645,14 +665,10 @@ sap.ui.define([
             }
          });
 
-         let label = new mText({ text: labelName });
-         label.addStyleClass("sapUiTinyMargin");
-
-         let frame = new HorizontalLayout({
-            content : [widget, label]
-         });
-
-         gedFrame.addContent(frame);
+         // Label first and in the shared column, like every other row. This
+         // one used to put the checkbox first, which broke the label column
+         // wherever a panel mixed a bool with anything else.
+         this.makeGedRow(labelName, widget, null, gedFrame);
       },
 
       makeColorSetter : function(val, labelName, funcName, gedFrame)
@@ -690,6 +706,83 @@ sap.ui.define([
          gedFrame.addContent(frame);
       },
 
+      /** One row of the editor: a label in a fixed-width column, then the
+       * control, both vertically centred.
+       *
+       * Every setter used to build its own HorizontalLayout, which aligns
+       * nothing: labels came before some controls and after others, each column
+       * was as wide as its own text, and nothing lined up down the panel. An
+       * HBox with a fixed label width gives a single left edge for the labels
+       * and a single left edge for the controls, which is the whole of what
+       * "aligned" means here.
+       *
+       * LABEL_W has to clear the longest name in use -- "BlackBackground" today
+       * -- or the column wraps and the row heights go ragged.
+       */
+      makeGedRow : function(labelText, widget, tip, gedFrame) {
+         if (!gedFrame)
+            gedFrame = this.getView().byId("GED");
+
+         let label = new mText({ text: labelText, width: "130px" });
+         if (tip) label.setTooltip(tip);
+         label.addStyleClass("sapUiTinyMarginBegin");
+
+         let row = new sap.m.HBox({
+            alignItems: "Center",
+            items: [label, widget]
+         });
+         row.addStyleClass("sapUiTinyMarginBottom");
+         gedFrame.addContent(row);
+         return row;
+      },
+
+      /** A continuous value, as a slider rather than a text field.
+       *
+       * For a bounded quantity a slider is the honest control: it shows the
+       * range, which a number field does not, and it cannot be given a value
+       * outside it -- so the server-side clamp never has to silently contradict
+       * what was typed. Attenuation is the case that made this obvious: typing
+       * 100 into the field got you 1, with nothing to say so.
+       *
+       * The MIR goes on `change` (drag released), not `liveChange`: every step
+       * of a drag would otherwise be a round trip, and for the font size each
+       * one costs a geometry rebuild on every client of the viewer.
+       */
+      makeSliderSetter : function(val, labelName, funcName, opts, gedFrame)
+      {
+         if (!gedFrame)
+            gedFrame = this.getView().byId("GED");
+         if (!funcName)
+            funcName = "Set" + labelName;
+         opts = opts || {};
+
+         let gcm = this;
+         let slider = new sap.m.Slider({
+            width: "160px",
+            tooltip: opts.tip,   // may be hidden by the advanced tooltip below
+
+            min: (opts.min !== undefined) ? opts.min : 0,
+            max: (opts.max !== undefined) ? opts.max : 1,
+            step: (opts.step !== undefined) ? opts.step : 0.05,
+            value: val,
+            enableTickmarks: !!opts.tickmarks,
+            showAdvancedTooltip: true,
+            change: function(event) {
+               let v = event.getParameter("value");
+               gcm.mgr.SendMIR(funcName + "(" + v + ")",
+                               gcm.editorElement.fElementId,
+                               gcm.editorElement._typename);
+            }
+         });
+
+         // The explanation goes on the LABEL as well as the slider.
+         // showAdvancedTooltip gives the slider its own value bubble -- which a
+         // slider needs, since there is otherwise nowhere to read the number --
+         // and that bubble can take the place of the plain hover tooltip. The
+         // label is the one hover target certain to carry the prose.
+         this.makeGedRow(labelName, slider, opts.tip, gedFrame);
+      },
+
       makeNumberSetter : function(val, labelName, funcName, gedFrame)
       {
          if (!gedFrame)
@@ -709,13 +802,8 @@ sap.ui.define([
             }
          });
          widget.setType(sap.m.InputType.Number);
-         let label = new mText({ text: labelName });
-         label.addStyleClass("sapUiTinyMargin");
-
-         let frame = new HorizontalLayout({
-            content : [widget, label]
-         });
-         gedFrame.addContent(frame);
+         widget.setWidth("160px");   // match the sliders' control column
+         this.makeGedRow(labelName, widget, null, gedFrame);
          return widget;
       },
 
@@ -826,14 +914,7 @@ sap.ui.define([
          
          comboBox.setModel(cameraModel);
          
-         let labelWidget = new mText({ text: "Camera Type" });
-         labelWidget.addStyleClass("sapUiTinyMargin");
-         
-         let frame = new HorizontalLayout({
-            content: [labelWidget, comboBox]
-         });
-         
-         gedFrame.addContent(frame);
+         gcm.makeGedRow("Camera Type", comboBox, null, gedFrame);
       },
       
       /** Axis style: none, from the origin, or a box round the scene.
@@ -858,7 +939,11 @@ sap.ui.define([
          // there is no model to attach late and no synchronisation step to get
          // wrong.
          let sel = new sap.m.Select({
-            width: "100%",
+            // Wide enough for the longest item plus the arrow. "100%" made it
+            // collapse to the content width of a HorizontalLayout, which is as
+            // narrow as the CURRENT selection -- so picking a longer name than
+            // the one first shown clipped it.
+            width: "110px",
             items: [
                new sap.ui.core.Item({ key: "0", text: "None" }),
                new sap.ui.core.Item({ key: "1", text: "Origin" }),
@@ -873,12 +958,9 @@ sap.ui.define([
             }
          });
 
-         let labelWidget = new mText({ text: "Axes" });
-         labelWidget.addStyleClass("sapUiTinyMargin");
-
-         gedFrame.addContent(new HorizontalLayout({
-            content: [labelWidget, sel]
-         }));
+         this.makeGedRow("Axes", sel,
+                         "None, rays from the origin, or a box round the scene.",
+                         gedFrame);
       },
 
       onCameraTypeChange: function(viewer, newCameraType) {
