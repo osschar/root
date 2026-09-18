@@ -351,10 +351,11 @@ sap.ui.define([
                                     + "reachable from a macro or a MIR, just not "
                                     + "from this slider." });
          this.makeSliderSetter(el.AxesFontSize, "AxesFontSize", "SetAxesFontSize",
-                               { min: 0.004, max: 0.15, step: 0.002,
+                               { min: 0.004, max: 0.05, step: 0.001,
                                  tip: "Label height as a fraction of the viewport. "
                                     + "0.018 is the default and about the smallest "
-                                    + "that stays crisp." });
+                                    + "that stays crisp; by 0.05 the labels of a "
+                                    + "box axis start to meet." });
          this.makeBoolSetter(el.BlackBg, "BlackBackground");
 
          // camera type selector
@@ -757,6 +758,19 @@ sap.ui.define([
          opts = opts || {};
 
          let gcm = this;
+
+         // How long the drag has to be still before the value is sent. Reuses
+         // the HTimeout user arg that already governs the hover-highlight
+         // delay, rather than inventing a second idle constant: both answer the
+         // same question, "has the pointer stopped?", and one knob should move
+         // them together. Client default 250 ms, as in GL.controller.
+         let idle = this.mgr?.handle?.getUserArgs?.("HTimeout");
+         if (idle === undefined || !(idle > 0)) idle = 250;
+
+         let send = (v) => gcm.mgr.SendMIR(funcName + "(" + v + ")",
+                                           gcm.editorElement.fElementId,
+                                           gcm.editorElement._typename);
+
          let slider = new sap.m.Slider({
             width: "160px",
             tooltip: opts.tip,   // may be hidden by the advanced tooltip below
@@ -767,11 +781,26 @@ sap.ui.define([
             value: val,
             enableTickmarks: !!opts.tickmarks,
             showAdvancedTooltip: true,
+
+            // Live, but only once the drag has paused. Sending on every
+            // liveChange is a round trip per pixel, and for the font size a
+            // geometry rebuild on every client of the viewer with it; sending
+            // only on release gives no feedback at all while you hunt for the
+            // value. Idle-debounced gets both: the handle tracks the pointer,
+            // the scene catches up the moment you hesitate.
+            liveChange: function(event) {
+               const v = event.getParameter("value");
+               const sl = event.getSource();
+               if (sl._ged_idle) clearTimeout(sl._ged_idle);
+               sl._ged_idle = setTimeout(() => { delete sl._ged_idle; send(v); }, idle);
+            },
+
+            // Release: send at once and drop any pending idle send, so the
+            // final value cannot be overtaken by a stale one still in flight.
             change: function(event) {
-               let v = event.getParameter("value");
-               gcm.mgr.SendMIR(funcName + "(" + v + ")",
-                               gcm.editorElement.fElementId,
-                               gcm.editorElement._typename);
+               const sl = event.getSource();
+               if (sl._ged_idle) { clearTimeout(sl._ged_idle); delete sl._ged_idle; }
+               send(event.getParameter("value"));
             }
          });
 
