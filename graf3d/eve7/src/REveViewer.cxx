@@ -159,6 +159,16 @@ void REveViewer::SetTooltipFontSize(Float_t s)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// Opacity of the plate behind the tooltip and kept annotations. 0 leaves the
+/// text floating on the scene, 1 hides whatever is behind it.
+
+void REveViewer::SetTooltipAlpha(Float_t a)
+{
+   fTooltipAlpha = a < 0.f ? 0.f : (a > 1.f ? 1.f : a);
+   StampObjProps();
+}
+
+////////////////////////////////////////////////////////////////////////////////
 //
 void REveViewer::SetBlackBackground(bool x)
 {
@@ -215,6 +225,7 @@ int REveViewer::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
    j["AxesAtten"] = fAxesAtten;
    j["AxesFontSize"] = fAxesFontSize;
    j["TooltipFontSize"] = fTooltipFontSize;
+   j["TooltipAlpha"] = fTooltipAlpha;
    j["BlackBg"] = fBlackBackground;
    j["LightScale"] = fLightScale;
    j["ToneMapMode"] = fToneMapMode;

@@ -52,6 +52,9 @@ sap.ui.define([], function() {
           * rather than as small. */
          this.frame_line = 0.14;
 
+         /** Plate opacity, streamed from REveViewer::fTooltipAlpha. */
+         this.plate_alpha = 0.85;
+
          this._font = null;      // {texture, metrics}, cached once delivered
          this._tip = null;       // the hover tooltip ZText
          this._pending = null;   // text asked for before the font arrived
@@ -116,7 +119,16 @@ sap.ui.define([], function() {
        * or resizes. Called from the viewer's render loop: a drag moves the box
        * through ovlSetPos without telling anyone, so there is nothing to hook. */
       layout() {
-         for (const a of this._kept) a.layout();
+         // Buttons show only while the pointer is on the annotation -- "when
+         // the tile is entered". The test is over the whole GROUP, not the box
+         // alone: moving onto a button leaves the box, and if that hid the
+         // buttons they could never be clicked.
+         const h = this.viewer.ovl_hover;
+         const dragged = this.viewer.ovl_drag ? this.viewer.ovl_drag.obj : null;
+         for (const a of this._kept) {
+            a.setButtonsVisible(a.owns(h) || a.owns(dragged));
+            a.layout();
+         }
       }
 
       //-----------------------------------------------------------------------
@@ -211,11 +223,36 @@ sap.ui.define([], function() {
       _plate(obj) {
          const RC = this.RC;
          obj.setupFrameStuff(1.0, true,
-                             new RC.Color(1.0, 1.0, 1.0), 0.85,
+                             new RC.Color(1.0, 1.0, 1.0), this.plate_alpha,
                              this.viewer.fgCol, 1.0, 0.25, this.frame_line);
          obj.use_fg_color = true;
          this._fixPixelScale(obj);
       }
+
+      /** Plate opacity, applied live to the tooltip and to every kept
+       * annotation.
+       *
+       * Both fill_alpha AND _norm_fill_alpha have to be set. ZText's highlight
+       * bumps fill_alpha by 0.30 and restores it from _norm_fill_alpha when the
+       * highlight goes -- so writing only fill_alpha survives exactly until the
+       * next time the pointer crosses the element, and then silently reverts. */
+      setPlateAlpha(a) {
+         if (!(a >= 0) || a === this.plate_alpha) return;
+         this.plate_alpha = a;
+
+         const put = (o) => {
+            if (!o) return;
+            o.fill_alpha = a;
+            o._norm_fill_alpha = a;
+         };
+         put(this._tip);
+         for (const an of this._kept) {
+            put(an.text_obj); put(an.btn_close); put(an.btn_edit);
+         }
+         this.viewer.request_render();
+      }
+
+      getPlateAlpha() { return this.plate_alpha; }
 
       _build() {
          const RC = this.RC;
@@ -327,6 +364,11 @@ sap.ui.define([], function() {
          this.btn_close = this._makeButton("X", () => this.remove());
          this.btn_edit  = this._makeButton("E", () => this.edit());
 
+         // Hidden until the pointer enters the annotation; layout() decides.
+         this.btn_close.visible = false;
+         this.btn_edit.visible  = false;
+         this._btns_on = false;
+
          const os = owner.viewer.overlay_scene;
          os.add(this.text_obj);
          os.add(this.btn_close);
@@ -384,6 +426,19 @@ sap.ui.define([], function() {
          // button keeps its place when the other changes width.
          this.btn_close.setOffset([xmax - wc,                  ymax + gap]);
          this.btn_edit .setOffset([xmax - wc - gap - we,       ymax + gap]);
+      }
+
+      /** Is `o` one of this annotation's three objects? */
+      owns(o) {
+         return !!o && (o === this.text_obj || o === this.btn_close || o === this.btn_edit);
+      }
+
+      setButtonsVisible(on) {
+         if (this._btns_on === on) return;
+         this._btns_on = on;
+         this.btn_close.visible = on;
+         this.btn_edit.visible  = on;
+         this.owner.viewer.request_render();
       }
 
       setText(t) {

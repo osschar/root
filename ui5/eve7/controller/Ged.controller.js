@@ -363,6 +363,12 @@ sap.ui.define([
                                     + "of the viewport. Separate from the axis "
                                     + "size because a tooltip is read, where an "
                                     + "axis number is only glanced at." });
+         this.makeSliderSetter(el.TooltipAlpha, "TooltipAlpha", "SetTooltipAlpha",
+                               { min: 0, max: 1, step: 0.05,
+                                 tip: "Opacity of the plate behind the tooltip "
+                                    + "and kept annotations. 0 leaves the text "
+                                    + "floating on the scene, 1 hides whatever "
+                                    + "is behind it." });
          this.makeBoolSetter(el.BlackBg, "BlackBackground");
 
          // camera type selector
