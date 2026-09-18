@@ -322,16 +322,37 @@ sap.ui.define([], function() {
                });
             }
 
-            // The axis name: at the middle of the axis, as far from either end
-            // as it gets, and standing further out again than the numbers.
-            const np = away(pt(i, lo + this.name_frac * (hi - lo)), this.name_out);
+            // Names at BOTH ends, on the axis and beyond it: "x" past the
+            // positive end, "-x" past the negative one. The offset runs along
+            // the axis rather than across it, so each name reads as the
+            // continuation of its own ray leaving the scene -- which is also
+            // what makes the sign unambiguous without a tick to hang off.
+            //
+            // Nothing perpendicular is added. An origin axis is a line through
+            // the scene, and its ends are the two places that are already clear
+            // of everything, so a name there needs no further dodging.
+            const nout = this.name_out * tick_len;
+
             labels.push({
                text: ax.name,
-               pos: np,
+               pos: pt(i, hi + nout),
                px: 0, py: 0,
                ah: RC.ZText.ALIGN_H.CENTER,
                av: RC.ZText.ALIGN_V.MIDDLE
             });
+
+            // Only when the axis actually reaches negative values: lo is
+            // min(0, bbox min), so a scene sitting entirely on the positive
+            // side has no negative end to name.
+            if (lo < 0) {
+               labels.push({
+                  text: "-" + ax.name,
+                  pos: pt(i, lo - nout),
+                  px: 0, py: 0,
+                  ah: RC.ZText.ALIGN_H.CENTER,
+                  av: RC.ZText.ALIGN_V.MIDDLE
+               });
+            }
          }
       }
 
