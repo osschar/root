@@ -124,9 +124,25 @@ sap.ui.define([], function() {
          this.font_size = 0.018;
          this.font_name = "LiberationSerif-Regular";
 
+         /** An axis whose whole extent projects to less than this fraction of
+          * the viewport is edge-on: it has no direction on screen to lay ticks
+          * or numbers along, so it is not drawn at all. Under an orthographic
+          * camera aimed down an axis that projection is exactly zero -- the
+          * classic case being z in an XOY view -- and the labels would stack on
+          * a single point.
+          *
+          * Kept small on purpose. This is about the DEGENERATE case only; a
+          * perspective axis pointing roughly at the viewer still has real
+          * screen extent (0.08 on boxset's x, measured) and its labels merely
+          * crowd, which is a thinning problem and not this one. */
+         this.min_axis_ndc = 0.02;
+
          this.ticks = new TickSource();
          this.bbox = null;
          this.labels_obj = null;
+         /** Per axis: is it edge-on for the current camera? Set at build time
+          * by _degenerate(); the camera check rebuilds when the set changes. */
+         this._degen = [false, false, false];
 
          /** Cached once delivered. The box style rebuilds whenever the camera
           * crosses a face plane, which is far too often to re-request a font. */
@@ -196,6 +212,7 @@ sap.ui.define([], function() {
       rebuild() {
          this.clear();
          this._octant = null;
+         this._camSig = null;
          if (this.style === STYLE.NONE || !this.bbox) return;
 
          // Both the tick generator and the font arrive asynchronously. Chain
@@ -230,14 +247,22 @@ sap.ui.define([], function() {
          const lines = [];    // flat [x0,y0,z0, x1,y1,z1] runs, one per segment
          const labels = [];   // for Z3DAxis
 
+         // Which axes are edge-on for this camera. Both builders skip those
+         // entirely -- there is no screen direction to lay a scale along.
+         this._degen = this._degenerate(this.viewer.camera);
+
          if (this.style === STYLE.ORIGIN) {
             this._buildOrigin(lines, labels);
          } else {
             this._buildBox(lines, labels);
-            // Record what this geometry was built for, so the camera check does
-            // not immediately rebuild the very thing it just triggered.
-            if (this.viewer.camera)
-               this._octant = this._octantKey(this.viewer.camera);
+         }
+
+         // Record what this geometry was built for, so the camera check does
+         // not immediately rebuild the very thing it just triggered.
+         if (this.viewer.camera) {
+            this._octant = (this.style === STYLE.BOX)
+                         ? this._octantKey(this.viewer.camera) : "";
+            this._camSig = this._degenKey(this.viewer.camera) + "/" + this._octant;
          }
 
          // ---- lines and ticks ------------------------------------------------
@@ -304,6 +329,7 @@ sap.ui.define([], function() {
 
          for (const ax of AX) {
             const i = ax.i;
+            if (this._degen[i]) continue;   // edge-on: nothing to lay out along
             const lo = Math.min(0, mn[i]), hi = Math.max(0, mx[i]);
             if (!(hi > lo)) continue;
 
@@ -404,6 +430,44 @@ sap.ui.define([], function() {
          return [-(e[0]*tx + e[1]*ty + e[2] *tz),
                  -(e[4]*tx + e[5]*ty + e[6] *tz),
                  -(e[8]*tx + e[9]*ty + e[10]*tz)];
+      }
+
+      /** Which axes are edge-on, as three booleans.
+       *
+       * Measured, not inferred from the camera type. The type names say which
+       * plane an orthographic camera faces -- XOY means x and y are in the
+       * screen plane, so z is the degenerate one -- but reading a name commits
+       * to a table that has to be kept in step with the enum, and it says
+       * nothing about a camera the user has since rotated. Projecting the axis
+       * and measuring how long it comes out answers the actual question. */
+      _degenerate(camera) {
+         const RC = this.RC, b = this.bbox;
+         const out = [false, false, false];
+         if (!camera || !b) return out;
+
+         const mid = [0.5 * (b.min.x + b.max.x),
+                      0.5 * (b.min.y + b.max.y),
+                      0.5 * (b.min.z + b.max.z)];
+         const ext = [b.max.x - b.min.x, b.max.y - b.min.y, b.max.z - b.min.z];
+
+         const proj = (p) => {
+            const v = new RC.Vector3(p[0], p[1], p[2]);
+            v.project(camera);
+            return v;
+         };
+         for (let a = 0; a < 3; ++a) {
+            if (!(ext[a] > 0)) { out[a] = true; continue; }
+            const p0 = mid.slice(), p1 = mid.slice();
+            p0[a] -= 0.5 * ext[a];
+            p1[a] += 0.5 * ext[a];
+            const s0 = proj(p0), s1 = proj(p1);
+            out[a] = Math.hypot(s1.x - s0.x, s1.y - s0.y) < this.min_axis_ndc;
+         }
+         return out;
+      }
+
+      _degenKey(camera) {
+         return this._degenerate(camera).map(d => d ? "1" : "0").join("");
       }
 
       /** Which half of each axis the camera is on, as a 3-character key.
@@ -517,6 +581,7 @@ sap.ui.define([], function() {
          const tick_len = 0.018 * diag;
 
          for (let a = 0; a < 3; ++a) {
+            if (this._degen[a]) continue;   // edge-on: no scale to draw
             const j = (a + 1) % 3, k = (a + 2) % 3;
 
             // `out` is the axis the tick runs along. Each candidate edge sits
@@ -613,17 +678,25 @@ sap.ui.define([], function() {
          v.applyMatrix4(camera.projectionMatrix);
          this.labels_obj.setReferenceW(v.w);
 
-         // The box is the only style whose geometry depends on where the camera
-         // is, and it depends on it only through the octant -- so this rebuilds
-         // when the camera crosses a face plane and not otherwise. Orbiting
-         // within one octant costs the comparison above and nothing else.
-         if (this.style === STYLE.BOX) {
-            const k = this._octantKey(camera);
-            if (k !== this._octant) {
-               this._octant = k;
-               this._build();
-               return true;
-            }
+         // Two things about the camera change what has to be drawn, and both
+         // are cheap to test and rare to change, so the geometry is rebuilt on
+         // them rather than reconsidered every frame:
+         //
+         //   - which octant the camera is in, which picks the box's back panels
+         //     and labelled edges (box style only);
+         //   - which axes are edge-on, which decides whether an axis is drawn
+         //     at all (both styles).
+         //
+         // Orbiting without crossing a face plane or taking an axis edge-on
+         // costs the three comparisons and nothing else.
+         const dk = this._degenKey(camera);
+         const ok = (this.style === STYLE.BOX) ? this._octantKey(camera) : "";
+         const sig = dk + "/" + ok;
+         if (sig !== this._camSig) {
+            this._camSig = sig;
+            this._octant = ok;
+            this._build();
+            return true;
          }
          return false;
       }
