@@ -21,6 +21,7 @@
 #include <ROOT/REveScene.hxx>
 #include <ROOT/REveSMorph.hxx>
 #include <ROOT/REveBox.hxx>
+#include <ROOT/REvePointSet.hxx>
 #include <ROOT/REveViewer.hxx>
 #include <ROOT/REveTrans.hxx>
 
@@ -51,9 +52,6 @@ class Boinger : public TTimer {
    REveSMorph *fBall{nullptr};
    REveSMorph *fShadow{nullptr};
 
-   // Starting at the apex pins the scene bounding box, and with it the axis
-   // box: the ball is elastic, so it never goes above where it starts, and the
-   // box is computed once at load from the elements as they are then.
    Double_t fX{0}, fY{kBY - kR}, fZ{0};       // position; elastic, so fY is the apex
    Double_t fVx{34}, fVy{0}, fVz{21};         // velocity; fVy is the falling one
    Double_t fSpin{0};                         // angle about the ball's polar axis
@@ -187,12 +185,40 @@ public:
 };
 
 ////////////////////////////////////////////////////////////////////////////////
+/// Eight points at the corners of the room, and nothing else.
+///
+/// The scene bounding box is computed once, from the elements as they stand at
+/// load -- so without this the axis box would frame the floor plus wherever the
+/// ball happened to be at that instant, which is not the room and not the same
+/// twice. Marking the corners pins it exactly, and the ball is then free to be
+/// anywhere.
+///
+/// This is Matevz's "inverted aquarium": rather than draw a box around the
+/// scene to contain it, put something at the extremities and let the bounding
+/// box be inflated from the inside. `Shell.cc` in mkFit does the same with four
+/// jet cones at twice the tracker radius and transparency 90 -- which is also
+/// why a sparse event there does not make the camera jump.
+///
+/// Left faintly visible rather than transparent: they read as the corners of
+/// the room, and an invisible element is one nobody can find when it is wrong.
+
+static REvePointSet *make_room_corners()
+{
+   auto ps = new REvePointSet("Room corners");
+   ps->SetMarkerColor(kMagenta - 7);
+   ps->SetMarkerSize(1);
+   ps->SetPickable(kFALSE);
+
+   for (int i = 0; i < 8; ++i)
+      ps->SetNextPoint((i & 1) ? kBX : -kBX,
+                       (i & 2) ? kBY : -kBY,
+                       (i & 4) ? kBZ : -kBZ);
+   return ps;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// The floor -- a slab, so the shadow has something to land on. Its top face is
 /// flush with the plane the ball bounces off.
-///
-/// It also sets the scale of the scene: the 3D axis takes its extents from the
-/// scene bounding box, so the floor's footprint is what the axis box ends up
-/// framing, together with the ball's travel above it.
 
 static REveBox *make_floor()
 {
@@ -230,6 +256,7 @@ void boing(Long_t period_ms = 40)
 
    auto scene = eveMng->GetEventScene();
 
+   scene->AddElement(make_room_corners());
    scene->AddElement(make_floor());
 
    auto ball = new REveSMorph("Boing ball");
@@ -248,7 +275,10 @@ void boing(Long_t period_ms = 40)
    shadow->SetPLevel(32);
    shadow->SetThetaMax(0.5);      // a hemisphere -- see the comment in Notify()
    shadow->SetMainColor(kBlack);
-   shadow->SetMainTransparency(55);
+   // Opaque enough to read. At 55 it was a faint smudge: the surface is lit
+   // like any other, so the specular lifts even a pure black off black, and
+   // what is left after that has to carry the whole shadow.
+   shadow->SetMainTransparency(20);
    shadow->SetPickable(kFALSE);
    scene->AddElement(shadow);
 
