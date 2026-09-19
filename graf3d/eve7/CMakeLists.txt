@@ -61,6 +61,7 @@ ROOT_STANDARD_LIBRARY_PACKAGE(ROOTEve
     ROOT/REveSecondarySelectable.hxx
     ROOT/REveSelection.hxx
     ROOT/REveShape.hxx
+    ROOT/REveSMorph.hxx
     ROOT/REveStraightLineSet.hxx
     ROOT/REveSystem.hxx
     ROOT/REveTableInfo.hxx
@@ -118,6 +119,7 @@ ROOT_STANDARD_LIBRARY_PACKAGE(ROOTEve
     src/REveSecondarySelectable.cxx
     src/REveSelection.cxx
     src/REveShape.cxx
+    src/REveSMorph.cxx
     src/REveStraightLineSet.cxx
     src/REveTableInfo.cxx
     src/REveTableProxyBuilder.cxx
