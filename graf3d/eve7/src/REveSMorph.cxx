@@ -14,6 +14,7 @@
 #include <ROOT/REveTrans.hxx>
 
 #include <algorithm>
+#include <cmath>
 
 using namespace ROOT::Experimental;
 
@@ -117,6 +118,37 @@ Int_t REveSMorph::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// Bounding box of the generated surface, in the element's own frame -- the
+/// client applies the transformation to it.
+///
+/// Computed rather than measured: the vertices live on the client, so there is
+/// nothing here to walk. That is also the point of streaming it. RenderCore
+/// would happily derive a box from the geometry it generated, but then the box
+/// is only as good as the last frame drawn, and the 3D axis, which takes its
+/// extents from the scene box, would follow it around. An analytic box is
+/// authoritative and costs nothing.
+///
+/// The surface reaches (1 + |fCx|) transversally and 1 along the polar axis.
+/// The fRz shear is a rotation about z, which preserves sqrt(x^2 + y^2), so it
+/// can only trade one of those two for the other -- hence the hypotenuse, and
+/// only when it is actually switched on. The theta and phi extents can only
+/// make the surface smaller, and are not taken into account.
+
+void REveSMorph::ComputeBBox()
+{
+   BBoxInit();
+
+   const Float_t t = 1.f + std::abs(fCx);       // transverse reach
+   Float_t hx = 1.f, hy = t;
+
+   if (fRz != 0.f)
+      hx = hy = std::hypot(1.f, t);
+
+   BBoxCheckPoint(-hx, -hy, -t);
+   BBoxCheckPoint( hx,  hy,  t);
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// No geometry is written -- makeSMorph builds it from the fields above. The
 /// render-data block still has to exist, because the client dispatches on
 /// render_data.rnr_func, and the base call is what puts the transformation in
@@ -127,4 +159,11 @@ void REveSMorph::BuildRenderData()
    fRenderData = std::make_unique<REveRenderData>("makeSMorph");
    REveElement::BuildRenderData();
    fRenderData->PushV(0.f, 0.f, 0.f);
+
+   // The bounding box rides in the normals channel, as REveBoxSet ships its
+   // own; the client feeds it to Geometry::setExternalBoundingBox.
+   ComputeBBox();
+   const Float_t *bb = GetBBox();
+   fRenderData->PushN(bb[0], bb[1], bb[2]);
+   fRenderData->PushN(bb[3], bb[4], bb[5]);
 }

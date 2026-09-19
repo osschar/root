@@ -2,11 +2,11 @@
 /// \ingroup tutorial_eve_7
 /// The Amiga Boing demo, server-side.
 ///
-/// A checkered ball bounces around a wireframe room. Everything about it is
-/// driven from the server -- position, spin and the shadow -- and every frame
-/// goes out as **one matrix per element**, under kCBTransBBox: nothing is
-/// re-tessellated, nothing is rebuilt on the client, and no geometry crosses
-/// the wire after the first frame.
+/// A checkered ball bounces above a floor, inside the 3D axis box. Everything
+/// about it is driven from the server -- position, spin and the shadow -- and
+/// every frame goes out as **one matrix per element**, under kCBTransBBox:
+/// nothing is re-tessellated, nothing is rebuilt on the client, and no geometry
+/// crosses the wire after the first frame.
 ///
 /// The ball is a `REveSMorph`, ported from Gled's SMorph, with the original
 /// `checker_8.png` from gled's Geom1 demos. Select it in the browser to get its
@@ -20,7 +20,8 @@
 #include <ROOT/REveManager.hxx>
 #include <ROOT/REveScene.hxx>
 #include <ROOT/REveSMorph.hxx>
-#include <ROOT/REveStraightLineSet.hxx>
+#include <ROOT/REveBox.hxx>
+#include <ROOT/REveViewer.hxx>
 #include <ROOT/REveTrans.hxx>
 
 #include <TTimer.h>
@@ -134,43 +135,36 @@ public:
 };
 
 ////////////////////////////////////////////////////////////////////////////////
-/// The room: a magenta cage with a grid on every face, in the spirit of the
-/// original's backdrop. Static -- it is streamed once and never touched again.
+/// The floor -- a slab, so the shadow has something to land on. Its top face is
+/// flush with the plane the ball bounces off.
+///
+/// It also sets the scale of the scene: the 3D axis takes its extents from the
+/// scene bounding box, so the floor's footprint is what the axis box ends up
+/// framing, together with the ball's travel above it.
 
-static REveStraightLineSet *make_room(Int_t ndiv)
+static REveBox *make_floor()
 {
-   auto ls = new REveStraightLineSet("Room");
-   ls->SetMainColor(kMagenta);
-   ls->SetLineWidth(1);
-   // Scenery, not an object of interest: without this it highlights whenever
-   // the pointer crosses any of its lines, which is most of the viewport.
-   ls->SetPickable(kFALSE);
+   auto b = new REveBox("Floor");
+   // SetFillColor, not SetMainColor -- REveBox::WriteCoreJson streams
+   // GetFillColor() under the "fMainColor" key and nothing else, so for this
+   // class the main colour never reaches the client at all.
+   //
+   // Plain light grey. A tinted one is not worth reaching for: TColor::GetColor
+   // snaps to a near-enough entry already in the table, so asking for a lilac
+   // (216, 204, 232) here quietly yields colour 18, which is this grey.
+   b->SetFillColor(18);
+   b->SetPickable(kFALSE);
 
-   const Float_t e[3] = {kBX, kBY, kBZ};
+   const Float_t y1 = -kBY - 3, y2 = -kBY;
 
-   // For each axis pair, rule both faces perpendicular to the third axis.
-   for (Int_t ax = 0; ax < 3; ++ax) {
-      Int_t a1 = (ax + 1) % 3, a2 = (ax + 2) % 3;
-      for (Int_t side = 0; side < 2; ++side) {
-         Float_t f = side ? e[ax] : -e[ax];
-         for (Int_t i = 0; i <= ndiv; ++i) {
-            Float_t u = -e[a1] + 2 * e[a1] * i / ndiv;
-            Float_t p1[3], p2[3];
-            p1[ax] = p2[ax] = f;
-            p1[a1] = p2[a1] = u;
-            p1[a2] = -e[a2]; p2[a2] = e[a2];
-            ls->AddLine(p1[0], p1[1], p1[2], p2[0], p2[1], p2[2]);
+   // Corner order as in box.C: 0-3 on the low-z face, 4-7 on the high-z one,
+   // each running (-x,-y) (-x,+y) (+x,+y) (+x,-y).
+   b->SetVertex(0, -kBX, y1, -kBZ);   b->SetVertex(1, -kBX, y2, -kBZ);
+   b->SetVertex(2,  kBX, y2, -kBZ);   b->SetVertex(3,  kBX, y1, -kBZ);
+   b->SetVertex(4, -kBX, y1,  kBZ);   b->SetVertex(5, -kBX, y2,  kBZ);
+   b->SetVertex(6,  kBX, y2,  kBZ);   b->SetVertex(7,  kBX, y1,  kBZ);
 
-            Float_t v = -e[a2] + 2 * e[a2] * i / ndiv;
-            Float_t q1[3], q2[3];
-            q1[ax] = q2[ax] = f;
-            q1[a2] = q2[a2] = v;
-            q1[a1] = -e[a1]; q2[a1] = e[a1];
-            ls->AddLine(q1[0], q1[1], q1[2], q2[0], q2[1], q2[2]);
-         }
-      }
-   }
-   return ls;
+   return b;
 }
 
 void boing(Long_t period_ms = 40)
@@ -178,9 +172,13 @@ void boing(Long_t period_ms = 40)
    auto eveMng = REveManager::Create();
    eveMng->AllowMultipleRemoteConnections(false, false);
 
+   // The box axes frame the scene and carry the scale, which is what the room
+   // grid used to do and did too loudly.
+   eveMng->GetDefaultViewer()->SetAxesType(REveViewer::kAxesEdge);
+
    auto scene = eveMng->GetEventScene();
 
-   scene->AddElement(make_room(6));
+   scene->AddElement(make_floor());
 
    auto ball = new REveSMorph("Boing ball");
    ball->SetTLevel(32);

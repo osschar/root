@@ -14,6 +14,8 @@
 
 #include <ROOT/REveElement.hxx>
 
+#include <TAttBBox.h>
+
 #include <string>
 
 namespace ROOT {
@@ -67,7 +69,8 @@ namespace Experimental {
 /// Worked example: `tutorials/visualisation/eve7/boing.C`.
 ////////////////////////////////////////////////////////////////////////////////
 
-class REveSMorph : public REveElement
+class REveSMorph : public REveElement,
+                   public TAttBBox
 {
 private:
    REveSMorph(const REveSMorph &) = delete;
@@ -148,6 +151,8 @@ public:
    /// that size here is transformation and not geometry: this stamps
    /// kCBTransBBox, so it streams as a matrix and rebuilds nothing.
    void SetRadius(Float_t r);
+
+   void ComputeBBox() override;
 
    Int_t WriteCoreJson(nlohmann::json &j, Int_t rnr_offset) override;
    void  BuildRenderData() override;
