@@ -230,12 +230,26 @@ sap.ui.define([], function() {
       }
 
       /** Invoke function on all receiver of scene events - when such function exists */
-      callSceneReceivers(scene, fname, arg) {
+      /** Call `fname` on every receiver of `scene` that implements it.
+       *
+       * The ONE place that knows the receiver contract, which is why it is also
+       * the one place that checks. Nothing in RegisterSceneReceiver says a
+       * receiver must implement every callback -- a receiver interested only in
+       * element removal is a reasonable thing to be -- so a missing method has
+       * to be ordinary, not fatal. It was fatal while SelectElement and
+       * UnselectElement dispatched by hand: one partial receiver and every
+       * selection refresh threw, unwinding CompleteSceneChanges and taking
+       * highlight propagation, projected-view updates and removal processing
+       * with it.
+       *
+       * Variadic, so the selection callbacks can use it too rather than keeping
+       * their own copies of this loop. */
+      callSceneReceivers(scene, fname, ...args) {
          if (scene.$receivers) {
              for (let i=0; i < scene.$receivers.length; i++) {
                  let receiver = scene.$receivers[i];
                  if (typeof receiver[fname] == "function")
-                    receiver[fname](arg);
+                    receiver[fname](...args);
              }
          }
      }
@@ -704,20 +718,8 @@ sap.ui.define([], function() {
       SelectElement(selection_obj, element, sec_idcs, extra)
       {
          let scene = this.GetElement(element.fSceneId);
-         if (scene.$receivers) {
-            // Guarded, as callSceneReceivers does it. A receiver registered for
-            // one callback -- element removal, say -- used to break selection
-            // for the whole session: this threw, the exception unwound
-            // CompleteSceneChanges, and with it went highlight propagation,
-            // projected-view updates and element-removal processing. Nothing in
-            // RegisterSceneReceiver says a receiver must implement every
-            // callback, and nothing should.
-            for (let r of scene.$receivers)
-            {
-               if (typeof r.SelectElement === "function")
-                  r.SelectElement(selection_obj, element.fElementId, sec_idcs, extra);
-            }
-         }
+         this.callSceneReceivers(scene, "SelectElement",
+                                 selection_obj, element.fElementId, sec_idcs, extra);
 
          // console.log("EveManager.SelectElement", element, scene.$receivers[0].viewer.outline_pass.id2obj_map);
       }
@@ -726,13 +728,8 @@ sap.ui.define([], function() {
       {
          let scene = this.GetElement(element.fSceneId);
 
-         if (scene.$receivers) {
-            for (let r of scene.$receivers)
-            {
-               if (typeof r.UnselectElement === "function")
-                  r.UnselectElement(selection_obj, element.fElementId);
-            }
-         }
+         this.callSceneReceivers(scene, "UnselectElement",
+                                 selection_obj, element.fElementId);
 
          // console.log("EveManager.UnselectElement", element, scene.$receivers[0].viewer.outline_pass.id2obj_map);
       }
@@ -761,6 +758,13 @@ sap.ui.define([], function() {
          }
 
          for (let item of recs) {
+            // Same rule as the update triggers and callSceneReceivers: a
+            // receiver implements the callbacks it cares about, and the caller
+            // checks. Without this a receiver registered for one thing throws
+            // here on every redraw -- caught and logged, so merely noisy rather
+            // than fatal, but noise that hides real exceptions from the same
+            // handler.
+            if (typeof item.endChanges !== "function") continue;
             try {
                item.endChanges();
             } catch (e) {
