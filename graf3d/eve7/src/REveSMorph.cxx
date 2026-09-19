@@ -115,6 +115,20 @@ Int_t REveSMorph::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
    j["fTexYC"]    = fTexYC;
    j["fTexYOff"]  = fTexYOff;
 
+   // Bounding box as JSON, min triple then max triple, ready for RC.Box3.
+   //
+   // Not in the render-data normals channel, where REveBoxSet and REvePointSet
+   // put theirs. Those two have no choice: they are drawn instanced, with a
+   // single primitive as geometry and every placement in a data texture the
+   // shader reads, so RenderCore cannot know the extent of what it is about to
+   // draw -- there may be a million instances of it. Here the client generates
+   // real geometry and could measure it; the box is streamed only because the
+   // server has it in closed form already. That does not justify putting
+   // numbers in an array named for normals.
+   ComputeBBox();
+   const Float_t *bb = GetBBox();
+   j["bbox"] = {bb[0], bb[2], bb[4], bb[1], bb[3], bb[5]};
+
    return ret;
 }
 
@@ -160,11 +174,4 @@ void REveSMorph::BuildRenderData()
    fRenderData = std::make_unique<REveRenderData>("makeSMorph");
    REveElement::BuildRenderData();
    fRenderData->PushV(0.f, 0.f, 0.f);
-
-   // The bounding box rides in the normals channel, as REveBoxSet ships its
-   // own; the client feeds it to Geometry::setExternalBoundingBox.
-   ComputeBBox();
-   const Float_t *bb = GetBBox();
-   fRenderData->PushN(bb[0], bb[1], bb[2]);
-   fRenderData->PushN(bb[3], bb[4], bb[5]);
 }
