@@ -261,7 +261,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
             if (!obj3d) {
                let el = this.mgr.GetElement(elId);
                if (el && el.render_data) {
-                  console.warning("EveScene.elementsRemoved can't find obj3d ", this.mgr.GetElement(el));
+                  console.warn("EveScene.elementsRemoved can't find obj3d ", this.mgr.GetElement(el));
                }
                continue;
             }

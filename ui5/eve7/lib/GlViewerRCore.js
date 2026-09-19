@@ -876,7 +876,7 @@ sap.ui.define([
                } else {
                   for (let geo of el_entry.geom) {
                      if (geo === undefined)
-                        console.warning("Processing viewer selection, undefined object for element", this.mgr.GetElement(el_idx));
+                        console.warn("Processing viewer selection, undefined object for element", this.mgr.GetElement(el_idx));
                      else
                         obj_list.push(geo);
                   }
