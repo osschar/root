@@ -208,19 +208,27 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
                this.need_visibility_update = false;
             }
 
-            // To improve when bbox info is streamed.
-            // Recalc scene bbox -- and update viewer total bbox, from scene boxes.
-            // 1. recalc-scene-bbox from known element bboxes (streamed)
-            //    [ this could really be done on the server ]
-            // 2. tell viewer to recalc-total-bbox ONLY from scene bboxes.
-
-            // For now just refresh the gl-viewer.
-            this.glctrl.viewer.request_render(true);
+            // Recompute the scene bounding box only when something structural
+            // happened -- elements added, removed, or rebuilt. NOT for a round
+            // that only moved things.
+            //
+            // Recomputing it every round is what makes the 3D axis breathe: the
+            // box is the union of what is in the scene, so it follows whatever
+            // is furthest out, and anything that moves drags the axis and its
+            // tick labels around with it. Nobody wants an axis whose extent
+            // depends on where a track happens to be this frame -- the axis is
+            // supposed to be the fixed thing you read positions against.
+            //
+            // An element that genuinely wants to set the extent can say so, with
+            // REveElement::SetFixedBBox().
+            this.glctrl.viewer.request_render(this.need_bbox_update);
+            this.need_bbox_update = false;
          }
       }
 
       elementAdded(el)
       {
+         this.need_bbox_update = true;
          if ( ! this.glctrl) return;
 
          let obj3d =  this.makeGLRepresentation(el);
@@ -306,6 +314,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
 
       elementsRemoved(ids)
       {
+         this.need_bbox_update = true;
+
          for (let i = 0; i < ids.length; i++)
          {
             let elId  = ids[i];
@@ -353,6 +363,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
          if (el.render_data) {
             if ((el.changeBit & this.mgr.EChangeBits.kCBObjProps) || (el.changeBit & this.mgr.EChangeBits.kCBColorSelection))
             {
+               this.need_bbox_update = true;
                this.replaceElement(el);
             }
          }

@@ -130,6 +130,14 @@ void REveViewer::SetAxesType(int at)
 /// seeing what the control does, the other for a picture that makes the depth
 /// ordering unmissable.
 
+void REveViewer::SetExtrapolateMotion(bool x)
+{
+   fExtrapolateMotion = x;
+   StampObjProps();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 void REveViewer::SetAxesAtten(Float_t a)
 {
    fAxesAtten = a < -4.f ? -4.f : (a > 8.f ? 8.f : a);
@@ -222,6 +230,7 @@ int REveViewer::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
 
    j["Mandatory"] = fMandatory;
    j["AxesType"] = fAxesType;
+   j["ExtrapolateMotion"] = fExtrapolateMotion;
    j["AxesAtten"] = fAxesAtten;
    j["AxesFontSize"] = fAxesFontSize;
    j["TooltipFontSize"] = fTooltipFontSize;

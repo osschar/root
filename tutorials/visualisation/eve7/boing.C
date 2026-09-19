@@ -220,12 +220,22 @@ public:
       // the flattening has to be along the *polar* axis, which for an SMorph is
       // the local x, and that axis has to end up pointing at the ceiling.
       Double_t h = (fY + kBY) / (2 * kBY);        // 0 at the floor, 1 at the ceiling
-      Double_t s = kR * (1.15 - 0.45 * h);
+
+      // Never wider than the ball. The ball's centre reaches kBX - kR, so a
+      // shadow any larger than kR sticks out through the wall -- and because
+      // the scene box is the union of what is in it, that is enough to drag the
+      // axis box out with it every time the ball nears a corner.
+      Double_t s = kR * (1.0 - 0.3 * h);
+
       REveTrans sh;
       sh.SetBaseVec(1, 0, 0.02 * kR, 0);          // polar axis up, and squashed
       sh.SetBaseVec(2, s, 0, 0);
       sh.SetBaseVec(3, 0, 0, s);
-      sh.SetPos(fX, -kBY + 0.01 * kR, fZ);
+      // Sit so the *bounding box* bottom lands exactly on the floor, not 0.08
+      // below it: REveSMorph's box is conservative and spans the whole sphere,
+      // so half the squashed thickness hangs beneath the dome that is drawn.
+      // Being below the floor is what put the axis grid under the slab.
+      sh.SetPos(fX, -kBY + 0.02 * kR, fZ);
       fShadow->SetTransMatrix(sh.Array());
 
       Reset();

@@ -133,34 +133,29 @@ Int_t REveSMorph::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Bounding box of the generated surface, in the element's own frame -- the
-/// client applies the transformation to it.
+/// Bounding box: fixed at unit extent, in the element's own frame.
 ///
-/// Computed rather than measured: the vertices live on the client, so there is
-/// nothing here to walk. That is also the point of streaming it. RenderCore
-/// would happily derive a box from the geometry it generated, but then the box
-/// is only as good as the last frame drawn, and the 3D axis, which takes its
-/// extents from the scene box, would follow it around. An analytic box is
-/// authoritative and costs nothing.
+/// Deliberately NOT tracking the morph. fCx can push the surface out past 1 and
+/// this box will not follow, which is a real if modest under-estimate -- and it
+/// is the better trade. The scene box is the union of what is in the scene and
+/// the 3D axis takes its extents from it, so a box that tracked fCx would move
+/// the axis while somebody dragged the fCx slider. An axis that rescales itself
+/// as you adjust a shape is worse than one that is a few per cent small.
 ///
-/// The surface reaches (1 + |fCx|) transversally and 1 along the polar axis.
-/// The fRz shear is a rotation about z, which preserves sqrt(x^2 + y^2), so it
-/// can only trade one of those two for the other -- hence the hypotenuse, and
-/// only when it is actually switched on. The theta and phi extents can only
-/// make the surface smaller, and are not taken into account.
+/// The surface is generated at unit size and scaled by the element's own
+/// transformation, so this is the whole of it for anything unmorphed.
+///
+/// Worth knowing: the client transforms this box by taking its corners, so a
+/// ROTATED object's world-axis-aligned box is inflated -- up to sqrt(3) for a
+/// cube rotated to point a corner along an axis. That is not fixable here. A
+/// sphere needs a bounding sphere, and RenderCore has no such thing; a box is
+/// all there is to give it.
 
 void REveSMorph::ComputeBBox()
 {
    BBoxInit();
-
-   const Float_t t = 1.f + std::abs(fCx);       // transverse reach
-   Float_t hx = 1.f, hy = t;
-
-   if (fRz != 0.f)
-      hx = hy = std::hypot(1.f, t);
-
-   BBoxCheckPoint(-hx, -hy, -t);
-   BBoxCheckPoint( hx,  hy,  t);
+   BBoxCheckPoint(-1.f, -1.f, -1.f);
+   BBoxCheckPoint( 1.f,  1.f,  1.f);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

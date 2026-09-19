@@ -27,6 +27,35 @@ sap.ui.define([], function() {
          this.objects = new Map();   // element id -> entry
          this.offset  = null;        // performance.now() - server ms
          this.raf     = 0;
+         this.enabled = true;
+      }
+
+      /** Per-viewer switch, from REveViewer::SetExtrapolateMotion.
+        *
+        * Off holds every object where its last update put it, which is what the
+        * scene looked like before any of this existed -- and is the way to see
+        * the real update rate when the motion looks wrong and the question is
+        * whether the stream or the extrapolation is at fault.
+        *
+        * Turning it off snaps each object back to the position the server last
+        * sent, rather than leaving it wherever the extrapolation had got to.
+        */
+      setEnabled(on) {
+         on = !!on;
+         if (on === this.enabled) return;
+         this.enabled = on;
+
+         if (on) {
+            this.start();
+         } else {
+            this.stop();
+            for (const e of this.objects.values()) {
+               const m = e.obj3d._matrix.elements;
+               m[12] = e.p0[0]; m[13] = e.p0[1]; m[14] = e.p0[2];
+               e.obj3d.matrixChanged();
+            }
+            this.viewer.request_render();
+         }
       }
 
       //--------------------------------------------------------------------
@@ -101,7 +130,7 @@ sap.ui.define([], function() {
       //--------------------------------------------------------------------
 
       start() {
-         if (this.raf || this.objects.size === 0) return;
+         if (this.raf || this.objects.size === 0 || !this.enabled) return;
          this.raf = requestAnimationFrame(this.tick.bind(this));
       }
 

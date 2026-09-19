@@ -369,6 +369,11 @@ sap.ui.define([
          // checkbox could only ever send 0 or 1, which left kAxesEdge -- the
          // box style -- unreachable from the GUI even after the client learned
          // to draw it.
+         // Whether this viewer evaluates streamed trajectories between updates
+         // (REveElement::SetMotion) or holds each object where the last update
+         // put it. Off is how you see the actual update rate.
+         this.makeBoolSetter(el.ExtrapolateMotion, "ExtrapolateMotion");
+
          this.makeAxesTypeSelector(el);
          // Shown unconditionally: the panel is built when the viewer is
          // selected, not when AxesType changes, so hiding these while the axes
@@ -867,6 +872,7 @@ sap.ui.define([
             liveChange: function(event) {
                const v = event.getParameter("value");
                const sl = event.getSource();
+               gcm.beginInteraction();
                // The readout is local and immediate -- it must track the handle
                // even while the MIR is still being held back.
                readout.setText(Number(v).toFixed(dec));
@@ -882,6 +888,46 @@ sap.ui.define([
                readout.setText(Number(v).toFixed(dec));
                if (sl._ged_idle) { clearTimeout(sl._ged_idle); delete sl._ged_idle; }
                send(v);
+               gcm.endInteraction();
+            }
+         });
+
+         // Wheel over the slider nudges it: one step, shift ten, ctrl+shift a
+         // hundred. A slider is a poor instrument for a small exact change --
+         // 150 pixels across a range of twenty is a tenth of a unit per pixel --
+         // and the wheel gives the step back without giving up the drag.
+         const wheelBump = function(ev) {
+            ev.preventDefault();
+
+            let mult = 1;
+            if (ev.shiftKey && ev.ctrlKey) mult = 100;
+            else if (ev.shiftKey)          mult = 10;
+
+            const dir = (ev.deltaY < 0) ? 1 : -1;
+            let v = slider.getValue() + dir * step * mult;
+
+            // Snap to the step grid, or repeated bumps accumulate the float
+            // error until the readout shows something the step cannot express.
+            v = min + Math.round((v - min) / step) * step;
+            v = Math.max(min, Math.min(max, v));
+
+            if (v === slider.getValue()) return;
+
+            slider.setValue(v);
+            readout.setText(Number(v).toFixed(dec));
+            gcm.beginInteraction();
+            send(v);
+            gcm.endInteraction();
+         };
+
+         slider.addEventDelegate({
+            onAfterRendering: function() {
+               const dom = slider.getDomRef();
+               if (!dom || dom._ged_wheel) return;
+               dom._ged_wheel = true;
+               // Not passive: this has to preventDefault, or the page scrolls
+               // under the pointer at the same time.
+               dom.addEventListener("wheel", wheelBump, { passive: false });
             }
          });
 
@@ -951,9 +997,48 @@ sap.ui.define([
       },
 
       updateGED: function(elementId) {
-         if (this.ged_visible && this.editorElement && (this.editorElement.fElementId == elementId)) {
-            this.buildEditor();
+         if ( ! (this.ged_visible && this.editorElement &&
+                 this.editorElement.fElementId == elementId)) return;
+
+         // buildEditor() destroys and recreates every control, so running it
+         // while the pointer is on one snatches the control away mid-gesture:
+         // the slider jumps back to whatever the element held when the round
+         // was assembled, which is usually the value from one MIR ago. That is
+         // the whole of "the slider resets while I drag it" -- and why it seems
+         // to work for some elements, namely the ones whose setter does not
+         // echo back through here.
+         //
+         // Defer instead. The value under the pointer is already the one the
+         // user wants and the server has just agreed to it; anything else that
+         // changed will be picked up by the rebuild once the gesture ends.
+         if (this.interacting) { this.rebuild_pending = true; return; }
+
+         this.buildEditor();
+      },
+
+      /** Hold off editor rebuilds for the duration of a gesture. */
+      beginInteraction: function() {
+         this.interacting = true;
+         if (this._interaction_timer) {
+            clearTimeout(this._interaction_timer);
+            delete this._interaction_timer;
          }
+      },
+
+      /** End of gesture. The delay covers the server's echo of the last value,
+        * which would otherwise arrive just after the guard lifted and rebuild
+        * anyway. */
+      endInteraction: function() {
+         let gcm = this;
+         if (this._interaction_timer) clearTimeout(this._interaction_timer);
+         this._interaction_timer = setTimeout(function() {
+            delete gcm._interaction_timer;
+            gcm.interacting = false;
+            if (gcm.rebuild_pending) {
+               gcm.rebuild_pending = false;
+               if (gcm.ged_visible && gcm.editorElement) gcm.buildEditor();
+            }
+         }, 400);
       },
 
       updateSecondarySelectionGED:function(elementId, sec_idcs) {
