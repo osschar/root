@@ -311,7 +311,7 @@ sap.ui.define([], function() {
             let elId = ids[i];
             let elem = this.GetElement(elId);
             if (!elem) {
-               console.warning("EveManager.removeElements REveElement not found in map, id = ", elId);
+               console.warn("EveManager.removeElements REveElement not found in map, id = ", elId);
                continue;
             }
 
@@ -328,7 +328,7 @@ sap.ui.define([], function() {
                }
             }
             else {
-               console.warning("EveManager.removeElements can't remove child from mother, mother id = ", elem.fMotherId);
+               console.warn("EveManager.removeElements can't remove child from mother, mother id = ", elem.fMotherId);
             }
             delete this.map[elId];
          }
