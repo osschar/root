@@ -11,6 +11,8 @@
 
 #include <ROOT/REveManager.hxx>
 
+#include <chrono>
+
 #include <ROOT/REveCamera.hxx>
 #include <ROOT/REveUtil.hxx>
 #include <ROOT/REveSelection.hxx>
@@ -1249,6 +1251,17 @@ void REveManager::SendBinary(unsigned connid, const void *data, std::size_t len)
 /// Dropping a round is the right response for anything that draws the current
 /// state rather than a sequence of edits: the next round carries the newer
 /// state anyway, so the skipped one had nothing to add.
+
+////////////////////////////////////////////////////////////////////////////////
+
+double REveManager::ServerTimeMs()
+{
+   using clock = std::chrono::steady_clock;
+   static const clock::time_point origin = clock::now();
+   return std::chrono::duration<double, std::milli>(clock::now() - origin).count();
+}
+
+////////////////////////////////////////////////////////////////////////////////
 
 bool REveManager::IsCaughtUpWithClients()
 {

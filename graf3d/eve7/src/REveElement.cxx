@@ -1506,6 +1506,37 @@ void REveElement::BuildRenderData()
 /// message that carries no geometry.
 
 ////////////////////////////////////////////////////////////////////////////////
+/// Declare how this element is moving, valid from now for max_dt seconds.
+///
+/// Stamps kCBTransBBox, like the transformation itself: it rides the same cheap
+/// update and the client applies both to the object it already has.
+///
+/// The timestamp is taken here rather than at stream time, and that matters.
+/// The manager may hold the round back while clients catch up, so the moment a
+/// state was computed and the moment it goes out are not the same. Stamping at
+/// stream time would quietly shift every trajectory forward by however long the
+/// link was congested -- which is precisely the lag this whole mechanism exists
+/// to remove.
+
+void REveElement::SetMotion(const Float_t vel[3], const Float_t acc[3], Float_t max_dt)
+{
+   for (int i = 0; i < 3; ++i) { fVel[i] = vel[i]; fAcc[i] = acc[i]; }
+   fMaxDt     = max_dt;
+   fMotionT0  = REveManager::ServerTimeMs();
+   fHasMotion = kTRUE;
+   StampTransBBox();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// Stop extrapolating: the element holds wherever its transformation puts it.
+
+void REveElement::ClearMotion()
+{
+   fHasMotion = kFALSE;
+   StampTransBBox();
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// Declare the bounding box, overriding whatever the geometry would give.
 /// Streamed as JSON and applied by the client to the renderer object; see the
 /// header for what it is for and what it is not.
@@ -1527,6 +1558,21 @@ void REveElement::WriteTransJson(nlohmann::json &cj)
    {
       const Double_t *m = fMainTrans->Array();
       cj["matrix"] = std::vector<double>(m, m + 16);
+   }
+
+   if (fHasMotion)
+   {
+      cj["mot"] = { {"t0",     fMotionT0},
+                    {"vel",    {fVel[0], fVel[1], fVel[2]}},
+                    {"acc",    {fAcc[0], fAcc[1], fAcc[2]}},
+                    {"max_dt", fMaxDt} };
+   }
+   else
+   {
+      // Say so explicitly: an element that stops moving has to cancel the
+      // trajectory the client is still evaluating, and absence of a field in a
+      // partial update means "unchanged", not "cleared".
+      cj["mot"] = nullptr;
    }
 }
 

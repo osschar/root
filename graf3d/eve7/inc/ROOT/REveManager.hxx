@@ -224,6 +224,15 @@ public:
    /// method comment for why such a producer must ask instead of being blocked.
    bool IsCaughtUpWithClients();
 
+   /// Milliseconds since this manager was created, from a monotonic clock.
+   ///
+   /// The time base for streamed motion (REveElement::SetMotion). It is
+   /// deliberately not a wall clock: the client's may be seconds off and may
+   /// step, and all that is needed is a steadily advancing origin both ends can
+   /// agree on. The client recovers the offset by watching how long ago the
+   /// updates it receives claim to be -- see EveManager's clock notes.
+   static double ServerTimeMs();
+
 
    void DisableRedraw() { printf("REveManager::DisableRedraw obsolete \n"); }
    void EnableRedraw()  { printf("REveManager::EnableRedraw obsolete \n");  }
