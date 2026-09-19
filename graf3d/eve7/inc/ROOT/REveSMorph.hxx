@@ -96,6 +96,14 @@ protected:
    /// which keeps the quads near the poles from collapsing.
    Bool_t  fEquiSurf{kFALSE};
 
+   /// Surface colour, multiplied by the texture where there is one.
+   ///
+   /// It has to be a member with SetMainColorPtr() pointing at it: REveElement
+   /// keeps only a *pointer* to whichever field a subclass nominates, and
+   /// leaves it null. SetMainColor() on a class that has not nominated one is a
+   /// silent no-op and GetMainColor() answers 0, which is white.
+   Color_t fColor{kWhite};
+
    /// File name under ui5/eve7/textures/. Empty draws in the main colour.
    std::string fTexture;
 

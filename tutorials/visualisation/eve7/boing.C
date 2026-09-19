@@ -27,6 +27,8 @@
 #include <TTimer.h>
 #include <TMath.h>
 
+#include <chrono>
+
 using namespace ROOT::Experimental;
 
 // Room half-extents and ball radius. **Y is up**: that is the up axis of the
@@ -49,10 +51,16 @@ class Boinger : public TTimer {
    REveSMorph *fBall{nullptr};
    REveSMorph *fShadow{nullptr};
 
-   Double_t fX{0}, fY{20}, fZ{0};             // position; elastic, so fY is the apex
+   // Starting at the apex pins the scene bounding box, and with it the axis
+   // box: the ball is elastic, so it never goes above where it starts, and the
+   // box is computed once at load from the elements as they are then.
+   Double_t fX{0}, fY{kBY - kR}, fZ{0};       // position; elastic, so fY is the apex
    Double_t fVx{34}, fVy{0}, fVz{21};         // velocity; fVy is the falling one
    Double_t fSpin{0};                         // angle about the ball's polar axis
-   Double_t fDt;
+
+   std::chrono::steady_clock::time_point fLast{std::chrono::steady_clock::now()};
+   std::chrono::steady_clock::time_point fT0{std::chrono::steady_clock::now()};
+   int fDropped{0}, fSent{0};
 
    static constexpr Double_t kGrav = -160;    // units / s^2, along -y
    static constexpr Double_t kTilt = 0.30;    // polar axis tipped out of vertical
@@ -69,11 +77,55 @@ class Boinger : public TTimer {
 
 public:
    Boinger(REveSMorph *ball, REveSMorph *shadow, Long_t ms)
-      : TTimer(ms, kTRUE), fBall(ball), fShadow(shadow), fDt(ms * 1e-3)
+      : TTimer(ms, kTRUE), fBall(ball), fShadow(shadow)
    {}
+
+   int GetDropped() const { return fDropped; }
+   int GetSent()    const { return fSent; }
 
    Bool_t Notify() override
    {
+      // Congestion control. The server will NOT hold us back -- BeginChange()
+      // waits only while another producer is mid-update, never while clients
+      // are still catching up -- so a timer that just fires and streams hands
+      // the websocket rounds faster than they drain, and the lag grows without
+      // limit. It grows faster with a second client, because a round is only
+      // done once the slowest one has answered. That is the whole of the "it
+      // gets laggy, and worse with two of us" problem.
+      //
+      // So: skip. This draws the current state, not a sequence of edits, so a
+      // round we cannot afford has nothing the next one will not carry anyway.
+      // Blocking instead is not on the table -- the acknowledgement arrives on
+      // the main thread, which is the thread this timer is on.
+      if (!REveManager::Create()->IsCaughtUpWithClients()) {
+         ++fDropped;
+         Reset();
+         return kTRUE;
+      }
+      ++fSent;
+
+      // Integrate on the wall clock, not on the timer period: frames are
+      // dropped, so the two are not the same, and using the period would slow
+      // the ball down exactly when the link is congested.
+      auto now = std::chrono::steady_clock::now();
+      Double_t dt = std::chrono::duration<double>(now - fLast).count();
+      fLast = now;
+      // A long stall -- a tab in the background, a client reconnecting -- must
+      // not teleport the ball through a wall.
+      if (dt > 0.1) dt = 0.1;
+
+      const Double_t fDt = dt;
+
+      // Say what the link is actually doing. "sent" counts rounds the clients
+      // kept up with, "dropped" those skipped because they had not. Compare the
+      // rate with the timer period: if they match, the timer is the limit; if
+      // the rate is far below and drops are few, the event loop is.
+      if (fSent % 50 == 0) {
+         Double_t el = std::chrono::duration<double>(now - fT0).count();
+         ::Info("boing", "sent %d, dropped %d (%.0f%%), %.1f rounds/s over %.1f s",
+                fSent, fDropped, 100.0 * fDropped / (fSent + fDropped), fSent / el, el);
+      }
+
       fVy += kGrav * fDt;
       fX += fVx * fDt;  fY += fVy * fDt;  fZ += fVz * fDt;
 
