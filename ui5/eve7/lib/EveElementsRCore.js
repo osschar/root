@@ -1060,17 +1060,16 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager) {
          mat._specular = new RC.Color(0.12, 0.12, 0.12);
          mat._shininess = 24;
 
-         // The bounding box is the server's, streamed in the normals channel the
-         // way REveBoxSet ships its own. RenderCore could derive one from the
-         // geometry just generated, but the server's is analytic and does not
-         // move: the 3D axis takes its extents from the scene box, so a box
-         // that tracked the geometry would drag the axis along behind it.
-         // TAttBBox stores (xmin, xmax, ymin, ymax, zmin, zmax), so min and max
-         // interleave -- the same indexing makeBoxSet uses, not [0..2]/[3..5].
-         let bb = rnr_data.nrmBuff;
+         // The server's bounding box, analytic and exact, as JSON in min-then-max
+         // order. Not out of the normals channel, where makeBoxSet and makeHit
+         // read theirs: those types are drawn instanced, one primitive plus a
+         // data texture of placements, so RenderCore cannot see their extent at
+         // all. This one generates real geometry and could be measured -- the
+         // box is sent only because the server already has it in closed form.
+         let bb = el.bbox;
          if (bb && bb.length >= 6)
-            geo.setExternalBoundingBox(new RC.Box3(new RC.Vector3(bb[0], bb[2], bb[4]),
-                                                   new RC.Vector3(bb[1], bb[3], bb[5])));
+            geo.setExternalBoundingBox(new RC.Box3(new RC.Vector3(bb[0], bb[1], bb[2]),
+                                                   new RC.Vector3(bb[3], bb[4], bb[5])));
 
          let mesh = new RC.Mesh(geo, mat);
 
