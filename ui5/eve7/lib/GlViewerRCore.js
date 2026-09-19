@@ -1321,6 +1321,16 @@ sap.ui.define([
                               ox: event.offsetX, oy: event.offsetY };
                   menu.add("Keep annotation", d,
                            function(q) { q.a.keepAt(q.txt, q.ox, q.oy); });
+
+                  // The same pick already carries depth -- that is what "Set
+                  // Camera Center" uses -- so the 3D point costs nothing extra.
+                  const w = this.annotations.worldFromPick(pstate);
+                  if (w) {
+                     const dc = { a: this.annotations, txt: txt,
+                                  ox: event.offsetX, oy: event.offsetY, w: w };
+                     menu.add("Keep and connect", dc,
+                              function(q) { q.a.keepAt(q.txt, q.ox, q.oy, q.w); });
+                  }
                }
             }
          }

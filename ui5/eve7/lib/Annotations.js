@@ -75,6 +75,9 @@ sap.ui.define([], function() {
          this.weight_px_lo  = 7;    ///< full weight at or below this cap height
          this.weight_px_hi  = 17;   ///< no weight at or above it
 
+         /** Connector line width, in CSS pixels. */
+         this.conn_width_px = 1.5;
+
          this._font = null;      // {texture, metrics}, cached once delivered
          this._tip = null;       // the hover tooltip ZText
          this._pending = null;   // text asked for before the font arrived
@@ -107,26 +110,52 @@ sap.ui.define([], function() {
        * whether a tooltip is showing. This is the context-menu path: by the time
        * the menu is up the tooltip has been hidden by pointerleave, so the menu
        * supplies its own text from its own pick. */
-      keepAt(text, x, y) {
+      keepAt(text, x, y, anchor3d) {
          if (!text) return null;
          if (!this._font) {
             // Font not in yet -- ask for it and place the annotation when it
             // lands, rather than dropping the request on the floor.
             this._ensureFont();
-            this._keep_pending = { text: text, x: x, y: y };
+            this._keep_pending = { text: text, x: x, y: y, a3: anchor3d };
             return null;
          }
-         return this._keepAtNow(text, x, y);
+         return this._keepAtNow(text, x, y, anchor3d);
       }
 
-      _keepAtNow(text, x, y) {
+      _keepAtNow(text, x, y, anchor3d) {
          const W = this.viewer.canvas.width, H = this.viewer.canvas.height;
          const px = (this.viewer.canvas.pixelRatio || 1);
          const pos = [(x * px) / W, 1.0 - (y * px) / H];
-         const a = new Annotation(this, text, pos, this.font_size);
+         const a = new Annotation(this, text, pos, this.font_size, anchor3d);
          this._kept.push(a);
          this.viewer.request_render();
          return a;
+      }
+
+      /** World-space point under a pick, from its depth.
+       *
+       * Camera-agnostic on purpose. setCameraCenter() does this with the fov
+       * tangent and camera.testMtx, which is perspective-only -- and an
+       * orthographic 3D view is an ordinary thing to be looking at. Here the
+       * pixel's near- and far-plane points are unprojected and the depth picks
+       * a point between them: eye-space z runs linearly along that world-space
+       * segment under BOTH projections, so one formula covers both.
+       *
+       * state.depth is already linearised to an eye-space distance by
+       * RendeQuTor.pick_low_level -- that is what the near*far reconstruction
+       * there is for. */
+      worldFromPick(pstate) {
+         const RC = this.RC, cam = this.viewer.camera;
+         if (!pstate || !cam || !(pstate.depth > 0)) return null;
+         const nx = pstate.mouse.x, ny = pstate.mouse.y;
+         const pn = new RC.Vector3(nx, ny, -1).unproject(cam);
+         const pf = new RC.Vector3(nx, ny,  1).unproject(cam);
+         const span = cam.far - cam.near;
+         if (!(Math.abs(span) > 1e-9)) return null;
+         const t = (pstate.depth - cam.near) / span;
+         return [pn.x + (pf.x - pn.x) * t,
+                 pn.y + (pf.y - pn.y) * t,
+                 pn.z + (pf.z - pn.z) * t];
       }
 
       _forget(a) {
@@ -149,6 +178,7 @@ sap.ui.define([], function() {
             // Geometry first: the test below is against the laid-out rects.
             a.syncWeight();
             a.layout();
+            a.updateConnector();
             a.setButtonsVisible(a.owns(dragged) || a.containsPointer(nx, ny));
          }
       }
@@ -223,7 +253,7 @@ sap.ui.define([], function() {
                if (this._keep_pending) {
                   const k = this._keep_pending;
                   this._keep_pending = null;
-                  this._keepAtNow(k.text, k.x, k.y);
+                  this._keepAtNow(k.text, k.x, k.y, k.a3);
                }
             },
             (img) => this.RC.ZText.createDefaultTexture(img),
@@ -385,8 +415,10 @@ sap.ui.define([], function() {
     */
    class Annotation {
 
-      constructor(owner, text, pos, font_size) {
+      constructor(owner, text, pos, font_size, anchor3d) {
          this.owner = owner;
+         /** World point this annotation points at, or null for a plain one. */
+         this.anchor3d = anchor3d || null;
          const RC = owner.RC, f = owner._font;
 
          this.text_obj = new RC.ZText({
@@ -415,11 +447,16 @@ sap.ui.define([], function() {
          this._btns_on = false;
 
          const os = owner.viewer.overlay_scene;
+         if (this.anchor3d) {
+            this.conn = this._makeConnector();
+            os.add(this.conn);          // first, so the plate draws over it
+         }
          os.add(this.text_obj);
          os.add(this.btn_close);
          os.add(this.btn_edit);
 
          this.layout();
+         this.updateConnector();
       }
 
       _makeButton(label, onclick) {
@@ -516,6 +553,93 @@ sap.ui.define([], function() {
          return !!o && (o === this.text_obj || o === this.btn_close || o === this.btn_edit);
       }
 
+      //-----------------------------------------------------------------------
+      // The connector
+      //-----------------------------------------------------------------------
+
+      /** A two-triangle quad, rewritten every frame. The overlay camera is an
+       * orthographic (0,1) box, so its coordinates are the same screen
+       * fractions everything else here uses. */
+      _makeConnector() {
+         const RC = this.owner.RC;
+         const g = new RC.Geometry();
+         g.vertices = new RC.Float32Attribute(new Float32Array(18), 3);
+         const m = new RC.MeshBasicMaterial();
+         m.color = this.owner.viewer.fgCol;
+         m.diffuse = this.owner.viewer.fgCol;
+         m.lights = false;
+         m.depthTest = false;
+         // Both faces. The quad is built from a perpendicular whose sign
+         // follows the line's direction, so its winding flips as the annotation
+         // moves around its anchor -- with culling on, the connector would
+         // vanish for half of the possible directions.
+         m.side = RC.FRONT_AND_BACK_SIDE;
+         const mesh = new RC.Mesh(g, m);
+         mesh.frustumCulled = false;
+         mesh.pickable = false;
+         mesh.use_fg_color = true;
+         return mesh;
+      }
+
+      /** Point the connector at its 3D anchor.
+       *
+       * Where it meets the box is recomputed every frame from the projected
+       * point, as TGLAnnotation did it: one of nine attachment positions,
+       * chosen by which side of the box the point falls on. The two ternaries
+       * below are that rule. If the point is INSIDE the box -- both fractions
+       * land on 0.5 -- no line is drawn at all, which is right: a line from a
+       * box to a point under it says nothing.
+       */
+      updateConnector() {
+         if (!this.conn) return;
+         const v = this.owner.viewer, RC = this.owner.RC;
+         const cam = v.camera;
+         if (!cam || !v.canvas || !v.canvas.width) { this.conn.visible = false; return; }
+
+         const W = v.canvas.width, H = v.canvas.height;
+         const aspect = W / H;
+
+         // 3D anchor -> overlay coordinates.
+         const p = new RC.Vector3(this.anchor3d[0], this.anchor3d[1], this.anchor3d[2]);
+         p.project(cam);
+         if (p.z < -1 || p.z > 1) { this.conn.visible = false; return; }  // behind or beyond
+         const tx = 0.5 * (p.x + 1.0), ty = 0.5 * (p.y + 1.0);
+
+         const o = this._outer(this.text_obj, aspect);
+         if (!o) { this.conn.visible = false; return; }
+
+         const fx = tx < o.l ? 0.0 : (tx > o.r ? 1.0 : 0.5);
+         const fy = ty < o.b ? 0.0 : (ty > o.t ? 1.0 : 0.5);
+         if (fx === 0.5 && fy === 0.5) { this.conn.visible = false; return; }
+
+         const ax = o.l + fx * (o.r - o.l);
+         const ay = o.b + fy * (o.t - o.b);
+
+         // Constant pixel width. Overlay x and y are both 0..1 but span
+         // different pixel counts, so the perpendicular has to be taken in
+         // PIXELS and converted back, or the line thins and thickens as it
+         // turns.
+         const dx = (tx - ax) * W, dy = (ty - ay) * H;
+         const len = Math.hypot(dx, dy);
+         if (!(len > 1e-6)) { this.conn.visible = false; return; }
+         const hw = 0.5 * this.owner.conn_width_px * (v.canvas.pixelRatio || 1);
+         const nx = (-dy / len) * hw / W, ny = (dx / len) * hw / H;
+
+         const a = this.conn.geometry.vertices;
+         const V = a.array;
+         let i = 0;
+         const put = (x, y) => { V[i++] = x; V[i++] = y; V[i++] = 0; };
+         put(ax - nx, ay - ny); put(ax + nx, ay + ny); put(tx + nx, ty + ny);
+         put(ax - nx, ay - ny); put(tx + nx, ty + ny); put(tx - nx, ty - ny);
+         // Assigning the array is what marks the buffer for re-upload: a
+         // same-length assignment sets _update, which is the path the renderer
+         // checks. BufferAttribute has both an `update` accessor and an
+         // update() method, so writing the property is not reliable.
+         a.array = V;
+
+         this.conn.visible = true;
+      }
+
       /** Frame width as a fraction of a BUTTON's line height, chosen so the
        * absolute width matches the plate's. The frame is line_width *
        * line_height and line_height scales with the font, so a button at
@@ -592,6 +716,7 @@ sap.ui.define([], function() {
 
       remove() {
          const os = this.owner.viewer.overlay_scene;
+         if (this.conn) os.remove(this.conn);
          os.remove(this.text_obj);
          os.remove(this.btn_close);
          os.remove(this.btn_edit);
