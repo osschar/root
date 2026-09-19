@@ -172,6 +172,7 @@ protected:
    void ExecuteMIR(std::shared_ptr<MIR> mir);
 
    void StreamSceneChangesToJson();
+   void SendMotionChanges();
    void SendSceneChanges();
 
 public:

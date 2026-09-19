@@ -1076,6 +1076,51 @@ void REveManager::StreamSceneChangesToJson()
    }
 }
 
+////////////////////////////////////////////////////////////////////////////////
+/// The motion channel: transformation-only changes, on the same websocket but
+/// outside the round protocol.
+///
+/// No BeginChanges/EndChanges envelope, no acknowledgement, and so nothing to
+/// gate the next update on the slowest client. On the client it reaches the 3D
+/// representations directly and the element tree and editor never hear of it --
+/// by construction, rather than by asking them to filter.
+///
+/// Pacing without an acknowledgement: RWebWindow::CanSend(id, true) is false
+/// while that connection's queue is non-empty, its credits are spent, or a send
+/// is in flight. Asking it before each send is the whole of the flow control --
+/// a client that is behind is simply skipped this time, and picks up the next
+/// message, which carries newer state anyway. An acknowledgement would only
+/// tell us the same thing one round-trip later.
+///
+/// A skipped client loses nothing: these messages are absolute state, not
+/// deltas, so the next one says everything the missed one would have.
+
+void REveManager::SendMotionChanges()
+{
+   nlohmann::json arr = nlohmann::json::array();
+
+   fWorld->StreamMotionChanges(arr);
+   for (auto &el : fScenes->RefChildren()) {
+      auto s = dynamic_cast<REveScene *>(el);
+      if (s) s->StreamMotionChanges(arr);
+   }
+
+   if (arr.empty() || fConnList.empty())
+      return;
+
+   nlohmann::json msg = {};
+   msg["content"] = "Motion";
+   msg["t"]       = ServerTimeMs();
+   msg["els"]     = arr;
+
+   std::string data = msg.dump();
+
+   for (auto &conn : fConnList)
+      if (fWebWindow->CanSend(conn.fId, true))
+         fWebWindow->Send(conn.fId, data);
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // Send json and binary data to scene's connections
 void REveManager::SendSceneChanges()
 {
@@ -1376,6 +1421,11 @@ void REveManager::EndChange()
    GetWorld()->EndAcceptingChanges();
 
    std::unique_lock<std::mutex> lock(fServerState.fMutex);
+
+   // Motion first, and unconditionally. It is not part of the round, so it must
+   // not be held back with one -- that would put the animation back behind the
+   // acknowledgement it was taken out of the round to escape.
+   SendMotionChanges();
 
    if ( ! fConnList.empty() && ! ClientConnectionsFree())
    {

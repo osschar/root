@@ -266,6 +266,22 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
          this.need_visibility_update = true;
       }
 
+      /** One element off the motion channel. Same work as a kCBTransBBox change,
+        * without any of the round around it. Only this class implements it, so
+        * the tree and the editor cannot hear it. */
+      sceneElementMotion(msg)
+      {
+         let el = this.mgr.GetElement(msg.fElementId);
+         if (!el) return;
+
+         this.updateElementTrans(el, msg);
+
+         // No endChanges to ask for one, and an element whose trajectory has
+         // just been cleared will not be redrawn by the motion loop either.
+         if (this.glctrl && this.glctrl.viewer)
+            this.glctrl.viewer.request_render();
+      }
+
       /** Apply a transformation-only change to the existing renderer object.
         *
         * A type whose positional state is not expressible as a matrix, or that
