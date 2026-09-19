@@ -1317,19 +1317,25 @@ sap.ui.define([
                const txt = (pstate.ctrl && typeof pstate.ctrl.getTooltipText === "function")
                          ? pstate.ctrl.getTooltipText(idx) : "";
                if (txt) {
-                  const d = { a: this.annotations, txt: txt,
+                  // What the annotation is ABOUT. Kept so it can die with its
+                  // subject -- in an event display the picked object is gone by
+                  // the next event, and an annotation that outlives it points
+                  // confidently at whatever has taken its place.
+                  const tgt = { elementId: pstate.eve_el.fElementId,
+                                sceneId:   pstate.eve_el.fSceneId };
+                  const d = { a: this.annotations, txt: txt, tgt: tgt,
                               ox: event.offsetX, oy: event.offsetY };
-                  menu.add("Keep annotation", d,
-                           function(q) { q.a.keepAt(q.txt, q.ox, q.oy); });
+                  menu.add("Annotate", d,
+                           function(q) { q.a.keepAt(q.txt, q.ox, q.oy, null, q.tgt); });
 
                   // The same pick already carries depth -- that is what "Set
                   // Camera Center" uses -- so the 3D point costs nothing extra.
                   const w = this.annotations.worldFromPick(pstate);
                   if (w) {
-                     const dc = { a: this.annotations, txt: txt,
+                     const dc = { a: this.annotations, txt: txt, tgt: tgt,
                                   ox: event.offsetX, oy: event.offsetY, w: w };
-                     menu.add("Keep and connect", dc,
-                              function(q) { q.a.keepAt(q.txt, q.ox, q.oy, q.w); });
+                     menu.add("Annotate && connect", dc,
+                              function(q) { q.a.keepAt(q.txt, q.ox, q.oy, q.w, q.tgt); });
                   }
                }
             }
