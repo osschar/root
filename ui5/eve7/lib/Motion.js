@@ -15,10 +15,14 @@ sap.ui.define([], function() {
      * rate stops being visible. Under constant acceleration that is the exact
      * trajectory, not an approximation.
      *
-     * Only the translation is extrapolated. Rotation and scale are taken from
-     * the last matrix the server sent and held, so a spinning object's spin
-     * steps at the update rate while its flight is smooth. Angular velocity is
-     * the obvious extension and is not done here.
+     * Rotation is extrapolated too, from an angular velocity in the world
+     * frame -- axis by direction, rad/s by length. It has to be: a spinning
+     * object whose flight is smooth but whose spin jumps once per update looks
+     * WORSE than one that does neither, because the two disagree and the jump
+     * is what the eye follows.
+     *
+     * Scale is not extrapolated and does not need to be -- it rides in the
+     * rotated columns, and a rotation preserves their lengths.
      */
    class Motion {
 
@@ -50,8 +54,12 @@ sap.ui.define([], function() {
          } else {
             this.stop();
             for (const e of this.objects.values()) {
-               const m = e.obj3d._matrix.elements;
+               const m = e.obj3d._matrix.elements, r = e.r0;
                m[12] = e.p0[0]; m[13] = e.p0[1]; m[14] = e.p0[2];
+               for (let cIdx = 0; cIdx < 3; ++cIdx) {
+                  const o = cIdx * 4;
+                  m[o] = r[cIdx*3]; m[o+1] = r[cIdx*3+1]; m[o+2] = r[cIdx*3+2];
+               }
                e.obj3d.matrixChanged();
             }
             this.viewer.request_render();
@@ -107,11 +115,14 @@ sap.ui.define([], function() {
          this.objects.set(id, {
             obj3d:  obj3d,
             // Where the server says it was at t0 -- the matrix it sent in the
-            // same message, before anything here has touched it.
+            // same message, before anything here has touched it. The rotation
+            // is kept as the three basis columns, scale and all.
             p0:     [m[12], m[13], m[14]],
+            r0:     [m[0], m[1], m[2],  m[4], m[5], m[6],  m[8], m[9], m[10]],
             t0:     mot.t0,
             vel:    mot.vel,
             acc:    mot.acc,
+            omega:  mot.omega || [0, 0, 0],
             max_dt: mot.max_dt
          });
 
@@ -172,11 +183,42 @@ sap.ui.define([], function() {
             const y = e.p0[1] + e.vel[1] * dt + 0.5 * e.acc[1] * dt * dt;
             const z = e.p0[2] + e.vel[2] * dt + 0.5 * e.acc[2] * dt * dt;
 
+            let touched = false;
+
             if (m[12] !== x || m[13] !== y || m[14] !== z) {
                m[12] = x; m[13] = y; m[14] = z;
-               e.obj3d.matrixChanged();
-               moved = true;
+               touched = true;
             }
+
+            // Spin: turn the stored basis by |omega|*dt about omega, in the
+            // world frame, so it composes on the left of the base rotation.
+            const w = e.omega;
+            const wl = Math.sqrt(w[0]*w[0] + w[1]*w[1] + w[2]*w[2]);
+
+            if (wl > 1e-9) {
+               const th = wl * dt;
+               const ux = w[0]/wl, uy = w[1]/wl, uz = w[2]/wl;
+               const c = Math.cos(th), s = Math.sin(th), t = 1 - c;
+
+               // Rodrigues, row-major.
+               const R = [t*ux*ux + c,      t*ux*uy - s*uz,  t*ux*uz + s*uy,
+                          t*ux*uy + s*uz,   t*uy*uy + c,     t*uy*uz - s*ux,
+                          t*ux*uz - s*uy,   t*uy*uz + s*ux,  t*uz*uz + c];
+
+               const r = e.r0;
+               // Each of the three basis columns through R. Lengths survive, so
+               // whatever scale the columns carried is still there afterwards.
+               for (let cIdx = 0; cIdx < 3; ++cIdx) {
+                  const a0 = r[cIdx*3], a1 = r[cIdx*3 + 1], a2 = r[cIdx*3 + 2];
+                  const o = cIdx * 4;
+                  m[o]     = R[0]*a0 + R[1]*a1 + R[2]*a2;
+                  m[o + 1] = R[3]*a0 + R[4]*a1 + R[5]*a2;
+                  m[o + 2] = R[6]*a0 + R[7]*a1 + R[8]*a2;
+               }
+               touched = true;
+            }
+
+            if (touched) { e.obj3d.matrixChanged(); moved = true; }
          }
          return moved;
       }
