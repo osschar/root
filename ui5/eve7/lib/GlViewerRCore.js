@@ -771,6 +771,8 @@ sap.ui.define([
          if (eveView.AxesFontSize !== undefined)
             this.axis3d.font_size = eveView.AxesFontSize;
          this.axis3d.setStyle(eveView.AxesType);
+         if (eveView.ExtrapolateMotion !== undefined && this.motion)
+            this.motion.setEnabled(eveView.ExtrapolateMotion);
          if (eveView.AxesAtten !== undefined)
             this.axis3d.setAttenuation(eveView.AxesAtten);
          if (eveView.AxesFontSize !== undefined)

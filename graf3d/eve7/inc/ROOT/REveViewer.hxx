@@ -65,6 +65,16 @@ private:
    REveCamera* fCamera{0};
 
    EAxesType fAxesType{kAxesNone};
+
+   /// Evaluate streamed trajectories between updates, or hold each object where
+   /// the last update put it. See REveElement::SetMotion and Motion.js.
+   ///
+   /// Per viewer and client-applied, like the axis settings: what it controls is
+   /// how this viewer draws between updates, not what the server sends. Turning
+   /// it off is how you see the raw update rate -- which is the thing to look at
+   /// when the motion is wrong and you need to know whether it is the stream or
+   /// the extrapolation.
+   Bool_t fExtrapolateMotion{kTRUE};
    bool      fBlackBackground{false};
 
    /// How much the 3D axis labels shrink with distance, in [0, 1]. The client
@@ -80,20 +90,20 @@ private:
    /// [-4, 8] rather than [0, 1]: 1 is the physically honest value, past it is
    /// exaggeration, and below 0 is inverse perspective with the far labels
    /// largest. Default 0, the safe look.
-   Float_t   fAxesAtten{0.f};
+   Float_t   fAxesAtten{1.f};
 
    /// Label size for the 3D axis, as a fraction of viewport height -- the units
    /// ZText uses in every screen-space mode. Client-applied like fAxesAtten and
    /// here for the same reason. Unlike attenuation this one is baked into the
    /// glyph geometry, so a change costs a rebuild on the client; it is a knob to
    /// set, not one to drag continuously.
-   Float_t   fAxesFontSize{0.018f};
+   Float_t   fAxesFontSize{0.015f};
 
    /// Label size for the hover tooltip, same units and same reasoning as
    /// fAxesFontSize. Separate from it because the two are read at different
    /// distances and for different lengths of time: an axis number is glanced at
    /// in passing, a tooltip is read.
-   Float_t   fTooltipFontSize{0.017f};
+   Float_t   fTooltipFontSize{0.012f};
 
    /// Opacity of the plate behind the tooltip and behind kept annotations, in
    /// [0, 1]. Unlike the font size this DOES reach annotations already placed:
@@ -150,6 +160,9 @@ public:
    /// not what any of them is currently showing.
    EAxesType GetAxesType() const { return fAxesType; }
    void SetAxesType(int);
+
+   Bool_t GetExtrapolateMotion() const { return fExtrapolateMotion; }
+   void   SetExtrapolateMotion(bool);
 
    bool GetBlackBackground() const { return fBlackBackground; }
    void SetBlackBackground(bool);
