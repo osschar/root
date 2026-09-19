@@ -862,6 +862,7 @@ void REveElement::DestroyMainTrans()
 void REveElement::SetTransMatrix(Double_t* carr)
 {
    RefMainTrans().SetFrom(carr);
+   StampTransBBox();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -870,6 +871,7 @@ void REveElement::SetTransMatrix(Double_t* carr)
 void REveElement::SetTransMatrix(const TGeoMatrix& mat)
 {
    RefMainTrans().SetFrom(mat);
+   StampTransBBox();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1484,6 +1486,31 @@ void REveElement::BuildRenderData()
    if (fMainTrans.get())
    {
       fRenderData->SetMatrix(fMainTrans->Array());
+   }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// Write the state needed for a transformation-only update, as streamed for
+/// kCBTransBBox. No render data is written and no display list is dropped: the
+/// client applies this to the renderer object it already has.
+///
+/// The base writes the main transformation, which is all most elements have.
+/// A subclass carrying further positional state -- a screen-space position, a
+/// width and height -- overrides this, calls the base, and adds its own fields.
+/// Its client-side counterpart is the `updateTrans` method that the matching
+/// maker function injects in EveElementsRCore.js.
+///
+/// This goes out as JSON rather than in the binary blob on purpose. The binary
+/// path exists to keep vertex arrays out of JSON; sixteen numbers do not need
+/// it, and staying out of the blob means no offset has to be reserved for a
+/// message that carries no geometry.
+
+void REveElement::WriteTransJson(nlohmann::json &cj)
+{
+   if (fMainTrans.get())
+   {
+      const Double_t *m = fMainTrans->Array();
+      cj["matrix"] = std::vector<double>(m, m + 16);
    }
 }
 

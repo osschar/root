@@ -252,6 +252,41 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
          this.need_visibility_update = true;
       }
 
+      /** Apply a transformation-only change to the existing renderer object.
+        *
+        * A type whose positional state is not expressible as a matrix, or that
+        * built something composite and has to reach into its pieces, injects an
+        * `updateTrans` method in its maker function. That closure already holds
+        * everything the maker built, so nothing here has to know the shape of
+        * the representation -- which is the whole reason this is not a switch.
+        *
+        * Everything else takes the fallback. REve objects are matrix-only
+        * (GlViewerRCore sets Object3D.sDefaultQuaternionsAndAutoUpdate = false,
+        * so nothing regenerates the matrix from position/rotation behind our
+        * back), and Object3D.updateMatrixWorld cascades the dirty flag to every
+        * child, so a single assignment covers a composite as well -- including
+        * its bounding boxes, which RCore recomputes in the same pass.
+        *
+        * No render request: endChanges() asks for one unconditionally.
+        */
+      updateElementTrans(el, msg)
+      {
+         let obj3d = this.getObj3D(msg.fElementId);
+         if (!obj3d) return;
+
+         if (typeof obj3d.updateTrans === "function") {
+            obj3d.updateTrans(el, msg);
+         }
+         else if (msg.matrix) {
+            if (this.mgr.is_rcore) {
+               obj3d.setMatrixFromArray(msg.matrix);
+            } else {
+               obj3d.matrix.fromArray(msg.matrix);
+               obj3d.updateMatrixWorld(true);
+            }
+         }
+      }
+
       elementsRemoved(ids)
       {
          for (let i = 0; i < ids.length; i++)
@@ -287,6 +322,14 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
          // visibility
          if (msg.changeBit & this.mgr.EChangeBits.kCBVisibility) {
             this.need_visibility_update = true;
+         }
+
+         // Transformation only -- update in place, never rebuild. If kCBObjProps
+         // is set as well the server streams full render data instead of a
+         // matrix, so this finds nothing to do and the rebuild below carries the
+         // new position.
+         if (msg.changeBit & this.mgr.EChangeBits.kCBTransBBox) {
+            this.updateElementTrans(el, msg);
          }
 
          // other change bits
