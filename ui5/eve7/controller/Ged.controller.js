@@ -315,6 +315,48 @@ sap.ui.define([
          }
       },
 
+      // REveSMorph. Every control here is a slider because every parameter is
+      // continuous and clamped server-side, and the ranges mirror those clamps
+      // exactly -- REveSMorph::SetTx and friends take [-10, 10], the extents
+      // [0, 1], the tessellation [2, 200] / [3, 200]. Move a clamp and this must
+      // move with it.
+      //
+      // That duplication is the point of the "extract Ged descriptions at build
+      // time" item in REVE-OPEN-ITEMS.md: in Gled, from which this class comes,
+      // the range lived once in the member's own comment and the GUI was
+      // generated from it. Here it is written twice and kept in step by hand.
+      buildREveSMorphSetter : function(el)
+      {
+         this.buildREveElementSetter(el);
+
+         this.makeSliderSetter(el.fTLevel, "TLevel", null, {min: 2, max: 100, step: 1});
+         this.makeSliderSetter(el.fPLevel, "PLevel", null, {min: 3, max: 100, step: 1});
+
+         this.makeSliderSetter(el.fTx, "Tx", null,
+            {min: -10, max: 10, step: 0.01, tip: "Twist of phi, proportional to cos(theta)"});
+         this.makeSliderSetter(el.fCx, "Cx", null,
+            {min: -10, max: 10, step: 0.01, tip: "Radial convergence, proportional to cos(theta)"});
+         this.makeSliderSetter(el.fRz, "Rz", null,
+            {min: -10, max: 10, step: 0.01, tip: "Shear about z, proportional to the polar coordinate"});
+
+         this.makeSliderSetter(el.fThetaMin,  "ThetaMin",  null, {min: 0, max: 1, step: 0.001});
+         this.makeSliderSetter(el.fThetaMax,  "ThetaMax",  null, {min: 0, max: 1, step: 0.001});
+         this.makeSliderSetter(el.fPhiMean,   "PhiMean",   null, {min: 0, max: 1, step: 0.001});
+         this.makeSliderSetter(el.fPhiRange,  "PhiRange",  null, {min: 0, max: 1, step: 0.001,
+            tip: "1 closes the seam; below that the surface is an open patch"});
+
+         this.makeBoolSetter(el.fEquiSurf, "EquiSurf");
+
+         this.makeSliderSetter(el.fTexXC, "TexXC", null,
+            {min: -8, max: 8, step: 0.05, tip: "Texture wraps per turn in phi"});
+         this.makeSliderSetter(el.fTexYC, "TexYC", null,
+            {min: -8, max: 8, step: 0.05, tip: "Texture wraps per sweep in theta"});
+         this.makeSliderSetter(el.fTexX0, "TexX0", null, {min: -2, max: 2, step: 0.01});
+         this.makeSliderSetter(el.fTexY0, "TexY0", null, {min: -2, max: 2, step: 0.01});
+         this.makeSliderSetter(el.fTexYOff, "TexYOff", null,
+            {min: -1, max: 1, step: 0.01, tip: "Shift u per whole v, for a brick bond"});
+      },
+
       buildREveTrackSetter : function(el)
       {
          this.buildREveElementSetter(el);

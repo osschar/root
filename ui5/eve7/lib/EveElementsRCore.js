@@ -724,14 +724,24 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager) {
          );
       }
 
-      GetRgbaTexture(name, callback) {
+      // `repeat` gives the texture RepeatWrapping instead of ClampToEdge, which
+      // is what makes tiling coefficients such as REveSMorph's fTexXC mean
+      // anything -- clamped, the second wrap onwards is a smear of edge pixels.
+      //
+      // The cache is keyed on the URL, and the same image fetched with two
+      // wrappings would silently get whichever arrived first. The "#repeat"
+      // fragment keeps the two apart: it makes a distinct key, and the browser
+      // strips it before the request, so both still fetch one file.
+      GetRgbaTexture(name, callback, repeat) {
          let url = this.viewer.eve_path + 'textures/' + name;
+         let wrap = repeat ? RC.Texture.WRAPPING.RepeatWrapping
+                           : RC.Texture.WRAPPING.ClampToEdgeWrapping;
 
-         this.tex_cache.deliver(url,
+         this.tex_cache.deliver(repeat ? url + '#repeat' : url,
             callback,
             (image) => {
                return new RC.Texture
-                  (image, RC.Texture.WRAPPING.ClampToEdgeWrapping, RC.Texture.WRAPPING.ClampToEdgeWrapping,
+                  (image, wrap, wrap,
                      RC.Texture.FILTER.LinearFilter, RC.Texture.FILTER.LinearFilter,
                      RC.Texture.FORMAT.RGBA, RC.Texture.FORMAT.RGBA,
                      RC.Texture.TYPE.UNSIGNED_BYTE,
@@ -928,6 +938,138 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager) {
 
          if (el.fPickable) this.RcPickable(el, logo);
          return logo;
+      }
+
+      //==============================================================================
+      // makeSMorph
+      //
+      // A parametric, texture-mapped surface of spherical topology. The server
+      // (REveSMorph) sends only the parameters -- the geometry is generated
+      // here, because the surface is textured and REveRenderData carries no UV
+      // channel. Ported from Gled's SMorph::Triangulate / Messofy, whose
+      // parameter names it keeps.
+      //
+      // The surface is built at unit size; size, position and orientation all
+      // live in the element's transformation, which is why an animated SMorph
+      // streams one matrix per frame and never comes back through here.
+      //==============================================================================
+
+      makeSMorph(el, rnr_data)
+      {
+         const TWO_PI = 2 * Math.PI;
+
+         const tl = Math.max(2, el.fTLevel);
+         const pl = Math.max(3, el.fPLevel);
+
+         // A closed sweep repeats the first column at the seam, at phi + 2pi,
+         // so the texture can run to its right-hand edge instead of wrapping
+         // back across the last quad. Same position, different u.
+         const full  = (el.fPhiRange >= 1);
+         const nPhi  = pl + (full ? 1 : 0);
+         const nRing = tl + 1;
+
+         let pos = new Float32Array(nRing * nPhi * 3);
+         let nrm = new Float32Array(nRing * nPhi * 3);
+         let uv  = new Float32Array(nRing * nPhi * 2);
+
+         const dt = Math.PI * (el.fThetaMax - el.fThetaMin) / tl;
+         const phi0 = TWO_PI * (el.fPhiMean - 0.5 * el.fPhiRange);
+         // As in the original: the step divides by pl even on an open sweep,
+         // so a patch falls one step short of its nominal range. Kept for
+         // parity rather than corrected, since the two must agree.
+         const dphi = TWO_PI * el.fPhiRange / pl;
+
+         let t = Math.PI * el.fThetaMin;
+         let last_ct = Math.cos(t) + 2.0 / tl;
+         let vi = 0, ui = 0;
+
+         for (let i = 0; i < nRing; ++i) {
+            let ct, st;
+            if (el.fEquiSurf) {
+               // Equal surface area per ring rather than equal angle: cos(theta)
+               // steps uniformly, which stops the quads collapsing at the poles.
+               ct = last_ct - 2.0 / tl;
+               if (ct < -1) ct = -1;
+               st = Math.sin(Math.acos(ct));
+            } else {
+               ct = Math.cos(t);
+               st = Math.sin(t);
+               t += dt;
+            }
+
+            const twist = ct * el.fTx;
+            const conv  = ct * el.fCx;
+            let phi = phi0;
+
+            for (let j = 0; j < nPhi; ++j, phi += dphi) {
+               const x = ct;
+               const y = (1 + conv) * st * Math.cos(phi + twist);
+               const z = (1 + conv) * st * Math.sin(phi + twist);
+
+               // Shear about z, growing along the polar axis -- which is x here,
+               // not z, exactly as in SMorph.
+               const a = x * el.fRz, ca = Math.cos(a), sa = Math.sin(a);
+               const X = x * ca - y * sa;
+               const Y = x * sa + y * ca;
+               const Z = z;
+
+               pos[vi] = X; pos[vi + 1] = Y; pos[vi + 2] = Z;
+
+               // The position doubles as the normal. Exact on the unmorphed
+               // sphere and good enough for modest fTx / fCx / fRz; the original
+               // made the same trade.
+               const l = Math.sqrt(X * X + Y * Y + Z * Z) || 1;
+               nrm[vi] = X / l; nrm[vi + 1] = Y / l; nrm[vi + 2] = Z / l;
+               vi += 3;
+
+               let u = el.fTexX0 + el.fTexXC * phi / TWO_PI;
+               const v = el.fTexY0 + el.fTexYC * Math.acos(Math.max(-1, Math.min(1, ct))) / Math.PI;
+               // Offset successive wraps against each other -- a brick bond.
+               if (el.fTexYOff != 0) u += Math.trunc(v) * el.fTexYOff;
+               uv[ui] = u; uv[ui + 1] = v; ui += 2;
+            }
+            last_ct = ct;
+         }
+
+         let idx = new Uint32Array(tl * (nPhi - 1) * 6);
+         let ii = 0;
+         for (let i = 0; i < tl; ++i) {
+            for (let j = 0; j < nPhi - 1; ++j) {
+               const a = i * nPhi + j, b = a + nPhi;
+               idx[ii++] = a; idx[ii++] = b; idx[ii++] = a + 1;
+               idx[ii++] = b; idx[ii++] = b + 1; idx[ii++] = a + 1;
+            }
+         }
+
+         let geo = new RC.Geometry();
+         geo.vertices = new RC.BufferAttribute(pos, 3);
+         geo.normals  = new RC.BufferAttribute(nrm, 3);
+         geo.uv       = new RC.BufferAttribute(uv, 2);
+         geo.indices  = new RC.BufferAttribute(idx, 1);
+
+         let mop = 1 - el.fMainTransparency / 100;
+         let mat = this.RcFancyMaterial(RcCol(el.fMainColor), mop);
+         // Two-sided: a partial sweep in theta or phi is an open shell, and the
+         // inside of it is exactly what you cut it open to see.
+         mat.side = RC.FRONT_AND_BACK_SIDE;
+
+         // RcFancyMaterial's specular is a green-tinted (0.3, 0.4, 0.3), which
+         // suits a solid-colour detector shape but casts a wash over a texture
+         // and takes white squares off-white. Neutral and weaker here: the
+         // texture is the thing being looked at.
+         mat._specular = new RC.Color(0.12, 0.12, 0.12);
+         mat._shininess = 24;
+
+         let mesh = new RC.Mesh(geo, mat);
+
+         if (el.fTexture) {
+            this.GetRgbaTexture(el.fTexture,
+                                (tex) => { this.AddMapToAllMaterials(mesh, tex); },
+                                true);
+         }
+
+         this.RcPickable(el, mesh);
+         return mesh;
       }
 
       //==============================================================================
