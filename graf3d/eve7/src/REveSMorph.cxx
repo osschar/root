@@ -28,6 +28,7 @@ the parametrisation and for why the geometry is built on the client.
 
 REveSMorph::REveSMorph(const std::string &n, const std::string &t) : REveElement(n, t)
 {
+   SetMainColorPtr(&fColor);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

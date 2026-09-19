@@ -1219,6 +1219,37 @@ void REveManager::SendBinary(unsigned connid, const void *data, std::size_t len)
    fWebWindow->SendBinary(connid, data, len);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+/// True when the last round of changes has been acknowledged by every client.
+///
+/// A producer driven by its own clock has to poll this and **skip** a round it
+/// cannot yet afford, because BeginChange() will not hold it back: that method
+/// waits only while another producer is mid-update (kUpdatingScenes), never
+/// while clients are still catching up (kUpdatingClients). Nothing else bounds
+/// the queue, so a producer that ignores this keeps handing the websocket
+/// rounds faster than they drain, and the lag grows without limit -- and grows
+/// faster with every extra client, since a round is only complete once the
+/// slowest of them has answered.
+///
+/// It is a query and not a wait on purpose. `__REveDoneChanges` arrives through
+/// RWebWindow's data callback, which the ROOT event loop dispatches on the main
+/// thread -- the same thread a TTimer fires on. A main-thread producer that
+/// blocked for the acknowledgement would be blocking the only thread that can
+/// deliver it. A producer on a thread of its own may block instead, as
+/// event_demo.C's autoplay does.
+///
+/// Dropping a round is the right response for anything that draws the current
+/// state rather than a sequence of edits: the next round carries the newer
+/// state anyway, so the skipped one had nothing to add.
+
+bool REveManager::IsCaughtUpWithClients()
+{
+   std::unique_lock<std::mutex> lock(fServerState.fMutex);
+   return fServerState.fVal == ServerState::Waiting;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 bool REveManager::ClientConnectionsFree() const
 {
    for (auto &conn : fConnList) {
