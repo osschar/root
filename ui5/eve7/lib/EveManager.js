@@ -244,6 +244,35 @@ sap.ui.define([], function() {
        *
        * Variadic, so the selection callbacks can use it too rather than keeping
        * their own copies of this loop. */
+      /** Dispatch one element change to the scene's receivers, skipping any that
+        * has said it does not care about these bits.
+        *
+        * A receiver may set `changeBitMask` to the EChangeBits it wants; the
+        * default is all of them, so a receiver that says nothing is unaffected.
+        *
+        * This exists for the position stream. A moving element streams
+        * kCBTransBBox at whatever rate the server is driven at, and the only
+        * thing with any use for it is the 3D representation. Before this, the
+        * Summary controller was taking ~20 calls a second from a single
+        * bouncing ball, refreshing its tree model on each and updating the Ged
+        * -- which made the element tree impossible to use while anything moved.
+        * No amount of coalescing fixes that: the updates are genuinely wanted,
+        * just not by the tree.
+        */
+      callSceneElementChange(scene, em) {
+         if ( ! scene.$receivers) return;
+
+         for (let i = 0; i < scene.$receivers.length; i++) {
+            let receiver = scene.$receivers[i];
+            if (typeof receiver.sceneElementChange != "function") continue;
+
+            let mask = receiver.changeBitMask;
+            if (mask !== undefined && !(em.changeBit & mask)) continue;
+
+            receiver.sceneElementChange(em);
+         }
+      }
+
       callSceneReceivers(scene, fname, ...args) {
          if (scene.$receivers) {
              for (let i=0; i < scene.$receivers.length; i++) {
@@ -457,7 +486,7 @@ sap.ui.define([], function() {
                   obj.render_data.matrix = em.matrix;
             }
 
-            this.callSceneReceivers(scene, "sceneElementChange", em);
+            this.callSceneElementChange(scene, em);
          }
 
          this.listScenesToRedraw.push(scene);

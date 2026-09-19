@@ -209,6 +209,12 @@ public:
    void SceneSubscriberWaitingResponse(unsigned cinnId);
 
    bool ClientConnectionsFree() const;
+   bool AnySceneChanged() const;
+
+   /// Changes are stamped but not yet streamed, because the clients had not
+   /// finished with the previous round when EndChange() ran. Flushed by the
+   /// last acknowledgement. Guarded by fServerState.fMutex.
+   bool fPendingSceneChanges{false};
 
    /// True when every client has acknowledged the last round of changes, so a
    /// new one would go out on an empty queue.

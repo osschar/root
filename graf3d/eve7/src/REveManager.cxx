@@ -925,7 +925,15 @@ void REveManager::WindowData(unsigned connid, const std::string &arg)
       }
 
       if (fServerState.fVal == ServerState::UpdatingClients && ClientConnectionsFree()) {
-         fServerState.fVal = ServerState::Waiting;
+         if (fPendingSceneChanges) {
+            // Changes accumulated while this round was in flight -- send them
+            // now, which leaves a fresh round outstanding rather than idle.
+            fPendingSceneChanges = false;
+            StreamSceneChangesToJson();
+            SendSceneChanges();
+         } else {
+            fServerState.fVal = ServerState::Waiting;
+         }
          fServerState.fCV.notify_all();
       }
 
@@ -1250,6 +1258,24 @@ bool REveManager::IsCaughtUpWithClients()
 
 ////////////////////////////////////////////////////////////////////////////////
 
+////////////////////////////////////////////////////////////////////////////////
+/// Is there anything stamped and not yet streamed?
+
+bool REveManager::AnySceneChanged() const
+{
+   if (fWorld->IsChanged())
+      return true;
+
+   for (auto &el : fScenes->RefChildren()) {
+      auto s = dynamic_cast<REveScene *>(el);
+      if (s && s->IsChanged())
+         return true;
+   }
+   return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 bool REveManager::ClientConnectionsFree() const
 {
    for (auto &conn : fConnList) {
@@ -1305,17 +1331,54 @@ void REveManager::BeginChange()
 }
 
 //____________________________________________________________________
+/// Close a round of changes and stream it -- unless the clients are still
+/// working through the previous one, in which case keep the stamps and let the
+/// last acknowledgement flush them.
+///
+/// Holding changes back is safe, and it is what stops a producer on its own
+/// clock from queueing rounds faster than they drain. It rests on two things
+/// that were already true:
+///
+///   - A change message carries the element's **current state**, not a delta.
+///     StreamRepresentationChanges() writes what the element is now, so a round
+///     that is never streamed loses nothing -- the next one says the same thing,
+///     only newer.
+///   - Stamps already coalesce. AddStamp() enqueues an element once and ORs the
+///     bits into it, so an element stamped fifty times while the link is busy is
+///     still one entry, streamed once, with its latest values.
+///
+/// Together those make accumulate-and-flush automatically latest-wins, with no
+/// bookkeeping and nothing for the producer to think about. Before this, every
+/// producer had to poll IsCaughtUpWithClients() and skip for itself, and nothing
+/// obliged a new one to bother.
+///
+/// The MIR path streams directly and is deliberately not deferred: a client that
+/// asked for something is owed an answer, and there is one round per request in
+/// any case.
+
 void REveManager::EndChange()
 {
    // tag scene to disable accepting chages, write the change json
    GetScenes()->EndAcceptingChanges();
    GetWorld()->EndAcceptingChanges();
 
-   StreamSceneChangesToJson();
-
-   // set new server state under lock
    std::unique_lock<std::mutex> lock(fServerState.fMutex);
+
+   if ( ! fConnList.empty() && ! ClientConnectionsFree())
+   {
+      // Previous round still outstanding. Leave everything stamped.
+      if (AnySceneChanged())
+         fPendingSceneChanges = true;
+
+      fServerState.fVal = ServerState::UpdatingClients;
+      fServerState.fCV.notify_all();
+      return;
+   }
+
+   StreamSceneChangesToJson();
    SendSceneChanges();
+   fPendingSceneChanges = false;
+
    fServerState.fVal = fConnList.empty() ? ServerState::Waiting : ServerState::UpdatingClients;
    fServerState.fCV.notify_all();
 }
