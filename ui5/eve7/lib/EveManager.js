@@ -447,6 +447,15 @@ sap.ui.define([], function() {
                delete em.render_data;
                Object.assign(obj, em);
             }
+            else if (em.changeBit & this.EChangeBits.kCBTransBBox) {
+               // Transformation-only update; no render data is streamed for it.
+               // render_data.matrix has to be kept in step by hand, or a later
+               // rebuild -- a colour change, today -- reads the stale matrix
+               // and teleports the object back to where it used to be.
+               Object.assign(obj, em);
+               if (em.matrix && obj.render_data)
+                  obj.render_data.matrix = em.matrix;
+            }
 
             this.callSceneReceivers(scene, "sceneElementChange", em);
          }

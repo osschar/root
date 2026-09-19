@@ -256,6 +256,7 @@ public:
    virtual void SetTransMatrix(const TGeoMatrix &mat);
 
    virtual Int_t WriteCoreJson(nlohmann::json &cj, Int_t rnr_offset);
+   virtual void  WriteTransJson(nlohmann::json &cj);
    virtual void  BuildRenderData();
 
    void* GetUserData() const   { return fUserData; }
@@ -323,11 +324,20 @@ public:
 
    // Change-stamping and change bits
    //---------------------------------
+   //
+   // kCBTransBBox is the cheap-update bit: it streams the main transformation
+   // (plus whatever WriteTransJson() adds) as JSON only, and the client applies
+   // it to the renderer object it already has instead of rebuilding it. Anything
+   // that invalidates geometry must still stamp kCBObjProps.
+   //
+   // The bounding-box half of the name is historical: it told the renderer to
+   // re-push bounding boxes up the scene graph. RenderCore recomputes those on
+   // every render step, so nothing has to be streamed for it.
 
    enum EChangeBits
    {
       kCBColorSelection =  BIT(0), // Main color or select/hilite state changed.
-      kCBTransBBox      =  BIT(1), // Transformation matrix or bounding-box changed.
+      kCBTransBBox      =  BIT(1), // Transformation changed; cheap update, no rebuild.
       kCBObjProps       =  BIT(2), // Object changed, requires dropping its display-lists.
       kCBVisibility     =  BIT(3), // Rendering of self/children changed.
       kCBElementAdded   =  BIT(4)  // Element was added to a new parent.

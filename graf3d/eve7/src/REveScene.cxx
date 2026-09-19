@@ -290,6 +290,7 @@ void REveScene::StreamRepresentationChanges()
 
         if (bits & kCBTransBBox)
         {
+          el->WriteTransJson(jobj);
         }
       }
 
