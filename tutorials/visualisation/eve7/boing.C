@@ -58,7 +58,7 @@ class Boinger : public TTimer {
 
    std::chrono::steady_clock::time_point fLast{std::chrono::steady_clock::now()};
    std::chrono::steady_clock::time_point fT0{std::chrono::steady_clock::now()};
-   int fDropped{0}, fSent{0};
+   int fSent{0};
 
    static constexpr Double_t kGrav = -160;    // units / s^2, along -y
    static constexpr Double_t kTilt = 0.30;    // polar axis tipped out of vertical
@@ -78,28 +78,16 @@ public:
       : TTimer(ms, kTRUE), fBall(ball), fShadow(shadow)
    {}
 
-   int GetDropped() const { return fDropped; }
-   int GetSent()    const { return fSent; }
+   int GetSent() const { return fSent; }
 
    Bool_t Notify() override
    {
-      // Congestion control. The server will NOT hold us back -- BeginChange()
-      // waits only while another producer is mid-update, never while clients
-      // are still catching up -- so a timer that just fires and streams hands
-      // the websocket rounds faster than they drain, and the lag grows without
-      // limit. It grows faster with a second client, because a round is only
-      // done once the slowest one has answered. That is the whole of the "it
-      // gets laggy, and worse with two of us" problem.
-      //
-      // So: skip. This draws the current state, not a sequence of edits, so a
-      // round we cannot afford has nothing the next one will not carry anyway.
-      // Blocking instead is not on the table -- the acknowledgement arrives on
-      // the main thread, which is the thread this timer is on.
-      if (!REveManager::Create()->IsCaughtUpWithClients()) {
-         ++fDropped;
-         Reset();
-         return kTRUE;
-      }
+      // No congestion check here, deliberately. The manager holds changes back
+      // when the clients have not finished with the previous round and flushes
+      // them on the last acknowledgement -- and because a change carries current
+      // state rather than a delta, and stamps coalesce per element, what finally
+      // goes out is simply the newest position. So this may fire as fast as it
+      // likes; the link decides how much of it is sent.
       ++fSent;
 
       // Integrate on the wall clock, not on the timer period: frames are
@@ -114,14 +102,12 @@ public:
 
       const Double_t fDt = dt;
 
-      // Say what the link is actually doing. "sent" counts rounds the clients
-      // kept up with, "dropped" those skipped because they had not. Compare the
-      // rate with the timer period: if they match, the timer is the limit; if
-      // the rate is far below and drops are few, the event loop is.
-      if (fSent % 50 == 0) {
+      // Ticks, not rounds on the wire -- the manager decides how many of these
+      // are actually streamed. Compare with the timer period to see whether the
+      // event loop is keeping up with the timer.
+      if (fSent % 100 == 0) {
          Double_t el = std::chrono::duration<double>(now - fT0).count();
-         ::Info("boing", "sent %d, dropped %d (%.0f%%), %.1f rounds/s over %.1f s",
-                fSent, fDropped, 100.0 * fDropped / (fSent + fDropped), fSent / el, el);
+         ::Info("boing", "%d ticks, %.1f/s over %.1f s", fSent, fSent / el, el);
       }
 
       fVy += kGrav * fDt;
