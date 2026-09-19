@@ -705,9 +705,17 @@ sap.ui.define([], function() {
       {
          let scene = this.GetElement(element.fSceneId);
          if (scene.$receivers) {
+            // Guarded, as callSceneReceivers does it. A receiver registered for
+            // one callback -- element removal, say -- used to break selection
+            // for the whole session: this threw, the exception unwound
+            // CompleteSceneChanges, and with it went highlight propagation,
+            // projected-view updates and element-removal processing. Nothing in
+            // RegisterSceneReceiver says a receiver must implement every
+            // callback, and nothing should.
             for (let r of scene.$receivers)
             {
-               r.SelectElement(selection_obj, element.fElementId, sec_idcs, extra);
+               if (typeof r.SelectElement === "function")
+                  r.SelectElement(selection_obj, element.fElementId, sec_idcs, extra);
             }
          }
 
@@ -721,7 +729,8 @@ sap.ui.define([], function() {
          if (scene.$receivers) {
             for (let r of scene.$receivers)
             {
-               r.UnselectElement(selection_obj, element.fElementId);
+               if (typeof r.UnselectElement === "function")
+                  r.UnselectElement(selection_obj, element.fElementId);
             }
          }
 
