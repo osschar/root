@@ -155,6 +155,9 @@ sap.ui.define([], function() {
                   });
                }
             }
+            else if (resp.content == "Motion") {
+               this.ImportMotion(resp);
+            }
             else if (resp.content == "BrowseElement") {
                this.BrowseElement(resp.id);
             }
@@ -822,6 +825,42 @@ sap.ui.define([], function() {
          if (!this.handle.isStandalone())
             this.handle.send("__REveDoneChanges");
          this.busyProcessingChanges = false;
+      }
+
+      /** The motion channel: transformation-only updates, outside the round.
+        *
+        * No BeginChanges/EndChanges, no acknowledgement, no pass over every
+        * receiver of every scene, no texture clear per viewer -- and the
+        * element tree and editor never see it, because only EveScene implements
+        * `sceneElementMotion`. That is the point of a separate channel rather
+        * than a filter on the ordinary one: the tree cannot be told about
+        * something it is not sent.
+        *
+        * Pacing is the server's, from RWebWindow::CanSend: a client whose queue
+        * is not drained is skipped rather than queued behind. Nothing is lost by
+        * that -- these carry absolute state, so the next message says everything
+        * the skipped one would have.
+        */
+      ImportMotion(resp)
+      {
+         let els = resp.els;
+         if (!els) return;
+
+         for (let i = 0; i < els.length; ++i) {
+            let em = els[i];
+            let obj = this.map[em.fElementId];
+            if (!obj) continue;   // gone, or not here yet -- a delete may race one of these
+
+            // Keep the model in step: a later rebuild reads render_data.matrix,
+            // and a stale one would put the object back where it used to be.
+            if (em.matrix && obj.render_data)
+               obj.render_data.matrix = em.matrix;
+            obj.mot = em.mot;
+
+            let scene = this.GetElement(em.fSceneId);
+            if (scene)
+               this.callSceneReceivers(scene, "sceneElementMotion", em);
+         }
       }
 
       /** Method invoked from server message to browse to element elid */

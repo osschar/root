@@ -233,6 +233,47 @@ void REveScene::StreamJsonRecurse(REveElement *el, nlohmann::json &jarr)
 //
 ////////////////////////////////////////////////////////////////////////////////
 
+////////////////////////////////////////////////////////////////////////////////
+/// Take the transformation-only changes off the ordinary round.
+///
+/// An element whose sole pending change is kCBTransBBox has nothing to say that
+/// needs the round machinery: no geometry, no structure, nothing another client
+/// has to agree about. Sending it that way costs a BeginChanges and an
+/// EndChanges to every connection, a pass over every receiver of every scene on
+/// the client, a texture and attribute clear per viewer, and an acknowledgement
+/// that gates the next round on the slowest client -- to move sixteen floats.
+///
+/// So it goes out on its own channel instead. See
+/// REveManager::SendMotionChanges().
+
+void REveScene::StreamMotionChanges(nlohmann::json &arr)
+{
+   if (fChangedElements.empty())
+      return;
+
+   List_t keep;
+
+   for (auto &el : fChangedElements)
+   {
+      if (el->GetChangeBits() != REveElement::kCBTransBBox) {
+         keep.push_back(el);
+         continue;
+      }
+
+      nlohmann::json jobj = {};
+      jobj["fElementId"] = el->GetElementId();
+      jobj["fSceneId"]   = GetElementId();
+      el->WriteTransJson(jobj);
+      arr.push_back(jobj);
+
+      el->ClearStamps();
+   }
+
+   fChangedElements.swap(keep);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 void REveScene::StreamRepresentationChanges()
 {
    fElsWithBinaryData.clear();
