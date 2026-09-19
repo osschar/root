@@ -92,6 +92,9 @@ protected:
    Char_t           fMainTransparency{0};      //  Main-transparency variable.
    Color_t          fDefaultColor{kPink};  //  Default color for sub-classes that enable it.
    Color_t         *fMainColorPtr{nullptr};//  Pointer to main-color variable.
+
+   Bool_t           fHasFixedBBox{kFALSE}; ///< see SetFixedBBox()
+   Float_t          fFixedBBox[6]{};       ///< xmin, ymin, zmin, xmax, ymax, zmax
    std::unique_ptr<REveTrans> fMainTrans;   //  Pointer to main transformation matrix.
 
    void            *fUserData{nullptr};     ///<! Externally assigned and controlled user data.
@@ -258,6 +261,36 @@ public:
    virtual Int_t WriteCoreJson(nlohmann::json &cj, Int_t rnr_offset);
    virtual void  WriteTransJson(nlohmann::json &cj);
    virtual void  BuildRenderData();
+
+   // Declared bounding box
+   //----------------------
+   //
+   // Every ComputeBBox() in REve derives the box from the geometry. This says
+   // what the box *is*, whatever the geometry does, and it is streamed and
+   // applied for any element type.
+   //
+   // Two uses, and they pull in opposite directions:
+   //
+   //   - Smaller than the geometry. A floor slab whose visible top is the plane
+   //     of interest can declare only that plane, so the scene box -- and the
+   //     3D axis, which takes its extents from it -- stops there while the slab
+   //     is drawn below.
+   //   - Larger than the geometry. One element can then declare the volume of
+   //     the whole scene, which keeps the axis and the camera still while
+   //     sparse content comes and goes. That is the trick mkFit's Shell.cc
+   //     plays with four transparent jet cones at twice the tracker radius, and
+   //     boing.C with eight corner points; either would be retired by saying it
+   //     outright.
+   //
+   // Not to be confused with what REveBoxSet and REvePointSet stream in the
+   // render-data normals channel: those are *computed* boxes that have to be
+   // sent because the types are drawn instanced -- one primitive plus a texture
+   // of placements -- so RenderCore cannot see their extent at all.
+
+   void SetFixedBBox(Float_t xmin, Float_t ymin, Float_t zmin,
+                     Float_t xmax, Float_t ymax, Float_t zmax);
+   void ClearFixedBBox() { fHasFixedBBox = kFALSE; StampObjProps(); }
+   Bool_t HasFixedBBox() const { return fHasFixedBBox; }
 
    void* GetUserData() const   { return fUserData; }
    void  SetUserData(void* ud) { fUserData = ud;   }

@@ -1505,6 +1505,22 @@ void REveElement::BuildRenderData()
 /// it, and staying out of the blob means no offset has to be reserved for a
 /// message that carries no geometry.
 
+////////////////////////////////////////////////////////////////////////////////
+/// Declare the bounding box, overriding whatever the geometry would give.
+/// Streamed as JSON and applied by the client to the renderer object; see the
+/// header for what it is for and what it is not.
+
+void REveElement::SetFixedBBox(Float_t xmin, Float_t ymin, Float_t zmin,
+                               Float_t xmax, Float_t ymax, Float_t zmax)
+{
+   fFixedBBox[0] = xmin; fFixedBBox[1] = ymin; fFixedBBox[2] = zmin;
+   fFixedBBox[3] = xmax; fFixedBBox[4] = ymax; fFixedBBox[5] = zmax;
+   fHasFixedBBox = kTRUE;
+   StampObjProps();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 void REveElement::WriteTransJson(nlohmann::json &cj)
 {
    if (fMainTrans.get())
@@ -1547,6 +1563,10 @@ Int_t REveElement::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
    j["fMainColor"]        = GetMainColor();
    j["fMainTransparency"] = GetMainTransparency();
    j["fPickable"]         = fPickable;
+
+   if (fHasFixedBBox)
+      j["fixed_bbox"] = {fFixedBBox[0], fFixedBBox[1], fFixedBBox[2],
+                         fFixedBBox[3], fFixedBBox[4], fFixedBBox[5]};
 
    Int_t ret = 0;
 

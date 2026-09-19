@@ -21,7 +21,6 @@
 #include <ROOT/REveScene.hxx>
 #include <ROOT/REveSMorph.hxx>
 #include <ROOT/REveBox.hxx>
-#include <ROOT/REvePointSet.hxx>
 #include <ROOT/REveViewer.hxx>
 #include <ROOT/REveTrans.hxx>
 
@@ -171,38 +170,6 @@ public:
 };
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Eight points at the corners of the room, and nothing else.
-///
-/// The scene bounding box is computed once, from the elements as they stand at
-/// load -- so without this the axis box would frame the floor plus wherever the
-/// ball happened to be at that instant, which is not the room and not the same
-/// twice. Marking the corners pins it exactly, and the ball is then free to be
-/// anywhere.
-///
-/// This is Matevz's "inverted aquarium": rather than draw a box around the
-/// scene to contain it, put something at the extremities and let the bounding
-/// box be inflated from the inside. `Shell.cc` in mkFit does the same with four
-/// jet cones at twice the tracker radius and transparency 90 -- which is also
-/// why a sparse event there does not make the camera jump.
-///
-/// Left faintly visible rather than transparent: they read as the corners of
-/// the room, and an invisible element is one nobody can find when it is wrong.
-
-static REvePointSet *make_room_corners()
-{
-   auto ps = new REvePointSet("Room corners");
-   ps->SetMarkerColor(kMagenta - 7);
-   ps->SetMarkerSize(1);
-   ps->SetPickable(kFALSE);
-
-   for (int i = 0; i < 8; ++i)
-      ps->SetNextPoint((i & 1) ? kBX : -kBX,
-                       (i & 2) ? kBY : -kBY,
-                       (i & 4) ? kBZ : -kBZ);
-   return ps;
-}
-
-////////////////////////////////////////////////////////////////////////////////
 /// The floor -- a slab, so the shadow has something to land on. Its top face is
 /// flush with the plane the ball bounces off.
 
@@ -218,6 +185,17 @@ static REveBox *make_floor()
    // (216, 204, 232) here quietly yields colour 18, which is this grey.
    b->SetFillColor(18);
    b->SetPickable(kFALSE);
+
+   // The slab declares the ROOM as its bounding box, not itself. Two things
+   // follow, and they are the whole reason SetFixedBBox exists:
+   //
+   //   - The axis box is exactly the room, whatever the ball is doing and
+   //     wherever it happens to be at load. No corner points needed; this
+   //     retires the eight that used to be here.
+   //   - Its lower face is the bounce plane rather than the underside of the
+   //     slab, so the slab is drawn BELOW the axis floor instead of pushing it
+   //     down by its own thickness.
+   b->SetFixedBBox(-kBX, -kBY, -kBZ, kBX, kBY, kBZ);
 
    const Float_t y1 = -kBY - 3, y2 = -kBY;
 
@@ -242,7 +220,6 @@ void boing(Long_t period_ms = 40)
 
    auto scene = eveMng->GetEventScene();
 
-   scene->AddElement(make_room_corners());
    scene->AddElement(make_floor());
 
    auto ball = new REveSMorph("Boing ball");
