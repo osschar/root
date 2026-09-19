@@ -569,6 +569,27 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager) {
          return mat;
       }
 
+      /** Apply an element's declared bounding box, from REveElement::SetFixedBBox.
+        *
+        * Every geometry in the subtree, not only the top one. Box3.expandByObject
+        * honours a geometry's external box but still walks the children, falling
+        * back to their raw vertices -- and a representation may well hang extra
+        * geometry off its mesh. makeBox does exactly that, adding a line outline
+        * over the same vertex buffer, which dragged the union straight back out
+        * to the geometry the declaration was there to override.
+        */
+      applyFixedBBox(el, obj3d) {
+         let b = el.fixed_bbox;
+         if (!b || b.length < 6) return;
+
+         obj3d.traverse(o => {
+            if (o.geometry)
+               o.geometry.setExternalBoundingBox(
+                  new RC.Box3(new RC.Vector3(b[0], b[1], b[2]),
+                              new RC.Vector3(b[3], b[4], b[5])));
+         });
+      }
+
       RcFancyMaterial(color, opacity, props) {
          let mat = new RC.MeshPhongMaterial;
          // let mat = new RC.MeshBasicMaterial;
