@@ -280,6 +280,11 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
          let obj3d = this.getObj3D(msg.fElementId);
          if (!obj3d) return;
 
+         // Streamed motion, if any. Handed over BEFORE the matrix is applied
+         // below would be wrong -- Motion reads the position out of the matrix
+         // the server just sent, so it has to see the new one.
+         let mot_viewer = this.glctrl ? this.glctrl.viewer : null;
+
          if (typeof obj3d.updateTrans === "function") {
             obj3d.updateTrans(el, msg);
          }
@@ -291,6 +296,12 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
                obj3d.updateMatrixWorld(true);
             }
          }
+
+         // "mot" is present on every transformation update -- an object that
+         // has stopped moving sends null, which clears the trajectory the
+         // client would otherwise keep evaluating.
+         if (mot_viewer && mot_viewer.motion && msg.mot !== undefined)
+            mot_viewer.motion.update(msg.fElementId, obj3d, msg.mot);
       }
 
       elementsRemoved(ids)

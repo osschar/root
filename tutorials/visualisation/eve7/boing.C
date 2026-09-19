@@ -63,6 +63,40 @@ class Boinger : public TTimer {
    static constexpr Double_t kTilt = 0.30;    // polar axis tipped out of vertical
    static constexpr Double_t kSpinRate = 2.4; // rad / s
 
+   /// How long until the ball next hits something, in seconds.
+   ///
+   /// This is what makes the extrapolation window meaningful: up to the bounce
+   /// the trajectory is exact, and the bounce is the one discontinuity the
+   /// client has no way of predicting. Walls are linear, the floor and ceiling
+   /// parabolic.
+   Double_t TimeToNextBounce() const
+   {
+      Double_t t = 1e9;
+
+      auto linear = [&](Double_t p, Double_t v, Double_t lim) {
+         if (v > 1e-9)       t = TMath::Min(t, ( lim - p) / v);
+         else if (v < -1e-9) t = TMath::Min(t, (-lim - p) / v);
+      };
+      linear(fX, fVx, kBX - kR);
+      linear(fZ, fVz, kBZ - kR);
+
+      // y: solve 0.5*g*t^2 + v*t + (p - lim) = 0 for the next positive root,
+      // against whichever of floor or ceiling it is heading for.
+      const Double_t ylim = kBY - kR;
+      for (Double_t lim : {ylim, -ylim}) {
+         Double_t c = fY - lim, b = fVy, a = 0.5 * kGrav;
+         Double_t disc = b * b - 4 * a * c;
+         if (disc < 0) continue;
+         Double_t sq = TMath::Sqrt(disc);
+         for (Double_t r : {(-b + sq) / (2 * a), (-b - sq) / (2 * a)})
+            if (r > 1e-6) t = TMath::Min(t, r);
+      }
+
+      // Never promise more than a short while regardless: the demo could be
+      // stopped, or the ball's motion changed from the prompt.
+      return TMath::Min(t, 2.0);
+   }
+
    /// Reflect off a wall, elastically. Perfectly elastic on purpose: with no
    /// loss the ball returns to the same height for ever, which is what the
    /// original did and what makes it a demo rather than a simulation.
@@ -99,8 +133,6 @@ public:
       // not teleport the ball through a wall.
       if (dt > 0.1) dt = 0.1;
 
-      const Double_t fDt = dt;
-
       // Ticks, not rounds on the wire -- the manager decides how many of these
       // are actually streamed. Compare with the timer period to see whether the
       // event loop is keeping up with the timer.
@@ -109,14 +141,33 @@ public:
          ::Info("boing", "%d ticks, %.1f/s over %.1f s", fSent, fSent / el, el);
       }
 
-      fVy += kGrav * fDt;
-      fX += fVx * fDt;  fY += fVy * fDt;  fZ += fVz * fDt;
+      // Integrate in small fixed sub-steps, NOT in one step of the whole
+      // interval. The simulation must not depend on how often this is called.
+      //
+      // Found the hard way: run at 200 ms and a single step moves the ball
+      // further than the room is high, so it passes clean through the floor and
+      // the reflection `p = 2*lim - p` puts it back somewhere with more energy
+      // than it had. Repeat, and the speed runs away -- the ball reached 336
+      // units/s against a physical maximum near 118, and the symptom was a ball
+      // stuck at the floor with a near-zero extrapolation window, which looks
+      // nothing like an integration bug.
+      //
+      // This is exactly what streaming trajectories is supposed to separate:
+      // simulate finely, send rarely.
+      for (Double_t rem = dt; rem > 0; ) {
+         const Double_t h = TMath::Min(rem, 0.005);
+         rem -= h;
 
-      Bounce(fX, fVx, kBX - kR);
-      Bounce(fY, fVy, kBY - kR);
-      Bounce(fZ, fVz, kBZ - kR);
+         fVy += kGrav * h;
+         fX += fVx * h;  fY += fVy * h;  fZ += fVz * h;
 
-      fSpin += kSpinRate * fDt;
+         Bounce(fX, fVx, kBX - kR);
+         Bounce(fY, fVy, kBY - kR);
+         Bounce(fZ, fVz, kBZ - kR);
+
+         fSpin += kSpinRate * h;
+      }
+
 
       // The ball spins about its own polar axis -- which for an SMorph is the
       // local x, not z -- and that axis is stood up near vertical and tipped
@@ -142,6 +193,19 @@ public:
       t.SetBaseVec(3, kR * e3[0], kR * e3[1], kR * e3[2]);
       t.SetPos(fX, fY, fZ);
       fBall->SetTransMatrix(t.Array());
+
+      // Say how it is moving, not just where it is. The client evaluates the
+      // trajectory on its own frame clock, so the ball is smooth at 60 fps
+      // however rarely this runs -- and under constant gravity the second-order
+      // form is the exact path, not a smoothing of it.
+      //
+      // The window is the time to the next bounce, which is the only thing the
+      // client cannot see coming. Up to it the extrapolation is exact; past it
+      // the ball simply stops, which is visible and honest, rather than
+      // continuing through the floor.
+      Float_t vel[3] = {(Float_t)fVx, (Float_t)fVy, (Float_t)fVz};
+      Float_t acc[3] = {0.f, (Float_t)kGrav, 0.f};
+      fBall->SetMotion(vel, acc, (Float_t)TimeToNextBounce());
 
       // The shadow, tightening as the ball comes down. Same mechanism, one more
       // matrix -- no second element type, no shadow pass, no light.

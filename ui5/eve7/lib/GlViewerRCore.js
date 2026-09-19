@@ -2,8 +2,9 @@ sap.ui.define([
    'rootui5/eve7/lib/GlViewer',
    'rootui5/eve7/lib/EveElementsRCore',
    'rootui5/eve7/lib/Axis3D',
-   'rootui5/eve7/lib/Annotations'
-], function(GlViewer, EveElements, Axis3D, Annotations) {
+   'rootui5/eve7/lib/Annotations',
+   'rootui5/eve7/lib/Motion'
+], function(GlViewer, EveElements, Axis3D, Annotations, Motion) {
 
    "use strict";
 
@@ -312,6 +313,8 @@ sap.ui.define([
          // which would put an axis line through the detector rather than
          // behind it.
          this.axis3d = new Axis3D(this, RC);
+         // Evaluates streamed trajectories on its own frame clock; see Motion.js.
+         this.motion = new Motion(this);
          this.scene.add(this.axis3d.group);
 
          // The hover tooltip and, later, annotations kept from it. Lives in the
