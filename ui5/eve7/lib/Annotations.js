@@ -110,26 +110,86 @@ sap.ui.define([], function() {
        * whether a tooltip is showing. This is the context-menu path: by the time
        * the menu is up the tooltip has been hidden by pointerleave, so the menu
        * supplies its own text from its own pick. */
-      keepAt(text, x, y, anchor3d) {
+      keepAt(text, x, y, anchor3d, target) {
          if (!text) return null;
          if (!this._font) {
             // Font not in yet -- ask for it and place the annotation when it
             // lands, rather than dropping the request on the floor.
             this._ensureFont();
-            this._keep_pending = { text: text, x: x, y: y, a3: anchor3d };
+            this._keep_pending = { text: text, x: x, y: y, a3: anchor3d, tgt: target };
             return null;
          }
-         return this._keepAtNow(text, x, y, anchor3d);
+         return this._keepAtNow(text, x, y, anchor3d, target);
       }
 
-      _keepAtNow(text, x, y, anchor3d) {
+      _keepAtNow(text, x, y, anchor3d, target) {
          const W = this.viewer.canvas.width, H = this.viewer.canvas.height;
          const px = (this.viewer.canvas.pixelRatio || 1);
          const pos = [(x * px) / W, 1.0 - (y * px) / H];
          const a = new Annotation(this, text, pos, this.font_size, anchor3d);
+         a.target = target || null;    // { elementId, sceneId }
          this._kept.push(a);
+         this._watchScene(a);
          this.viewer.request_render();
          return a;
+      }
+
+      /** Listen to the scene the annotated element lives in.
+       *
+       * An annotation describes ONE object, and in an event display that object
+       * is transient: the next event replaces it. Nothing about a screen
+       * position expires on its own, so without this an annotation survives its
+       * subject and goes on pointing confidently at whatever now occupies that
+       * part of space -- which is worse than showing nothing.
+       *
+       * REveManager already announces this: ImportSceneChange calls
+       * elementsRemoved on every receiver registered for the scene, before the
+       * elements are actually dropped. */
+      _watchScene(a) {
+         const sid = a.target && a.target.sceneId;
+         if (!sid) return;
+         this._watched = this._watched || {};
+         if (this._watched[sid]) return;
+         const mgr = this.viewer.controller ? this.viewer.controller.mgr : null;
+         if (!mgr || typeof mgr.RegisterSceneReceiver !== "function") return;
+         mgr.RegisterSceneReceiver(sid, this);
+         this._watched[sid] = true;
+      }
+
+      /** Scene-receiver callback: drop annotations whose subject is gone.
+       *
+       * Matching the annotated id against the removed list is NOT enough.
+       * REveElement::RemoveElementsInternal reports only the DIRECT children of
+       * the scene, so clearing an event scene announces the container -- the
+       * jet list, say -- and never the individual jet an annotation was made
+       * about. The subject therefore has to be considered dead if it or any of
+       * its ancestors is in the list, which is what the walk below does.
+       *
+       * This is the client-side stand-in for what the server does properly with
+       * aunts: an annotation there holds the annotated element as a NIECE, and
+       * ~REveElement calls RemoveNieceInternal on every aunt of every element
+       * as it dies, however deeply nested. There is no such back-link on the
+       * client, so the ancestry is walked instead. */
+      elementsRemoved(ids) {
+         if (!ids || !ids.length || !this._kept.length) return;
+         const mgr = this.viewer.controller ? this.viewer.controller.mgr : null;
+         if (!mgr) return;
+         const dead = new Set(ids);
+
+         const subjectIsGone = (id) => {
+            // The callback runs BEFORE removeElements, so the chain is intact.
+            let guard = 0;
+            while (id !== undefined && id !== null && ++guard < 64) {
+               if (dead.has(id)) return true;
+               const el = mgr.GetElement(id);
+               if (!el) return false;
+               id = el.fMotherId;
+            }
+            return false;
+         };
+
+         for (const a of this._kept.slice())
+            if (a.target && subjectIsGone(a.target.elementId)) a.remove();
       }
 
       /** World-space point under a pick, from its depth.
@@ -253,7 +313,7 @@ sap.ui.define([], function() {
                if (this._keep_pending) {
                   const k = this._keep_pending;
                   this._keep_pending = null;
-                  this._keepAtNow(k.text, k.x, k.y, k.a3);
+                  this._keepAtNow(k.text, k.x, k.y, k.a3, k.tgt);
                }
             },
             (img) => this.RC.ZText.createDefaultTexture(img),
