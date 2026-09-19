@@ -205,7 +205,16 @@ public:
       // continuing through the floor.
       Float_t vel[3] = {(Float_t)fVx, (Float_t)fVy, (Float_t)fVz};
       Float_t acc[3] = {0.f, (Float_t)kGrav, 0.f};
-      fBall->SetMotion(vel, acc, (Float_t)TimeToNextBounce());
+
+      // Angular velocity in the WORLD frame: the ball turns about its own polar
+      // axis, which after standing it up and leaning it over is e1. Without
+      // this the flight is smooth and the spin jumps once per update, and the
+      // two disagreeing is more distracting than neither being smooth.
+      Float_t omega[3] = {(Float_t)(kSpinRate * e1[0]),
+                          (Float_t)(kSpinRate * e1[1]),
+                          (Float_t)(kSpinRate * e1[2])};
+
+      fBall->SetMotion(vel, acc, omega, (Float_t)TimeToNextBounce());
 
       // The shadow, tightening as the ball comes down. Same mechanism, one more
       // matrix -- no second element type, no shadow pass, no light.
@@ -271,7 +280,15 @@ static REveBox *make_floor()
    //     down by its own thickness.
    b->SetFixedBBox(-kBX, -kBY, -kBZ, kBX, kBY, kBZ);
 
-   const Float_t y1 = -kBY - 3, y2 = -kBY;
+   // The visible top sits a hair BELOW the bounce plane. The axis box draws its
+   // floor grid on the face of the bounding box, which is that plane exactly,
+   // and two coplanar surfaces fight -- the slab wins the depth test and the
+   // grid disappears under it (visible only through the translucent shadow,
+   // which is a good way to notice you have done this).
+   //
+   // The declared box below still says -kBY, so the axis is where it should be;
+   // only the paint moves.
+   const Float_t y1 = -kBY - 3, y2 = -kBY - 0.05f;
 
    // Corner order as in box.C: 0-3 on the low-z face, 4-7 on the high-z one,
    // each running (-x,-y) (-x,+y) (+x,+y) (+x,-y).

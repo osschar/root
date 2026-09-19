@@ -98,6 +98,7 @@ protected:
 
    Bool_t           fHasMotion{kFALSE};    ///< see SetMotion()
    Float_t          fVel[3]{}, fAcc[3]{};  ///< units/s and units/s^2
+   Float_t          fOmega[3]{};           ///< angular velocity, world frame, rad/s
    Float_t          fMaxDt{0.f};           ///< seconds the trajectory may be trusted
    Double_t         fMotionT0{0.};         ///< REveManager::ServerTimeMs() when set
    std::unique_ptr<REveTrans> fMainTrans;   //  Pointer to main transformation matrix.
@@ -315,11 +316,19 @@ public:
    //
    // Set it to the time to the next known discontinuity where that is known.
    //
+   // Rotation is extrapolated the same way, from an angular velocity vector in
+   // the world frame: direction is the axis, length the rate in rad/s. Without
+   // it a spinning object's position glides while its spin jumps once per
+   // update, and the jump is the thing the eye goes to -- worse than not
+   // extrapolating at all, because the two disagree.
+   //
    // Position and orientation still travel in fMainTrans as before -- this only
    // adds how they are changing, so an element with no motion set behaves
    // exactly as it always did.
 
    void SetMotion(const Float_t vel[3], const Float_t acc[3], Float_t max_dt);
+   void SetMotion(const Float_t vel[3], const Float_t acc[3], const Float_t omega[3],
+                  Float_t max_dt);
    void ClearMotion();
    Bool_t HasMotion() const { return fHasMotion; }
 

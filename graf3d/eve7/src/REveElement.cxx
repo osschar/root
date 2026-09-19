@@ -1520,7 +1520,18 @@ void REveElement::BuildRenderData()
 
 void REveElement::SetMotion(const Float_t vel[3], const Float_t acc[3], Float_t max_dt)
 {
-   for (int i = 0; i < 3; ++i) { fVel[i] = vel[i]; fAcc[i] = acc[i]; }
+   const Float_t no_spin[3] = {0.f, 0.f, 0.f};
+   SetMotion(vel, acc, no_spin, max_dt);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// As above, with an angular velocity in the world frame -- axis by direction,
+/// rad/s by length.
+
+void REveElement::SetMotion(const Float_t vel[3], const Float_t acc[3],
+                            const Float_t omega[3], Float_t max_dt)
+{
+   for (int i = 0; i < 3; ++i) { fVel[i] = vel[i]; fAcc[i] = acc[i]; fOmega[i] = omega[i]; }
    fMaxDt     = max_dt;
    fMotionT0  = REveManager::ServerTimeMs();
    fHasMotion = kTRUE;
@@ -1565,6 +1576,7 @@ void REveElement::WriteTransJson(nlohmann::json &cj)
       cj["mot"] = { {"t0",     fMotionT0},
                     {"vel",    {fVel[0], fVel[1], fVel[2]}},
                     {"acc",    {fAcc[0], fAcc[1], fAcc[2]}},
+                    {"omega",  {fOmega[0], fOmega[1], fOmega[2]}},
                     {"max_dt", fMaxDt} };
    }
    else
