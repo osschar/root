@@ -71,9 +71,9 @@ sap.ui.define([], function() {
           *
           * Ramped by size rather than applied flat: a large label does not need
           * it and would merely look overweight. */
-         this.weight_max    = 0.16;
-         this.weight_px_lo  = 7;    ///< full weight at or below this cap height
-         this.weight_px_hi  = 17;   ///< no weight at or above it
+         this.weight_max    = 0.07;
+         this.weight_px_lo  = 6;    ///< full weight at or below this cap height
+         this.weight_px_hi  = 14;   ///< no weight at or above it
 
          /** Connector line width, in CSS pixels. */
          this.conn_width_px = 1.5;
@@ -294,12 +294,34 @@ sap.ui.define([], function() {
        * fraction so that its absolute frame comes out the same -- see
        * Annotation._frameFrac(). */
       _plate(obj, line_frac) {
-         const RC = this.RC;
+         // The plate is the BACKGROUND colour, not white.
+         //
+         // A white plate is invisible on a white background and blinding on a
+         // black one -- and setHighlight() pulls fill_alpha towards opaque, so
+         // on a dark background entering an annotation lit a white slab over
+         // the scene. Painting the plate in the background colour makes the
+         // highlight read as "this one is active" under either background,
+         // which is what it is for.
          obj.setupFrameStuff(1.0, true,
-                             new RC.Color(1.0, 1.0, 1.0), this.plate_alpha,
+                             this.viewer.bgCol, this.plate_alpha,
                              this.viewer.fgCol, 1.0, 0.25,
                              (line_frac === undefined) ? this.frame_line : line_frac);
          obj.use_fg_color = true;
+
+         // recolourFgElements() traverses the overlay scene calling
+         // setColors(fg, fg) on anything flagged use_fg_color. ZText's own
+         // version sets the text and line colours but knows nothing about the
+         // fill, so the plate would keep the old background after a flip.
+         const owner = this;
+         if (!obj._ann_recolour) {
+            obj._ann_recolour = true;
+            const base = obj.setColors.bind(obj);
+            obj.setColors = function(text_col, line_col) {
+               base(text_col, line_col);
+               this.fill_color = owner.viewer.bgCol;
+            };
+         }
+
          this._fixPixelScale(obj);
          obj.fontWeight = this.weightFor(obj.fontSize);
       }
@@ -577,7 +599,16 @@ sap.ui.define([], function() {
          const mesh = new RC.Mesh(g, m);
          mesh.frustumCulled = false;
          mesh.pickable = false;
+
+         // Give the mesh a setColors, so the viewer's existing recolour
+         // traversal reaches it. That traversal calls setColors on anything
+         // flagged use_fg_color, and a plain Mesh has no such method -- so the
+         // connector stayed black when the background went black.
          mesh.use_fg_color = true;
+         mesh.setColors = function(text_col, line_col) {
+            m.color = line_col;
+            m.diffuse = line_col;
+         };
          return mesh;
       }
 
