@@ -1781,10 +1781,19 @@ sap.ui.define([
          return touched;
       }
 
+      /** GL resource recycling, called by EveManager around a scene rebuild --
+       * see the block comment at the top of this file. A GL buffer or texture
+       * is only a cache of the BufferAttribute or Texture holding the data, so
+       * nothing has to track what a dropped element owned: age everything
+       * first, rebuild, then drop whatever the rebuild did not reach for.
+       *
+       * REve is what drives this because REve is the only one that knows when
+       * the scene has finished changing. RenderCore sees a stream of draws and
+       * cannot tell an element that was removed from one that simply was not
+       * visible this frame. */
       timeStampAttributesAndTextures() {
          try {
-            this.renderer.glManager._textureManager.incrementTime();
-            this.renderer.glManager._attributeManager.incrementTime();
+            this.renderer.ageResources();
          }
          catch (e) {
             console.error("Exception caught in timeStampAttributesAndTextures.", e);
@@ -1793,9 +1802,9 @@ sap.ui.define([
 
       clearAttributesAndTextures() {
          try {
-            let delta = 2;
-            this.renderer.glManager._textureManager.deleteTextures(true, delta);
-            this.renderer.glManager._attributeManager.deleteBuffers(true, delta);
+            // One cycle of grace, so a resource used by every second update is
+            // not thrashed. Raise it if elements come and go on alternate events.
+            this.renderer.collectResources(2);
          }
          catch (e) {
             console.error("Exception caught in clearAttributesAndTextures.", e);
