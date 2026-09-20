@@ -2,7 +2,8 @@
 /// \ingroup tutorial_eve_7
 /// The Amiga Boing demo, server-side.
 ///
-/// A checkered ball bounces above a floor, inside the 3D axis box. Everything
+/// A checkered ball bounces inside the 3D axis box, which rules its floor.
+/// Everything
 /// about it is driven from the server -- position, spin and the shadow -- and
 /// every frame goes out as **one matrix per element**, under kCBTransBBox:
 /// nothing is re-tessellated, nothing is rebuilt on the client, and no geometry
@@ -253,72 +254,48 @@ public:
 };
 
 ////////////////////////////////////////////////////////////////////////////////
-/// The floor -- a slab, so the shadow has something to land on. Its top face is
-/// flush with the plane the ball bounces off.
+/// The room: eight corners, never drawn.
+///
+/// There is no floor any more. There were briefly two -- a solid slab and the
+/// ruled floor of the axis box, in the same plane -- and the axis lost, for a
+/// reason worth knowing: its panels are ruled with screen-space stripes, so a
+/// line's depth comes from the line and not from the surface it lies on. On a
+/// near-horizontal plane at a grazing angle they disagree by more than any sane
+/// clearance. Moving the slab a quarter unit below changed nothing, five units
+/// below brought back fragments, and turning the depth test off showed the grid
+/// had been there, whole, the entire time. (The general fix is a depth bias for
+/// chrome drawn on a surface; RenderCore has no polygon offset. See
+/// REVE-OPEN-ITEMS.md.)
+///
+/// So the axis rules the floor and the shadow lands on it, and what remains
+/// here is the one job the slab was really doing: saying how big the room is.
+/// The scene bounding box is the union of what is in the scene, and the 3D axis
+/// takes its extents from that -- so without something to mark the corners the
+/// box would shrink to the ball and its shadow, and the axis with it.
+///
+/// This is the "inverted aquarium": rather than draw a box around the scene to
+/// contain it, put something at the extremities and let the bounding box be
+/// inflated from inside. mkFit's Shell.cc does it with four transparent jet
+/// cones at twice the tracker radius, which is also what stops a sparse event
+/// making its camera jump.
+///
+/// An invisible element still counts toward the bounding box, so the geometry
+/// here is simply the room itself and needs no help. Where geometry and
+/// intended extent genuinely differ -- a slab whose visible top is the plane
+/// that matters -- REveElement::SetFixedBBox() says so outright.
 
-static REveBox *make_floor()
+static REveBox *make_room()
 {
-   auto b = new REveBox("Floor");
-   // SetFillColor, not SetMainColor -- REveBox::WriteCoreJson streams
-   // GetFillColor() under the "fMainColor" key and nothing else, so for this
-   // class the main colour never reaches the client at all.
-   //
-   // Plain light grey. A tinted one is not worth reaching for: TColor::GetColor
-   // snaps to a near-enough entry already in the table, so asking for a lilac
-   // (216, 204, 232) here quietly yields colour 18, which is this grey.
-   b->SetFillColor(18);
-   b->SetPickable(kFALSE);
-
-   // NOT DRAWN. This element exists to declare the room, and nothing else.
-   //
-   // There were two floors competing: this slab and the ruled floor of the
-   // axis box, in the same plane. The axis loses, and not for the reason it
-   // first looks like -- its lines are screen-space stripes, so their depth
-   // does not follow the surface they lie on, and a near-horizontal plane seen
-   // at a grazing angle is the worst case there is. Moving the slab 0.25 below
-   // changed nothing; five units below brought back only fragments. Turning the
-   // depth test off showed the grid had been there, whole, the entire time.
-   //
-   // So: one floor. The axis rules it, the shadow lands on it, and this keeps
-   // its job of saying how big the room is -- an invisible element still counts
-   // toward the scene bounding box.
-   //
-   // The general fix is a depth bias for chrome drawn on a surface. RenderCore
-   // has no polygon offset; see REVE-OPEN-ITEMS.md.
+   auto b = new REveBox("Room");
    b->SetRnrSelf(kFALSE);
-
-   // The slab declares the ROOM as its bounding box, not itself. Two things
-   // follow, and they are the whole reason SetFixedBBox exists:
-   //
-   //   - The axis box is exactly the room, whatever the ball is doing and
-   //     wherever it happens to be at load. No corner points needed; this
-   //     retires the eight that used to be here.
-   //   - Its lower face is the bounce plane rather than the underside of the
-   //     slab, so the slab is drawn BELOW the axis floor instead of pushing it
-   //     down by its own thickness.
-   b->SetFixedBBox(-kBX, -kBY, -kBZ, kBX, kBY, kBZ);
-
-   // The visible top sits a hair BELOW the bounce plane. The axis box draws its
-   // floor grid on the face of the bounding box, which is that plane exactly,
-   // and two coplanar surfaces fight -- the slab wins the depth test and the
-   // grid disappears under it (visible only through the translucent shadow,
-   // which is a good way to notice you have done this).
-   //
-   // The declared box below still says -kBY, so the axis is where it should be;
-   // only the paint moves.
-   //
-   // 0.25 and not a hair's breadth: the two planes only have to be separable in
-   // the depth buffer, and at this distance a 0.05 gap is close enough to
-   // coplanar to fight. A quarter of a unit in a room sixty tall is invisible
-   // and settles it.
-   const Float_t y1 = -kBY - 3, y2 = -kBY;
+   b->SetPickable(kFALSE);
 
    // Corner order as in box.C: 0-3 on the low-z face, 4-7 on the high-z one,
    // each running (-x,-y) (-x,+y) (+x,+y) (+x,-y).
-   b->SetVertex(0, -kBX, y1, -kBZ);   b->SetVertex(1, -kBX, y2, -kBZ);
-   b->SetVertex(2,  kBX, y2, -kBZ);   b->SetVertex(3,  kBX, y1, -kBZ);
-   b->SetVertex(4, -kBX, y1,  kBZ);   b->SetVertex(5, -kBX, y2,  kBZ);
-   b->SetVertex(6,  kBX, y2,  kBZ);   b->SetVertex(7,  kBX, y1,  kBZ);
+   b->SetVertex(0, -kBX, -kBY, -kBZ);   b->SetVertex(1, -kBX,  kBY, -kBZ);
+   b->SetVertex(2,  kBX,  kBY, -kBZ);   b->SetVertex(3,  kBX, -kBY, -kBZ);
+   b->SetVertex(4, -kBX, -kBY,  kBZ);   b->SetVertex(5, -kBX,  kBY,  kBZ);
+   b->SetVertex(6,  kBX,  kBY,  kBZ);   b->SetVertex(7,  kBX, -kBY,  kBZ);
 
    return b;
 }
@@ -339,7 +316,7 @@ void boing(Long_t period_ms = 40)
 
    auto scene = eveMng->GetEventScene();
 
-   scene->AddElement(make_floor());
+   scene->AddElement(make_room());
 
    auto ball = new REveSMorph("Boing ball");
    ball->SetTLevel(32);
