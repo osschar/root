@@ -300,10 +300,33 @@ sap.ui.define([], function() {
          // needs the screen-space perpendicular, which is camera-dependent and
          // so cannot be baked into a static vertex buffer. Stripes computes it
          // in its vertex shader, which is exactly the job.
+         // Batched by width and colour, NOT one object per segment.
+         //
+         // A stripe buffer is read as independent two-vertex segments -- the
+         // prev/next setup keys on vertex parity -- so every line of the same
+         // style fits in one buffer and draws in one call. That is what
+         // REveStraightLineSet has always done with its whole plex.
+         //
+         // It matters more than it looks. One object per segment made 46 of
+         // them for a box, each with its own geometry, material, program setup
+         // and draw; measured by hiding the axis, that was 1.1 ms of a 1.81 ms
+         // frame -- 61%, for chrome, every frame an animation runs. Grouped it
+         // is three or four objects and the difference is not visible.
+         //
+         // The labels below were always built this way, and the comment there
+         // says why. This is the same argument applied to the lines.
+         const groups = new Map();
          for (const seg of lines) {
+            const key = seg.width + "|" + seg.color.getHex();
+            let g = groups.get(key);
+            if (!g) { g = { width: seg.width, color: seg.color, pts: [] }; groups.set(key, g); }
+            for (const c of seg.pts) g.pts.push(c);
+         }
+
+         for (const g of groups.values()) {
             const geom = new RC.Geometry();
-            geom.vertices = new RC.Float32Attribute(new Float32Array(seg.pts), 3);
-            const ss = this.viewer.creator.RcMakeStripes(geom, seg.width, seg.color);
+            geom.vertices = new RC.Float32Attribute(new Float32Array(g.pts), 3);
+            const ss = this.viewer.creator.RcMakeStripes(geom, g.width, g.color);
             this.group.add(ss);
          }
 
