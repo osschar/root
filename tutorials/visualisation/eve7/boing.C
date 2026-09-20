@@ -3,16 +3,40 @@
 /// The Amiga Boing demo, server-side.
 ///
 /// A checkered ball bounces inside the 3D axis box, which rules its floor.
-/// Everything
-/// about it is driven from the server -- position, spin and the shadow -- and
-/// every frame goes out as **one matrix per element**, under kCBTransBBox:
-/// nothing is re-tessellated, nothing is rebuilt on the client, and no geometry
-/// crosses the wire after the first frame.
+/// Everything about it is driven from the server -- position, spin, the shadow
+/// -- and nothing is re-tessellated, nothing is rebuilt on the client, and no
+/// geometry crosses the wire after the first frame.
+///
+/// The two halves of that are worth separating, because the demo uses one
+/// without the other on purpose:
+///
+///   - A transformation-only change (kCBTransBBox and nothing else) leaves the
+///     acknowledged round entirely and goes out on the motion channel: no
+///     BeginChanges/EndChanges, no acknowledgement, nothing gated on it, and
+///     the element tree and editor never hear of it. THE SHADOW USES ONLY THIS.
+///     It is placed by a matrix per update and steps at whatever rate those
+///     arrive.
+///
+///   - SetMotion() additionally says how a thing is MOVING -- velocity,
+///     acceleration, angular velocity, and how long the trajectory may be
+///     trusted. The client then evaluates it on its own frame clock and draws
+///     smoothly between updates. ONLY THE BALL DOES THIS.
+///
+/// So the ball is smooth at the display rate however rarely the server runs,
+/// and the shadow steps. That is deliberate: a shadow's exact position between
+/// updates is not worth a trajectory, and having one element of each makes the
+/// point that the cheap channel and the trajectory are independent -- an
+/// element may use the first without the second.
 ///
 /// The ball is a `REveSMorph`, ported from Gled's SMorph, with the original
 /// `checker_8.png` from gled's Geom1 demos. Select it in the browser to get its
 /// full parameter set in the editor: twist it, pinch it, shear it, cut it open
 /// in theta and phi, or retile the texture, all while it is bouncing.
+///
+/// The viewer's Ged has a Motion panel, folded away at the bottom, with the
+/// three knobs that govern all of the above: how often the stream is acted on,
+/// how often the result is drawn, and whether anything is drawn between
+/// updates.
 ///
 /// \macro_code
 ///
@@ -216,8 +240,15 @@ public:
 
       fBall->SetMotion(vel, acc, omega, (Float_t)TimeToNextBounce());
 
-      // The shadow, tightening as the ball comes down. Same mechanism, one more
-      // matrix -- no second element type, no shadow pass, no light.
+      // The shadow, tightening as the ball comes down. One more matrix -- no
+      // second element type, no shadow pass, no light.
+      //
+      // Note what it does NOT get: SetMotion(). It rides the same motion
+      // channel as the ball, but declares no trajectory, so the client never
+      // extrapolates it -- it steps to each new matrix as it arrives while the
+      // ball flies smoothly between them. A shadow's position between updates
+      // is not worth a trajectory, and it leaves one element of each kind in
+      // the demo, which is the clearest way to show the two are separable.
       //
       // It is a hemisphere (SetThetaMax(0.5)) squashed along its own polar axis
       // into a very shallow dome, NOT a flattened whole sphere. A whole one
@@ -243,7 +274,7 @@ public:
       // Sit so the *bounding box* bottom lands exactly on the floor, not 0.08
       // below it: REveSMorph's box is conservative and spans the whole sphere,
       // so half the squashed thickness hangs beneath the dome that is drawn.
-      // Being below the floor is what put the axis grid under the slab.
+      // Reaching below the floor would put it outside the declared room.
       sh.SetPos(fX, -kBY + 0.02 * kR, fZ);
       fShadow->SetTransMatrix(sh.Array());
 
