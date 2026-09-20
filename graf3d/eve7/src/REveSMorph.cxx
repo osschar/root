@@ -54,9 +54,9 @@ void REveSMorph::SetPLevel(Int_t l)
    StampObjProps();
 }
 
-void REveSMorph::SetTx(Float_t v) { fTx = std::clamp(v, -10.f, 10.f); StampObjProps(); }
-void REveSMorph::SetCx(Float_t v) { fCx = std::clamp(v, -10.f, 10.f); StampObjProps(); }
-void REveSMorph::SetRz(Float_t v) { fRz = std::clamp(v, -10.f, 10.f); StampObjProps(); }
+void REveSMorph::SetTx(Float_t v) { fTx = std::clamp(v, -2.f, 2.f); StampObjProps(); }
+void REveSMorph::SetCx(Float_t v) { fCx = std::clamp(v, -2.f, 2.f); StampObjProps(); }
+void REveSMorph::SetRz(Float_t v) { fRz = std::clamp(v, -2.f, 2.f); StampObjProps(); }
 
 /// Theta and phi extents. Deliberately not cross-checked: fThetaMin above
 /// fThetaMax sweeps the surface backwards, which is harmless and occasionally

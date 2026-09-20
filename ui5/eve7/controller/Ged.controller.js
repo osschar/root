@@ -333,11 +333,11 @@ sap.ui.define([
          this.makeSliderSetter(el.fPLevel, "PLevel", null, {min: 3, max: 100, step: 1});
 
          this.makeSliderSetter(el.fTx, "Tx", null,
-            {min: -10, max: 10, step: 0.01, tip: "Twist of phi, proportional to cos(theta)"});
+            {min: -2, max: 2, step: 0.01, tip: "Twist of phi, proportional to cos(theta)"});
          this.makeSliderSetter(el.fCx, "Cx", null,
-            {min: -10, max: 10, step: 0.01, tip: "Radial convergence, proportional to cos(theta)"});
+            {min: -2, max: 2, step: 0.01, tip: "Radial convergence, proportional to cos(theta)"});
          this.makeSliderSetter(el.fRz, "Rz", null,
-            {min: -10, max: 10, step: 0.01, tip: "Shear about z, proportional to the polar coordinate"});
+            {min: -2, max: 2, step: 0.01, tip: "Shear about z, proportional to the polar coordinate"});
 
          this.makeSliderSetter(el.fThetaMin,  "ThetaMin",  null, {min: 0, max: 1, step: 0.001});
          this.makeSliderSetter(el.fThetaMax,  "ThetaMax",  null, {min: 0, max: 1, step: 0.001});
