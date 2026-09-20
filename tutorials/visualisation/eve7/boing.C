@@ -288,7 +288,12 @@ static REveBox *make_floor()
    //
    // The declared box below still says -kBY, so the axis is where it should be;
    // only the paint moves.
-   const Float_t y1 = -kBY - 3, y2 = -kBY - 0.05f;
+   //
+   // 0.25 and not a hair's breadth: the two planes only have to be separable in
+   // the depth buffer, and at this distance a 0.05 gap is close enough to
+   // coplanar to fight. A quarter of a unit in a room sixty tall is invisible
+   // and settles it.
+   const Float_t y1 = -kBY - 3, y2 = -kBY - 0.25f;
 
    // Corner order as in box.C: 0-3 on the low-z face, 4-7 on the high-z one,
    // each running (-x,-y) (-x,+y) (+x,+y) (+x,-y).
@@ -307,7 +312,12 @@ void boing(Long_t period_ms = 40)
 
    // The box axes frame the scene and carry the scale, which is what the room
    // grid used to do and did too loudly.
-   eveMng->GetDefaultViewer()->SetAxesType(REveViewer::kAxesEdge);
+   auto viewer = eveMng->GetDefaultViewer();
+   viewer->SetAxesType(REveViewer::kAxesEdge);
+   // Y is up here, so the box axes rule the FLOOR rather than whichever face
+   // happens to point away -- from eye height inside the room that would be the
+   // ceiling, leaving the surface the ball bounces off unmarked.
+   viewer->SetAxesUpAxis(1);
 
    auto scene = eveMng->GetEventScene();
 

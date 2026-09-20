@@ -75,6 +75,25 @@ private:
    /// when the motion is wrong and you need to know whether it is the stream or
    /// the extrapolation.
    Bool_t fExtrapolateMotion{kTRUE};
+
+   /// Which axis points up -- 0/1/2 for x/y/z, -1 for "no opinion", the default.
+   ///
+   /// The box axes draw the three faces pointing away from the camera, so the
+   /// panels sit behind the scene rather than in front of it. That is right for
+   /// a scene with no preferred direction, and wrong for one standing on a
+   /// floor: from eye height inside a room the far face along up is the
+   /// CEILING, so the floor -- the one surface you want ruled -- is the one not
+   /// drawn.
+   ///
+   /// Naming the up axis makes that face always the minimum one. A floor is
+   /// safe to draw even when it faces the camera, because the scene rests on
+   /// top of it; a near side wall would cut across the view, which is what the
+   /// back-face rule is there to prevent.
+   ///
+   /// Told, not inferred. REve's camera types encode it -- XOZ means y is up --
+   /// but Axis3D deliberately measures rather than reading type names, so as not
+   /// to carry a table that has to track the enum.
+   Int_t fAxesUpAxis{-1};
    bool      fBlackBackground{false};
 
    /// How much the 3D axis labels shrink with distance, in [0, 1]. The client
@@ -163,6 +182,9 @@ public:
 
    Bool_t GetExtrapolateMotion() const { return fExtrapolateMotion; }
    void   SetExtrapolateMotion(bool);
+
+   Int_t GetAxesUpAxis() const { return fAxesUpAxis; }
+   void  SetAxesUpAxis(int);
 
    bool GetBlackBackground() const { return fBlackBackground; }
    void SetBlackBackground(bool);

@@ -87,6 +87,9 @@ sap.ui.define([], function() {
          this.style = STYLE.NONE;
          this.atten = RC.Z3DAxis.ATTEN_FIXED;
 
+         /** Which axis points up, or -1 for no opinion. See setUpAxis(). */
+         this.up_axis = -1;
+
          /** Target number of labelled ticks per axis. Unlike the projected axis
           * this is not over-provided: there is no client-side filtering step to
           * feed, because a 3D tick's position is known exactly here. */
@@ -516,6 +519,15 @@ sap.ui.define([], function() {
        * labelled edges and the tick directions -- changes only when the camera
        * crosses a face plane. That is what makes rebuilding on the key, rather
        * than every frame, correct and cheap. */
+      /** Which axis points up, from REveViewer::SetAxesUpAxis. -1 for none. */
+      setUpAxis(a) {
+         a = (a >= 0 && a <= 2) ? a : -1;
+         if (a === this.up_axis) return;
+         this.up_axis = a;
+         this._octant = null;   // the panel set changes; force a rebuild
+         this.rebuild();
+      }
+
       _octantKey(camera) {
          const c = this._camPos(camera), b = this.bbox;
          const mid = [0.5 * (b.min.x + b.max.x),
@@ -554,6 +566,19 @@ sap.ui.define([], function() {
             const camOnMaxSide = cam[a] > mid[a];
             back[a]  = camOnMaxSide ? mn[a] : mx[a];
             front[a] = camOnMaxSide ? mx[a] : mn[a];
+         }
+
+         // ...except along an axis the viewer has named as up, where the floor
+         // is drawn whichever side the camera is on. From eye height inside a
+         // scene the far face along up is the ceiling, which leaves the one
+         // surface worth ruling -- the one everything stands on -- undrawn.
+         //
+         // Safe to override only here: the scene rests on top of the floor, so a
+         // floor panel never comes between the camera and the content. A near
+         // side wall would, which is what the back-face rule is for.
+         if (this.up_axis >= 0 && this.up_axis <= 2) {
+            back[this.up_axis]  = mn[this.up_axis];
+            front[this.up_axis] = mx[this.up_axis];
          }
 
          const col  = new RC.Color(0.55, 0.55, 0.55);
