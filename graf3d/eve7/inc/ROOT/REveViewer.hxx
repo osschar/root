@@ -99,6 +99,7 @@ private:
    Float_t fAxesBBox[6]{};        ///< xmin, ymin, zmin, xmax, ymax, zmax
 
    Float_t fMotionMaxHz{60.f};    ///< see SetMotionMaxHz(); 0 freezes
+   Float_t fRenderMaxHz{0.f};     ///< see SetRenderMaxHz(); 0 is uncapped
    bool      fBlackBackground{false};
 
    /// How much the 3D axis labels shrink with distance, in [0, 1]. The client
@@ -223,6 +224,28 @@ public:
    /// as "stop". This is the one that stops it.
    Float_t GetMotionMaxHz() const { return fMotionMaxHz; }
    void    SetMotionMaxHz(Float_t);
+
+   /// Cap on how often the animation loop redraws this viewer, in frames per
+   /// second. Zero means no cap -- redraw on every display frame.
+   ///
+   /// The third knob and the cheapest. Animation renders once per display
+   /// frame, and a render is almost entirely fixed cost: measured on a scene of
+   /// two objects, 97% of the frame is RenderCore's pass chain and 3% is
+   /// everything the viewer computes before it. That cost does not shrink with
+   /// the scene, so a trivial scene pays nearly what a detector pays, and
+   /// halving the frame rate halves it.
+   ///
+   /// Between the three: MotionMaxHz decides how often the stream is ACTED on,
+   /// this decides how often the result is DRAWN, and fExtrapolateMotion
+   /// decides whether anything is drawn between updates at all. Smooth at 30
+   /// frames costs half of smooth at 60 and is hard to tell apart; stepping at
+   /// 10 is cheaper still and obvious.
+   ///
+   /// Note the zeros differ, deliberately: zero here means uncapped, because a
+   /// viewer that never redraws would be useless, while zero MotionMaxHz means
+   /// frozen, which is a state somebody actually wants.
+   Float_t GetRenderMaxHz() const { return fRenderMaxHz; }
+   void    SetRenderMaxHz(Float_t);
 
    bool GetBlackBackground() const { return fBlackBackground; }
    void SetBlackBackground(bool);

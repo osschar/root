@@ -372,14 +372,6 @@ sap.ui.define([
          // Whether this viewer evaluates streamed trajectories between updates
          // (REveElement::SetMotion) or holds each object where the last update
          // put it. Off is how you see the actual update rate.
-         // Two different things, and the names have to carry the difference:
-         // MotionMaxHz decides whether the object moves at all (0 freezes it),
-         // ExtrapolateMotion only whether the client draws between updates.
-         this.makeSliderSetter(el.MotionMaxHz, "MotionMaxHz", null,
-            {min: 0, max: 60, step: 1,
-             tip: "Updates per second this viewer applies. 0 freezes the scene."});
-         this.makeBoolSetter(el.ExtrapolateMotion, "ExtrapolateMotion");
-
          this.makeAxesTypeSelector(el);
          // Shown unconditionally: the panel is built when the viewer is
          // selected, not when AxesType changes, so hiding these while the axes
@@ -423,6 +415,35 @@ sap.ui.define([
                                     + "floating on the scene, 1 hides whatever "
                                     + "is behind it." });
          this.makeBoolSetter(el.BlackBg, "BlackBackground");
+
+         // Motion, last and folded away. Three knobs that only matter while
+         // something is actually moving, which for most scenes is never -- and
+         // they are the ones you reach for when it is too slow or too jumpy,
+         // not the ones you set to make a picture.
+         //
+         // They are also easy to confuse with each other, so they read better
+         // together under one heading than scattered among the axis settings:
+         //
+         //   MotionMaxHz        how often the update stream is ACTED on
+         //   RenderMaxHz        how often the result is DRAWN
+         //   ExtrapolateMotion  whether anything is drawn BETWEEN updates
+         let motion = new sap.m.Panel({
+            headerText: "Motion",
+            expandable: true,
+            expanded: false,
+            width: "100%"
+         });
+         this.getView().byId("GED").addContent(motion);
+
+         this.makeSliderSetter(el.MotionMaxHz, "MotionMaxHz", null,
+            {min: 0, max: 60, step: 1,
+             tip: "Updates per second this viewer applies. 0 freezes the scene."},
+            motion);
+         this.makeSliderSetter(el.RenderMaxHz, "RenderMaxHz", null,
+            {min: 0, max: 120, step: 1,
+             tip: "Animation redraws per second. 0 is uncapped -- every display frame."},
+            motion);
+         this.makeBoolSetter(el.ExtrapolateMotion, "ExtrapolateMotion", null, motion);
 
          // camera type selector
          this.makeCameraTypeSelector(el);

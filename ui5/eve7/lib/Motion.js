@@ -40,6 +40,11 @@ sap.ui.define([], function() {
            * was -- so every element in one message shares one decision. */
          this._msg_t    = null;
          this._msg_ok   = false;
+
+         /** Cap on animation-driven redraws per second; 0 is uncapped. */
+         this.render_max_hz = 0;
+         this._last_render  = 0;
+         this._pending      = 0;
       }
 
       /** How often this viewer may apply streamed motion, from
@@ -59,6 +64,55 @@ sap.ui.define([], function() {
 
          if (hz === 0) this.stop();
          else          this.start();
+      }
+
+      /** How often the animation loop may redraw, from
+        * REveViewer::SetRenderMaxHz. Zero is uncapped -- every display frame.
+        *
+        * This is the cheap knob. A render costs almost the same whatever is in
+        * the scene -- nearly all of it is the renderer's fixed per-pass work --
+        * so halving the frame rate halves the cost, and smooth at 30 is hard to
+        * tell from smooth at 60.
+        *
+        * The trajectory is still evaluated at the moment it is drawn, so a
+        * capped viewer is not behind, only coarser.
+        */
+      setRenderMaxHz(hz) {
+         this.render_max_hz = (hz > 0) ? hz : 0;
+      }
+
+      /** Ask for a redraw, subject to the cap.
+        *
+        * Everything that redraws because motion changed goes through here --
+        * the animation loop AND an arriving update. Capping only the loop
+        * leaves the stream redrawing at its own rate, which is how the first
+        * version of this measured 6 frames a second under a cap of 2.
+        *
+        * A suppressed request is not dropped but deferred: without the trailing
+        * timer the newest state could sit undrawn indefinitely, which is what
+        * would happen to the last update before a scene goes still -- and with
+        * extrapolation off there is no loop coming along later to draw it.
+        */
+      requestRender() {
+         if (this.render_max_hz <= 0) { this.viewer.request_render(); return; }
+
+         const now  = performance.now();
+         const gap  = 1000 / this.render_max_hz;
+         const wait = gap - (now - this._last_render);
+
+         if (wait <= 0) {
+            this._last_render = now;
+            this.viewer.request_render();
+            return;
+         }
+
+         if (!this._pending) {
+            this._pending = setTimeout(() => {
+               this._pending = 0;
+               this._last_render = performance.now();
+               this.viewer.request_render();
+            }, wait);
+         }
       }
 
       /** Gate for an incoming update: false means drop it.
@@ -201,14 +255,23 @@ sap.ui.define([], function() {
 
       stop() {
          if (this.raf) { cancelAnimationFrame(this.raf); this.raf = 0; }
+         if (this._pending) { clearTimeout(this._pending); this._pending = 0; }
       }
 
       tick() {
          this.raf = 0;
          if (this.objects.size === 0) return;
 
-         if (this.apply())
-            this.viewer.request_render();
+         // Skip the work entirely on a frame we are not going to draw. Not just
+         // the render -- evaluating positions nobody sees is waste too, and the
+         // next frame we do draw evaluates for ITS own instant, so nothing is
+         // lost by having missed this one.
+         const now = performance.now();
+         const due = (this.render_max_hz === 0) ||
+                     (now - this._last_render >= 1000 / this.render_max_hz);
+
+         if (due && this.apply())
+            this.requestRender();
 
          this.raf = requestAnimationFrame(this.tick.bind(this));
       }

@@ -285,7 +285,13 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
 
          // No endChanges to ask for one, and an element whose trajectory has
          // just been cleared will not be redrawn by the motion loop either.
-         if (this.glctrl && this.glctrl.viewer)
+         //
+         // Through Motion, so this obeys the viewer's render cap like the
+         // animation loop does -- otherwise the stream would redraw at its own
+         // rate and the cap would only govern half of what it names.
+         if (mo)
+            mo.requestRender();
+         else if (this.glctrl && this.glctrl.viewer)
             this.glctrl.viewer.request_render();
       }
 
