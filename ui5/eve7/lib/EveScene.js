@@ -247,6 +247,15 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
       replaceElement(el) {
          if (!this.glctrl) return;
 
+         // Any trajectory being evaluated refers to the object about to be
+         // thrown away. Left in place it would go on moving the discarded one
+         // while the replacement sat still -- until the next motion message
+         // re-registered it, so a glitch rather than a freeze, but a real one.
+         // Dropping it is enough: the next message brings it back, attached to
+         // whatever object exists then.
+         let mo = this.glctrl.viewer.motion;
+         if (mo) mo.remove(el.fElementId);
+
          let container = this.glctrl.getSceneContainer(this);
 
          try {
@@ -345,9 +354,18 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
       {
          this.need_bbox_update = true;
 
+         let mo = this.glctrl ? this.glctrl.viewer.motion : null;
+
          for (let i = 0; i < ids.length; i++)
          {
             let elId  = ids[i];
+
+            // Nothing will re-register this one -- it is gone. Left behind, its
+            // trajectory would be evaluated every frame for ever, and because
+            // the position keeps changing it would report movement and hold the
+            // render loop open at full rate. An event's worth of moving
+            // elements would do that once per event, and never give it back.
+            if (mo) mo.remove(elId);
             let obj3d = this.getObj3D(elId);
             if (!obj3d) {
                let el = this.mgr.GetElement(elId);
