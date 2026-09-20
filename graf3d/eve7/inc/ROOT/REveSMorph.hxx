@@ -81,7 +81,9 @@ protected:
    Int_t   fTLevel{24};     ///< divisions in theta
    Int_t   fPLevel{32};     ///< divisions in phi
 
-   // Morph. All zero is a plain sphere. GUI range [-10, 10], step 0.01.
+   // Morph. All zero is a plain sphere. GUI range [-2, 2], step 0.01 -- the
+   // shape stops being informative long before the ends of that, and a wider
+   // range only makes the useful part of the slider harder to hit.
    Float_t fTx{0.f};        ///< twist of phi, proportional to cos(theta)
    Float_t fCx{0.f};        ///< radial convergence, proportional to cos(theta)
    Float_t fRz{0.f};        ///< shear about z, proportional to x
