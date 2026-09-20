@@ -269,6 +269,24 @@ static REveBox *make_floor()
    b->SetFillColor(18);
    b->SetPickable(kFALSE);
 
+   // NOT DRAWN. This element exists to declare the room, and nothing else.
+   //
+   // There were two floors competing: this slab and the ruled floor of the
+   // axis box, in the same plane. The axis loses, and not for the reason it
+   // first looks like -- its lines are screen-space stripes, so their depth
+   // does not follow the surface they lie on, and a near-horizontal plane seen
+   // at a grazing angle is the worst case there is. Moving the slab 0.25 below
+   // changed nothing; five units below brought back only fragments. Turning the
+   // depth test off showed the grid had been there, whole, the entire time.
+   //
+   // So: one floor. The axis rules it, the shadow lands on it, and this keeps
+   // its job of saying how big the room is -- an invisible element still counts
+   // toward the scene bounding box.
+   //
+   // The general fix is a depth bias for chrome drawn on a surface. RenderCore
+   // has no polygon offset; see REVE-OPEN-ITEMS.md.
+   b->SetRnrSelf(kFALSE);
+
    // The slab declares the ROOM as its bounding box, not itself. Two things
    // follow, and they are the whole reason SetFixedBBox exists:
    //
@@ -293,7 +311,7 @@ static REveBox *make_floor()
    // the depth buffer, and at this distance a 0.05 gap is close enough to
    // coplanar to fight. A quarter of a unit in a room sixty tall is invisible
    // and settles it.
-   const Float_t y1 = -kBY - 3, y2 = -kBY - 0.25f;
+   const Float_t y1 = -kBY - 3, y2 = -kBY;
 
    // Corner order as in box.C: 0-3 on the low-z face, 4-7 on the high-z one,
    // each running (-x,-y) (-x,+y) (+x,+y) (+x,-y).
