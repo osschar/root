@@ -789,6 +789,8 @@ sap.ui.define([
 
          if (eveView.MotionMaxHz !== undefined && this.motion)
             this.motion.setMaxHz(eveView.MotionMaxHz);
+         if (eveView.RenderMaxHz !== undefined && this.motion)
+            this.motion.setRenderMaxHz(eveView.RenderMaxHz);
          if (eveView.ExtrapolateMotion !== undefined && this.motion)
             this.motion.setEnabled(eveView.ExtrapolateMotion);
          if (eveView.AxesAtten !== undefined)

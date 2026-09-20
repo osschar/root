@@ -149,6 +149,14 @@ void REveViewer::ClearAxesBBox()
 
 ////////////////////////////////////////////////////////////////////////////////
 
+void REveViewer::SetRenderMaxHz(Float_t hz)
+{
+   fRenderMaxHz = hz < 0.f ? 0.f : (hz > 240.f ? 240.f : hz);
+   StampObjProps();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 void REveViewer::SetMotionMaxHz(Float_t hz)
 {
    fMotionMaxHz = hz < 0.f ? 0.f : (hz > 240.f ? 240.f : hz);
@@ -268,6 +276,7 @@ int REveViewer::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
    j["ExtrapolateMotion"] = fExtrapolateMotion;
    j["AxesUpAxis"] = fAxesUpAxis;
    j["MotionMaxHz"] = fMotionMaxHz;
+   j["RenderMaxHz"] = fRenderMaxHz;
    if (fHasAxesBBox)
       j["AxesBBox"] = {fAxesBBox[0], fAxesBBox[1], fAxesBBox[2],
                        fAxesBBox[3], fAxesBBox[4], fAxesBBox[5]};
