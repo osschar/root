@@ -36,6 +36,10 @@ sap.ui.define([], function() {
          /** Cap on applied updates per second; 0 freezes. See setMaxHz(). */
          this.max_hz    = 60;
          this._last_app = 0;
+         /** The message the last accept/drop decision was made for, and what it
+           * was -- so every element in one message shares one decision. */
+         this._msg_t    = null;
+         this._msg_ok   = false;
       }
 
       /** How often this viewer may apply streamed motion, from
@@ -57,15 +61,31 @@ sap.ui.define([], function() {
          else          this.start();
       }
 
-      /** Gate for an incoming update: false means drop it. */
-      acceptUpdate() {
+      /** Gate for an incoming update: false means drop it.
+        *
+        * Decided once per MESSAGE, not per element -- `t` is the server
+        * timestamp the whole message carries, and every element in it gets the
+        * same answer.
+        *
+        * Per element it is wrong, and wrong in a way that looks like a dead
+        * object rather than a throttle: the elements of one message arrive
+        * microseconds apart, so the first spends the budget and every later one
+        * is refused, every time, for ever. In boing.C that was the ball moving
+        * and the shadow sitting where it had been at connect time.
+        */
+      acceptUpdate(t) {
          if (this.max_hz === 0) return false;
 
-         const now = performance.now();
-         if (now - this._last_app < 1000 / this.max_hz) return false;
+         if (t !== undefined && t === this._msg_t)
+            return this._msg_ok;
 
-         this._last_app = now;
-         return true;
+         const now = performance.now();
+         const ok  = (now - this._last_app) >= 1000 / this.max_hz;
+         if (ok) this._last_app = now;
+
+         this._msg_t  = t;
+         this._msg_ok = ok;
+         return ok;
       }
 
       /** Per-viewer switch, from REveViewer::SetExtrapolateMotion.

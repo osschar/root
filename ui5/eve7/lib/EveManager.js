@@ -851,6 +851,10 @@ sap.ui.define([], function() {
             let obj = this.map[em.fElementId];
             if (!obj) continue;   // gone, or not here yet -- a delete may race one of these
 
+            // The message's own timestamp, so a viewer's rate cap can decide
+            // once for the whole message rather than once per element.
+            em.msg_t = resp.t;
+
             // Keep the model in step: a later rebuild reads render_data.matrix,
             // and a stale one would put the object back where it used to be.
             if (em.matrix && obj.render_data)
