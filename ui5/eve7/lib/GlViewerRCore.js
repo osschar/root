@@ -632,7 +632,7 @@ sap.ui.define([
             this.scene_bbox.expandByPoint(new RC.Vector3(-ext,-ext,-ext));
             this.scene_bbox.expandByPoint(new RC.Vector3( ext, ext, ext));
          }
-         if (this.axis3d) this.axis3d.setBBox(this.scene_bbox);
+         if (this.axis3d) this.axis3d.setBBox(this.axes_bbox || this.scene_bbox);
 
          this.updateRenderBBox();
       }
@@ -651,7 +651,7 @@ sap.ui.define([
        * the axis style (which decides whether there is a margin at all). */
       updateRenderBBox()
       {
-         this.render_bbox = this.scene_bbox.clone();
+         this.render_bbox = (this.axes_bbox || this.scene_bbox).clone();
          if (this.axis3d) {
             const m = this.axis3d.getRenderMargin();
             if (m > 0) this.render_bbox.expandByScalar(m);
@@ -773,6 +773,22 @@ sap.ui.define([
          this.axis3d.setStyle(eveView.AxesType);
          if (eveView.AxesUpAxis !== undefined)
             this.axis3d.setUpAxis(eveView.AxesUpAxis);
+
+         // A declared axis volume replaces the computed scene box, for the axis
+         // and the clip box only -- camera framing still follows the content,
+         // so declaring a large volume does not push the view off it.
+         if (eveView.AxesBBox) {
+            let b = eveView.AxesBBox;
+            this.axes_bbox = new RC.Box3(new RC.Vector3(b[0], b[1], b[2]),
+                                         new RC.Vector3(b[3], b[4], b[5]));
+         } else {
+            this.axes_bbox = null;
+         }
+         this.axis3d.setBBox(this.axes_bbox || this.scene_bbox);
+         this.updateRenderBBox();
+
+         if (eveView.MotionMaxHz !== undefined && this.motion)
+            this.motion.setMaxHz(eveView.MotionMaxHz);
          if (eveView.ExtrapolateMotion !== undefined && this.motion)
             this.motion.setEnabled(eveView.ExtrapolateMotion);
          if (eveView.AxesAtten !== undefined)

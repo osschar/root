@@ -274,6 +274,13 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
          let el = this.mgr.GetElement(msg.fElementId);
          if (!el) return;
 
+         // The viewer's own rate cap. Dropping one of these costs nothing --
+         // they carry absolute state, so the next says everything this one
+         // would have -- which is what lets a viewer be throttled or frozen
+         // without the server knowing or caring.
+         let mo = this.glctrl ? this.glctrl.viewer.motion : null;
+         if (mo && !mo.acceptUpdate()) return;
+
          this.updateElementTrans(el, msg);
 
          // No endChanges to ask for one, and an element whose trajectory has

@@ -94,6 +94,11 @@ private:
    /// but Axis3D deliberately measures rather than reading type names, so as not
    /// to carry a table that has to track the enum.
    Int_t fAxesUpAxis{-1};
+
+   Bool_t  fHasAxesBBox{kFALSE};  ///< see SetAxesBBox()
+   Float_t fAxesBBox[6]{};        ///< xmin, ymin, zmin, xmax, ymax, zmax
+
+   Float_t fMotionMaxHz{60.f};    ///< see SetMotionMaxHz(); 0 freezes
    bool      fBlackBackground{false};
 
    /// How much the 3D axis labels shrink with distance, in [0, 1]. The client
@@ -185,6 +190,39 @@ public:
 
    Int_t GetAxesUpAxis() const { return fAxesUpAxis; }
    void  SetAxesUpAxis(int);
+
+   /// The volume the 3D axis spans, instead of whatever the scene happens to
+   /// contain.
+   ///
+   /// The scene bounding box is the union of what is in the scene, which is the
+   /// right default and the wrong answer whenever the content is not the
+   /// subject: a detector half-loaded, an event with two hits in it, a ball
+   /// bouncing in a room that is nowhere drawn. Then the axis measures the
+   /// content rather than the space, and rescales as the content comes and goes.
+   ///
+   /// Saying it outright retires the trick of putting something invisible at
+   /// the extremities to inflate the box from inside -- corner points, or the
+   /// four transparent jet cones mkFit's Shell.cc uses at twice the tracker
+   /// radius. Those work, but they are an element that exists to be counted,
+   /// and they have to be kept in step with a volume nobody wrote down.
+   ///
+   /// Only the axis and the clip box follow this. Camera framing still uses the
+   /// real content, so declaring a large volume does not push the view away
+   /// from what is actually there.
+   void SetAxesBBox(Float_t xmin, Float_t ymin, Float_t zmin,
+                    Float_t xmax, Float_t ymax, Float_t zmax);
+   void ClearAxesBBox();
+   Bool_t HasAxesBBox() const { return fHasAxesBBox; }
+
+   /// Cap on how often this viewer applies streamed motion, in updates per
+   /// second. Zero freezes it where it stands.
+   ///
+   /// Distinct from fExtrapolateMotion, which only decides whether the client
+   /// draws between updates. Turning that off still leaves the object stepping
+   /// along at whatever rate the server sends -- which is why it does not read
+   /// as "stop". This is the one that stops it.
+   Float_t GetMotionMaxHz() const { return fMotionMaxHz; }
+   void    SetMotionMaxHz(Float_t);
 
    bool GetBlackBackground() const { return fBlackBackground; }
    void SetBlackBackground(bool);

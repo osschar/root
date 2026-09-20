@@ -372,6 +372,12 @@ sap.ui.define([
          // Whether this viewer evaluates streamed trajectories between updates
          // (REveElement::SetMotion) or holds each object where the last update
          // put it. Off is how you see the actual update rate.
+         // Two different things, and the names have to carry the difference:
+         // MotionMaxHz decides whether the object moves at all (0 freezes it),
+         // ExtrapolateMotion only whether the client draws between updates.
+         this.makeSliderSetter(el.MotionMaxHz, "MotionMaxHz", null,
+            {min: 0, max: 60, step: 1,
+             tip: "Updates per second this viewer applies. 0 freezes the scene."});
          this.makeBoolSetter(el.ExtrapolateMotion, "ExtrapolateMotion");
 
          this.makeAxesTypeSelector(el);

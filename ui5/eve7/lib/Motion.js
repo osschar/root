@@ -32,6 +32,40 @@ sap.ui.define([], function() {
          this.offset  = null;        // performance.now() - server ms
          this.raf     = 0;
          this.enabled = true;
+
+         /** Cap on applied updates per second; 0 freezes. See setMaxHz(). */
+         this.max_hz    = 60;
+         this._last_app = 0;
+      }
+
+      /** How often this viewer may apply streamed motion, from
+        * REveViewer::SetMotionMaxHz. Zero freezes it where it stands.
+        *
+        * Not the same knob as setEnabled(). That one only decides whether the
+        * client draws BETWEEN updates; with it off an object still steps along
+        * at whatever rate the server sends, which is why turning it off does
+        * not read as "stop". This is the one that stops it -- and at zero it
+        * also stops extrapolating, since continuing to evaluate a trajectory
+        * while refusing its updates would be the worst of both.
+        */
+      setMaxHz(hz) {
+         hz = (hz >= 0) ? hz : 60;
+         if (hz === this.max_hz) return;
+         this.max_hz = hz;
+
+         if (hz === 0) this.stop();
+         else          this.start();
+      }
+
+      /** Gate for an incoming update: false means drop it. */
+      acceptUpdate() {
+         if (this.max_hz === 0) return false;
+
+         const now = performance.now();
+         if (now - this._last_app < 1000 / this.max_hz) return false;
+
+         this._last_app = now;
+         return true;
       }
 
       /** Per-viewer switch, from REveViewer::SetExtrapolateMotion.
@@ -141,7 +175,7 @@ sap.ui.define([], function() {
       //--------------------------------------------------------------------
 
       start() {
-         if (this.raf || this.objects.size === 0 || !this.enabled) return;
+         if (this.raf || this.objects.size === 0 || !this.enabled || this.max_hz === 0) return;
          this.raf = requestAnimationFrame(this.tick.bind(this));
       }
 

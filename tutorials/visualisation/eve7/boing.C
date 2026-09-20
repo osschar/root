@@ -21,7 +21,6 @@
 #include <ROOT/REveManager.hxx>
 #include <ROOT/REveScene.hxx>
 #include <ROOT/REveSMorph.hxx>
-#include <ROOT/REveBox.hxx>
 #include <ROOT/REveViewer.hxx>
 #include <ROOT/REveTrans.hxx>
 
@@ -253,53 +252,6 @@ public:
    }
 };
 
-////////////////////////////////////////////////////////////////////////////////
-/// The room: eight corners, never drawn.
-///
-/// There is no floor any more. There were briefly two -- a solid slab and the
-/// ruled floor of the axis box, in the same plane -- and the axis lost, for a
-/// reason worth knowing: its panels are ruled with screen-space stripes, so a
-/// line's depth comes from the line and not from the surface it lies on. On a
-/// near-horizontal plane at a grazing angle they disagree by more than any sane
-/// clearance. Moving the slab a quarter unit below changed nothing, five units
-/// below brought back fragments, and turning the depth test off showed the grid
-/// had been there, whole, the entire time. (The general fix is a depth bias for
-/// chrome drawn on a surface; RenderCore has no polygon offset. See
-/// REVE-OPEN-ITEMS.md.)
-///
-/// So the axis rules the floor and the shadow lands on it, and what remains
-/// here is the one job the slab was really doing: saying how big the room is.
-/// The scene bounding box is the union of what is in the scene, and the 3D axis
-/// takes its extents from that -- so without something to mark the corners the
-/// box would shrink to the ball and its shadow, and the axis with it.
-///
-/// This is the "inverted aquarium": rather than draw a box around the scene to
-/// contain it, put something at the extremities and let the bounding box be
-/// inflated from inside. mkFit's Shell.cc does it with four transparent jet
-/// cones at twice the tracker radius, which is also what stops a sparse event
-/// making its camera jump.
-///
-/// An invisible element still counts toward the bounding box, so the geometry
-/// here is simply the room itself and needs no help. Where geometry and
-/// intended extent genuinely differ -- a slab whose visible top is the plane
-/// that matters -- REveElement::SetFixedBBox() says so outright.
-
-static REveBox *make_room()
-{
-   auto b = new REveBox("Room");
-   b->SetRnrSelf(kFALSE);
-   b->SetPickable(kFALSE);
-
-   // Corner order as in box.C: 0-3 on the low-z face, 4-7 on the high-z one,
-   // each running (-x,-y) (-x,+y) (+x,+y) (+x,-y).
-   b->SetVertex(0, -kBX, -kBY, -kBZ);   b->SetVertex(1, -kBX,  kBY, -kBZ);
-   b->SetVertex(2,  kBX,  kBY, -kBZ);   b->SetVertex(3,  kBX, -kBY, -kBZ);
-   b->SetVertex(4, -kBX, -kBY,  kBZ);   b->SetVertex(5, -kBX,  kBY,  kBZ);
-   b->SetVertex(6,  kBX,  kBY,  kBZ);   b->SetVertex(7,  kBX, -kBY,  kBZ);
-
-   return b;
-}
-
 void boing(Long_t period_ms = 40)
 {
    auto eveMng = REveManager::Create();
@@ -313,10 +265,18 @@ void boing(Long_t period_ms = 40)
    // happens to point away -- from eye height inside the room that would be the
    // ceiling, leaving the surface the ball bounces off unmarked.
    viewer->SetAxesUpAxis(1);
+   // The axis spans the ROOM, not whatever the scene happens to hold. Without
+   // this it would measure the ball and its shadow -- the room is nowhere
+   // drawn, so there is nothing else to take it from.
+   //
+   // This is what retires the trick of putting something invisible at the
+   // extremities to inflate the bounding box from inside: an eight-corner box
+   // that existed only to be counted, which had to be kept in step with a
+   // volume nobody had written down. Now it is written down.
+   viewer->SetAxesBBox(-kBX, -kBY, -kBZ, kBX, kBY, kBZ);
 
    auto scene = eveMng->GetEventScene();
 
-   scene->AddElement(make_room());
 
    auto ball = new REveSMorph("Boing ball");
    ball->SetTLevel(32);
