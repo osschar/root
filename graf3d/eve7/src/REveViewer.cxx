@@ -130,6 +130,33 @@ void REveViewer::SetAxesType(int at)
 /// seeing what the control does, the other for a picture that makes the depth
 /// ordering unmissable.
 
+void REveViewer::SetAxesBBox(Float_t xmin, Float_t ymin, Float_t zmin,
+                             Float_t xmax, Float_t ymax, Float_t zmax)
+{
+   fAxesBBox[0] = xmin; fAxesBBox[1] = ymin; fAxesBBox[2] = zmin;
+   fAxesBBox[3] = xmax; fAxesBBox[4] = ymax; fAxesBBox[5] = zmax;
+   fHasAxesBBox = kTRUE;
+   StampObjProps();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void REveViewer::ClearAxesBBox()
+{
+   fHasAxesBBox = kFALSE;
+   StampObjProps();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void REveViewer::SetMotionMaxHz(Float_t hz)
+{
+   fMotionMaxHz = hz < 0.f ? 0.f : (hz > 240.f ? 240.f : hz);
+   StampObjProps();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 void REveViewer::SetAxesUpAxis(int a)
 {
    fAxesUpAxis = (a >= 0 && a <= 2) ? a : -1;
@@ -240,6 +267,12 @@ int REveViewer::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
    j["AxesType"] = fAxesType;
    j["ExtrapolateMotion"] = fExtrapolateMotion;
    j["AxesUpAxis"] = fAxesUpAxis;
+   j["MotionMaxHz"] = fMotionMaxHz;
+   if (fHasAxesBBox)
+      j["AxesBBox"] = {fAxesBBox[0], fAxesBBox[1], fAxesBBox[2],
+                       fAxesBBox[3], fAxesBBox[4], fAxesBBox[5]};
+   else
+      j["AxesBBox"] = nullptr;
    j["AxesAtten"] = fAxesAtten;
    j["AxesFontSize"] = fAxesFontSize;
    j["TooltipFontSize"] = fTooltipFontSize;
