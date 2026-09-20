@@ -279,7 +279,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
          // would have -- which is what lets a viewer be throttled or frozen
          // without the server knowing or caring.
          let mo = this.glctrl ? this.glctrl.viewer.motion : null;
-         if (mo && !mo.acceptUpdate()) return;
+         if (mo && !mo.acceptUpdate(msg.msg_t)) return;
 
          this.updateElementTrans(el, msg);
 
