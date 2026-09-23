@@ -828,13 +828,35 @@ sap.ui.define([], function() {
          const dom = v.canvas.parentDOM;
          if (!dom) return;
 
+         // Editor and buttons are one box, so the keyboard shortcuts are not the
+         // only way out. Ctrl-Enter and Esc still work and are named in the
+         // button tooltips, but nothing about a bare textarea says they exist.
+         const box = document.createElement('div');
+         box.style.position = "absolute";
+         box.style.zIndex = 1000;
+         box.style.display = "flex";
+         box.style.flexDirection = "column";
+         box.style.background = "#fff";
+         box.style.border = "1px solid #888";
+         box.style.boxShadow = "0 2px 8px rgba(0,0,0,0.35)";
+
          const ta = document.createElement('textarea');
          ta.value = this.text_obj.text;
-         ta.style.position = "absolute";
-         ta.style.zIndex = 1000;
          ta.style.font = "13px monospace";
          ta.style.minWidth = "220px";
          ta.style.minHeight = "70px";
+         ta.style.border = "none";
+         ta.style.outline = "none";
+         ta.style.margin = "0";
+         ta.style.padding = "4px";
+         ta.style.resize = "both";
+
+         const row = document.createElement('div');
+         row.style.display = "flex";
+         row.style.justifyContent = "flex-end";
+         row.style.gap = "4px";
+         row.style.padding = "4px";
+         row.style.borderTop = "1px solid #ddd";
 
          // Over the annotation itself: the thing being edited should not be
          // somewhere else on the screen while it is edited.
@@ -842,27 +864,65 @@ sap.ui.define([], function() {
          const r = this.text_obj.getScreenRect(aspect);
          const px = (v.canvas.pixelRatio || 1);
          if (r) {
-            ta.style.left = (Math.min(r.x0, r.x1) * v.canvas.width / px) + "px";
-            ta.style.top  = ((1 - Math.max(r.y0, r.y1)) * v.canvas.height / px) + "px";
+            box.style.left = (Math.min(r.x0, r.x1) * v.canvas.width / px) + "px";
+            box.style.top  = ((1 - Math.max(r.y0, r.y1)) * v.canvas.height / px) + "px";
          }
 
+         // Guarded, because every route out of the editor is reachable twice:
+         // removing a focused element fires blur, which used to call close() a
+         // second time and throw NotFoundError out of remove(). Escape was worse
+         // than noisy -- the blur that followed it applied the edit that Escape
+         // had just abandoned.
+         let closed = false;
          const close = (apply) => {
+            if (closed) return;
+            closed = true;
             if (apply) this.setText(ta.value);
-            ta.remove();
+            box.remove();
             this._editor = null;
          };
+
+         const button = (label, title, apply) => {
+            const b = document.createElement('button');
+            b.textContent = label;
+            b.title = title;
+            b.style.font = "12px sans-serif";
+            b.style.padding = "2px 10px";
+            b.style.cursor = "pointer";
+            // Take the click without taking the focus, so the textarea never
+            // blurs and focusout below stays a click-away-to-save.
+            b.addEventListener('mousedown', (e) => e.preventDefault());
+            b.addEventListener('click', (e) => { e.stopPropagation(); close(apply); });
+            return b;
+         };
+         row.appendChild(button("Discard", "Esc", false));
+         row.appendChild(button("Save", "Ctrl-Enter", true));
+
          ta.addEventListener('keydown', (e) => {
+            // Every key is stopped here. The viewer keeps a window-level keydown
+            // handler in which bare t, e and r rescale line widths, so typing any
+            // of the three into the editor would also rescale the scene.
+            e.stopPropagation();
             // Esc abandons; Ctrl/Cmd-Enter applies. Plain Enter must stay a
             // newline -- these strings are multi-line by nature.
-            if (e.key === "Escape") { e.stopPropagation(); close(false); }
+            if (e.key === "Escape") { e.preventDefault(); close(false); }
             else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-               e.stopPropagation(); close(true);
+               e.preventDefault(); close(true);
             }
          });
-         ta.addEventListener('blur', () => close(true));
 
-         dom.appendChild(ta);
-         this._editor = ta;
+         // Clicking outside still saves, as it did before the buttons existed.
+         // focusout rather than blur, so moving focus within the box is not an
+         // exit; the buttons decline focus anyway, this covers the tab key.
+         box.addEventListener('focusout', (e) => {
+            if (box.contains(e.relatedTarget)) return;
+            close(true);
+         });
+
+         box.appendChild(ta);
+         box.appendChild(row);
+         dom.appendChild(box);
+         this._editor = box;
          ta.focus();
          ta.select();
       }
