@@ -46,7 +46,12 @@ sap.ui.define([
          this.top_path = jsrp.substring(0, jsrp.length - 10);
          this.eve_path = this.top_path + 'rootui5sys/eve7/';
 
-         this._logLevel = 3; // 0 - error, 1 - warning, 2 - info, 3 - debug
+         // 0 - error, 1 - warning, 2 - info, 3 - debug. Debug prints on every
+         // overlay pick and every picking pass, which is once per pointer move,
+         // so it drowns anything else in the console. Raise it with RQ_LogLevel
+         // when chasing a pick problem.
+         let log_mm = /^[0-3]$/.exec(urlParams.get('RQ_LogLevel'));
+         this._logLevel = (log_mm) ? parseInt(log_mm[0]) : 1;
 
          if (this._logLevel > 2) {
             console.log("GlViewerRCore RQ_Mode:", this.RQ_Mode, "RQ_SSAA:", this.RQ_SSAA,
