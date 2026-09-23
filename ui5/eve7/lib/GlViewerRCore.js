@@ -1258,12 +1258,48 @@ sap.ui.define([
 
          if (this.highlighted_top_object !== pstate.top_object)
             this._ttip_text = (pstate.object && pstate.eve_el) ? c.getTooltipText(idx) : "";
+         // Which pick the displayed text belongs to. Stamped on every hover, not
+         // only when the object changes, so that a server push landing after this
+         // hover is attributed to the index that asked for it.
+         this._ttip_key = GlViewerRCore.ttipKey(pstate, idx);
          this.highlighted_top_object = pstate.top_object;
 
          // Position and edge-flipping now belong to the tooltip itself: it is a
          // ZText in the overlay scene, so it knows its own laid-out box and does
          // not need the DOM offset arithmetic this used to do against the view.
          this.annotations.showTooltip(this._ttip_text, x, y);
+      }
+
+      /** Identity of a pick, for matching a displayed tooltip to a later pick. */
+      static ttipKey(pstate, idx)
+      {
+         if (!pstate || !pstate.eve_el) return null;
+         return pstate.eve_el.fElementId + ":" + idx;
+      }
+
+      /** The text an annotation should carry for this pick.
+       *
+       * Prefer what the tooltip is actually showing. For secondary-selectable
+       * elements -- REveDataItemList, REveDigitSet, REveCaloData, REveGeoTopNode
+       * -- that text came from the server: REveSelection streams
+       * GetHighlightTooltip() in the highlight record and remoteToolTip() installs
+       * it. Those elements have no client-side tooltip of their own, so
+       * ctrl.getTooltipText() falls through to EveElemControl's fTitle || fName,
+       * which is a single line. Recomputing it here is what made an annotation on
+       * a FireworksWeb collection item keep the first line and drop every line the
+       * server had added -- while the tooltip beside it showed all of them.
+       *
+       * The key guards against annotating text that belongs to something else:
+       * the menu's own DOM opening over the canvas fires pointerleave, which
+       * clears the highlight but not the text, and the menu takes a fresh pick
+       * that need not land on what was last hovered. */
+      tooltipTextForPick(pstate, idx)
+      {
+         const key = GlViewerRCore.ttipKey(pstate, idx);
+         if (key && key === this._ttip_key && this._ttip_text)
+            return this._ttip_text;
+         return (pstate.ctrl && typeof pstate.ctrl.getTooltipText === "function")
+              ? pstate.ctrl.getTooltipText(idx) : "";
       }
 
       remoteToolTip(msg)
@@ -1344,8 +1380,7 @@ sap.ui.define([
             // everything the tooltip had anyway, and depth besides.
             if (this.annotations) {
                const idx = pstate.ctrl ? pstate.ctrl.extractIndex(pstate.instance) : null;
-               const txt = (pstate.ctrl && typeof pstate.ctrl.getTooltipText === "function")
-                         ? pstate.ctrl.getTooltipText(idx) : "";
+               const txt = this.tooltipTextForPick(pstate, idx);
                if (txt) {
                   // What the annotation is ABOUT. Kept so it can die with its
                   // subject -- in an event display the picked object is gone by
