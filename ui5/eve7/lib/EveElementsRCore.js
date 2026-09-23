@@ -154,7 +154,6 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager) {
 
    class Calo3DControl extends EveElemControl {
       DrawForSelection(sec_idcs, res, extra) {
-         console.log("CALO 3d draw for selection ", extra);
          let eve_el = this.invoke_obj.eve_el;
          // locate REveCaloData cells for this object
          let cells;
@@ -1913,12 +1912,9 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager) {
 
             let pthis = this;
             obj3d.get_ctrl = function (iobj, tobj) {
-               console.log("get crtl ", iobj, tobj);
                let octrl = new EveElemControl(iobj, tobj);
 
                octrl.extractIndex = function (instance) {
-                  console.log("AMT extreact index ", instance);
-                  console.log("objs: invoke type ", this.invoke_obj.type, "top obj ", this.top_obj.type);
                   return instance;
                }
 
