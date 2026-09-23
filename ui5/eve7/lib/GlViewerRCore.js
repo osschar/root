@@ -1399,7 +1399,7 @@ sap.ui.define([
                   if (w) {
                      const dc = { a: this.annotations, txt: txt, tgt: tgt,
                                   ox: event.offsetX, oy: event.offsetY, w: w };
-                     menu.add("Annotate && connect", dc,
+                     menu.add("Annotate & connect", dc,
                               function(q) { q.a.keepAt(q.txt, q.ox, q.oy, q.w, q.tgt); });
                   }
                }
