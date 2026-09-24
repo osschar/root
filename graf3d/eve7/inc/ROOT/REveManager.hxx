@@ -217,12 +217,6 @@ public:
    /// last acknowledgement. Guarded by fServerState.fMutex.
    bool fPendingSceneChanges{false};
 
-   /// True when every client has acknowledged the last round of changes. A
-   /// producer on its own schedule must poll this; see the method comment.
-   bool IsCaughtUpWithClients();
-
-
-
    void DisableRedraw() { printf("REveManager::DisableRedraw obsolete \n"); }
    void EnableRedraw()  { printf("REveManager::EnableRedraw obsolete \n");  }
 

@@ -1267,30 +1267,6 @@ void REveManager::SendBinary(unsigned connid, const void *data, std::size_t len)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// True when the last round of changes has been acknowledged by every client.
-///
-/// A producer driven by its own clock must poll this and skip a round it cannot
-/// yet afford. BeginChange() will not hold it back: that waits only while
-/// another producer is mid-update, never while clients are still catching up,
-/// and nothing else bounds the queue.
-///
-/// It is a query rather than a wait because `__REveDoneChanges` arrives on the
-/// main thread, which is also where a TTimer fires -- a main-thread producer
-/// that blocked for the acknowledgement would block the only thread that can
-/// deliver it. A producer on its own thread may block instead.
-///
-/// Skipping is safe for anything drawing current state rather than a sequence
-/// of edits: the next round carries the newer state anyway.
-
-bool REveManager::IsCaughtUpWithClients()
-{
-   std::unique_lock<std::mutex> lock(fServerState.fMutex);
-   return fServerState.fVal == ServerState::Waiting;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-////////////////////////////////////////////////////////////////////////////////
 /// Is there anything stamped and not yet streamed?
 
 bool REveManager::AnySceneChanged() const
@@ -1363,30 +1339,10 @@ void REveManager::BeginChange()
 }
 
 //____________________________________________________________________
-/// Close a round of changes and stream it -- unless the clients are still
-/// working through the previous one, in which case keep the stamps and let the
-/// last acknowledgement flush them.
-///
-/// Holding changes back is safe, and it is what stops a producer on its own
-/// clock from queueing rounds faster than they drain. It rests on two things
-/// that were already true:
-///
-///   - A change message carries the element's **current state**, not a delta.
-///     StreamRepresentationChanges() writes what the element is now, so a round
-///     that is never streamed loses nothing -- the next one says the same thing,
-///     only newer.
-///   - Stamps already coalesce. AddStamp() enqueues an element once and ORs the
-///     bits into it, so an element stamped fifty times while the link is busy is
-///     still one entry, streamed once, with its latest values.
-///
-/// Together those make accumulate-and-flush automatically latest-wins, with no
-/// bookkeeping and nothing for the producer to think about. Before this, every
-/// producer had to poll IsCaughtUpWithClients() and skip for itself, and nothing
-/// obliged a new one to bother.
-///
-/// The MIR path streams directly and is deliberately not deferred: a client that
-/// asked for something is owed an answer, and there is one round per request in
-/// any case.
+/// Close a round of changes and stream it, unless the clients have not yet
+/// acknowledged the previous one; then keep the stamps and let the last
+/// acknowledgement flush them. Nothing is lost: a change carries the element's
+/// current state and stamps coalesce per element. MIR rounds are not held back.
 
 void REveManager::EndChange()
 {
