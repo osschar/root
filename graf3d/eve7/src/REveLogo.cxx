@@ -21,7 +21,19 @@ using namespace ROOT::Experimental;
 
 /** \class REveLogo
 \ingroup REve
-A screen-space image for an overlay scene. See the header.
+A screen-space image for an overlay scene: an experiment logo, a watermark.
+
+Rendered client-side as a RenderCore ZSprite in screen space, so the size is
+in CSS pixels and stays constant as the camera moves, and the shape comes
+from the image's own alpha rather than from the quad. Like other overlay
+elements it can be moved, and resized from its corner grip, entirely in the
+client -- nothing is sent back, so two people watching the same scene place
+their logo independently.
+
+The image is served from a directory registered once with SetImageDir(),
+which maps it under "eve-images/" the same way REveText maps its SDF fonts.
+The images themselves are not shipped with ROOT; point this at wherever the
+experiment keeps them.
 */
 
 std::string REveLogo::sImageDir;

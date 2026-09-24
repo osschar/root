@@ -26,10 +26,8 @@ namespace Experimental {
 
 ////////////////////////////////////////////////////////////////////////////////
 /// How a transformation is changing: the state REveTrans::SetMotion() records.
-///
 /// Held by pointer and allocated on demand, the way REveElement holds its
-/// REveTrans, because most transformations never move and would otherwise carry
-/// this for nothing.
+/// REveTrans, because most transformations never move.
 
 struct REveDeltaTrans
 {
@@ -75,20 +73,8 @@ public:
    REveTrans(const Float_t arr[16]);
    ~REveTrans() override {}
 
-   // Streamed motion
-   //
-   // Says how this transformation is changing, so the client can evaluate
-   //     p(t) = p0 + v*dt + 0.5*a*dt^2,  dt = min(now - t0, max_dt)
-   // on its own frame clock and draw smooth motion between updates. Under
-   // constant acceleration that is the trajectory, not an approximation.
-   //
-   // max_dt is what makes it safe: extrapolation holds only until something the
-   // client cannot know about happens -- a bounce, a new event -- and past the
-   // window the client stops at the last valid point rather than sailing on.
-   //
-   // Spin is an axis and a rate, in the LOCAL frame, so "turns about its own
-   // axis at this rate" is said once and does not have to be restated every
-   // time the orientation changes.
+   // Streamed motion: how this transformation is changing, so the client can
+   // extrapolate between updates. Spin is an axis and rate in the LOCAL frame.
    // @{
    void SetMotion(const REveVectorD &vel, const REveVectorD &acc, Double_t max_dt);
    void SetMotion(const REveVectorD &vel, const REveVectorD &acc,

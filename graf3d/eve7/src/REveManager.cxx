@@ -1078,22 +1078,14 @@ void REveManager::StreamSceneChangesToJson()
 
 ////////////////////////////////////////////////////////////////////////////////
 /// The motion channel: transformation-only changes, on the same websocket but
-/// outside the round protocol.
+/// outside the round protocol -- no BeginChanges/EndChanges envelope and no
+/// acknowledgement, so nothing gates the next update on the slowest client.
 ///
-/// No BeginChanges/EndChanges envelope, no acknowledgement, and so nothing to
-/// gate the next update on the slowest client. On the client it reaches the 3D
-/// representations directly and the element tree and editor never hear of it --
-/// by construction, rather than by asking them to filter.
-///
-/// Pacing without an acknowledgement: RWebWindow::CanSend(id, true) is false
+/// RWebWindow::CanSend(id, true) is the whole of the flow control. It is false
 /// while that connection's queue is non-empty, its credits are spent, or a send
-/// is in flight. Asking it before each send is the whole of the flow control --
-/// a client that is behind is simply skipped this time, and picks up the next
-/// message, which carries newer state anyway. An acknowledgement would only
-/// tell us the same thing one round-trip later.
-///
-/// A skipped client loses nothing: these messages are absolute state, not
-/// deltas, so the next one says everything the missed one would have.
+/// is in flight, so a client that is behind is skipped this time. Nothing is
+/// lost: these messages are absolute state rather than deltas, and the next one
+/// says everything the missed one would have.
 
 void REveManager::SendMotionChanges()
 {
@@ -1277,28 +1269,18 @@ void REveManager::SendBinary(unsigned connid, const void *data, std::size_t len)
 ////////////////////////////////////////////////////////////////////////////////
 /// True when the last round of changes has been acknowledged by every client.
 ///
-/// A producer driven by its own clock has to poll this and **skip** a round it
-/// cannot yet afford, because BeginChange() will not hold it back: that method
-/// waits only while another producer is mid-update (kUpdatingScenes), never
-/// while clients are still catching up (kUpdatingClients). Nothing else bounds
-/// the queue, so a producer that ignores this keeps handing the websocket
-/// rounds faster than they drain, and the lag grows without limit -- and grows
-/// faster with every extra client, since a round is only complete once the
-/// slowest of them has answered.
+/// A producer driven by its own clock must poll this and skip a round it cannot
+/// yet afford. BeginChange() will not hold it back: that waits only while
+/// another producer is mid-update, never while clients are still catching up,
+/// and nothing else bounds the queue.
 ///
-/// It is a query and not a wait on purpose. `__REveDoneChanges` arrives through
-/// RWebWindow's data callback, which the ROOT event loop dispatches on the main
-/// thread -- the same thread a TTimer fires on. A main-thread producer that
-/// blocked for the acknowledgement would be blocking the only thread that can
-/// deliver it. A producer on a thread of its own may block instead, as
-/// event_demo.C's autoplay does.
+/// It is a query rather than a wait because `__REveDoneChanges` arrives on the
+/// main thread, which is also where a TTimer fires -- a main-thread producer
+/// that blocked for the acknowledgement would block the only thread that can
+/// deliver it. A producer on its own thread may block instead.
 ///
-/// Dropping a round is the right response for anything that draws the current
-/// state rather than a sequence of edits: the next round carries the newer
-/// state anyway, so the skipped one had nothing to add.
-
-
-////////////////////////////////////////////////////////////////////////////////
+/// Skipping is safe for anything drawing current state rather than a sequence
+/// of edits: the next round carries the newer state anyway.
 
 bool REveManager::IsCaughtUpWithClients()
 {

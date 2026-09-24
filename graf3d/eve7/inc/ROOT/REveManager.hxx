@@ -217,12 +217,8 @@ public:
    /// last acknowledgement. Guarded by fServerState.fMutex.
    bool fPendingSceneChanges{false};
 
-   /// True when every client has acknowledged the last round of changes, so a
-   /// new one would go out on an empty queue.
-   ///
-   /// For a producer that generates changes on its own schedule -- an animation
-   /// timer, a detector poll -- rather than in response to a client. See the
-   /// method comment for why such a producer must ask instead of being blocked.
+   /// True when every client has acknowledged the last round of changes. A
+   /// producer on its own schedule must poll this; see the method comment.
    bool IsCaughtUpWithClients();
 
 

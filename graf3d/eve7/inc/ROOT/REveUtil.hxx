@@ -61,13 +61,9 @@ public:
 
    // Math utilities
 
-   /// Milliseconds from a monotonic clock, counted from first use.
-   ///
-   /// The time base for streamed motion, see REveTrans::SetMotion(). It is
-   /// deliberately not a wall clock: the client's may be seconds off and may
-   /// step, and all that is needed is a steadily advancing origin both ends can
-   /// agree on. The client recovers the offset by watching how long ago the
-   /// updates it receives claim to be -- see EveManager's clock notes.
+   /// Milliseconds from a monotonic clock, counted from first use. The time
+   /// base for streamed motion, see REveTrans::SetMotion(). Not a wall clock:
+   /// only a steadily advancing origin both ends agree on is needed.
    static double ServerTimeMs();
 
    static Bool_t IsU1IntervalContainedByMinMax(Float_t minM, Float_t maxM, Float_t minQ, Float_t maxQ);

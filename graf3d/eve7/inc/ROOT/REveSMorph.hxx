@@ -22,53 +22,6 @@
 namespace ROOT {
 namespace Experimental {
 
-////////////////////////////////////////////////////////////////////////////////
-/// REveSMorph
-///
-/// A parametric, texture-mapped surface of spherical topology -- a sphere that
-/// can be twisted, pinched and sheared, and cut down to a patch in theta and
-/// phi. Ported from Gled's `SMorph` (libsets/Geom1/Glasses/SMorph.{h,cxx}),
-/// whose parameter names it keeps so the two can be read side by side.
-///
-/// **The geometry is built on the client, not here.** That is unusual for REve,
-/// where tessellation is normally server-side, and it is deliberate: this
-/// surface is textured, and `REveRenderData` has no channel for texture
-/// coordinates -- only vertices, normals, indices and the transformation
-/// matrix. Rather than widen the wire format for every element that will never
-/// have a UV, the parameters are streamed and `makeSMorph` in
-/// `EveElementsRCore.js` runs the same construction there. `REveLogo` streams
-/// itself the same way and for a related reason.
-///
-/// The surface is generated at unit size and scaled by the element's own
-/// transformation, exactly as Gled's SMorph used its ZNode scale. So the radius
-/// costs nothing to animate: it rides in `fMainTrans` along with position and
-/// orientation, and a change to any of them streams as one matrix under
-/// kCBTransBBox without the client rebuilding anything. Everything else here is
-/// shape, and changing it does force a rebuild -- hence StampObjProps().
-///
-/// The parametrisation, with ct = cos(theta), st = sin(theta):
-///
-///     twist = ct * fTx,  conv = ct * fCx
-///     x = ct
-///     y = (1 + conv) * st * cos(phi + twist)
-///     z = (1 + conv) * st * sin(phi + twist)
-///
-/// followed by a rotation about z through x * fRz, which shears the whole body
-/// along its polar axis. Note the polar axis is **x**, as in the original, not
-/// the more usual z. The normal is taken to be the position itself, which is
-/// exact for the unmorphed sphere and a good approximation for small fTx, fCx
-/// and fRz -- also as in the original.
-///
-/// Texture coordinates are laid out as
-///
-///     u = fTexX0 + fTexXC * phi / 2pi
-///     v = fTexY0 + fTexYC * acos(ct) / pi
-///
-/// with fTexYOff, if set, adding int(v) * fTexYOff to u, which offsets
-/// successive wraps against each other -- a brick bond rather than a grid.
-///
-/// Worked example: `tutorials/visualisation/eve7/boing.C`.
-////////////////////////////////////////////////////////////////////////////////
 
 class REveSMorph : public REveElement,
                    public TAttBBox
@@ -99,12 +52,9 @@ protected:
    /// which keeps the quads near the poles from collapsing.
    Bool_t  fEquiSurf{kFALSE};
 
-   /// Surface colour, multiplied by the texture where there is one.
-   ///
-   /// It has to be a member with SetMainColorPtr() pointing at it: REveElement
-   /// keeps only a *pointer* to whichever field a subclass nominates, and
-   /// leaves it null. SetMainColor() on a class that has not nominated one is a
-   /// silent no-op and GetMainColor() answers 0, which is white.
+   /// Surface colour, multiplied by the texture where there is one. Must be a
+   /// member with SetMainColorPtr() pointing at it, or SetMainColor() is a
+   /// silent no-op.
    Color_t fColor{kWhite};
 
    /// File name under ui5/eve7/textures/. Empty draws in the main colour.
@@ -120,14 +70,8 @@ public:
    REveSMorph(const std::string &n = "REveSMorph", const std::string &t = "");
    ~REveSMorph() override = default;
 
-   /// Shape and texture parameters. Each changes the generated geometry, so each
-   /// stamps kCBObjProps and the client rebuilds. Size is not here: it is the
-   /// transformation, see SetRadius().
-   ///
-   /// The clamps double as the GUI ranges, mirrored exactly by this class's Ged
-   /// sliders, so moving a clamp moves the slider with it. Theta and phi extents
-   /// are deliberately not cross-checked: fThetaMin above fThetaMax sweeps the
-   /// surface backwards, which is harmless and occasionally wanted.
+   /// Shape and texture parameters; each stamps kCBObjProps. The clamps double
+   /// as the Ged slider ranges. Size is the transformation, see SetRadius().
    /// @{
    Int_t GetTLevel() const { return fTLevel; }
    Int_t GetPLevel() const { return fPLevel; }

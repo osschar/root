@@ -66,33 +66,13 @@ private:
 
    EAxesType fAxesType{kAxesNone};
 
-   /// Evaluate streamed trajectories between updates, or hold each object where
-   /// the last update put it. See REveElement::SetMotion and Motion.js.
-   ///
-   /// Per viewer and client-applied, like the axis settings: what it controls is
-   /// how this viewer draws between updates, not what the server sends. Turning
-   /// it off is how you see the raw update rate -- which is the thing to look at
-   /// when the motion is wrong and you need to know whether it is the stream or
-   /// the extrapolation.
+   /// Instruct the client-side viewer to use the streamed velocity and
+   /// acceleration to animate the moving objects. Off holds each object where
+   /// the last update put it, which is how you see the raw update rate.
    Bool_t fExtrapolateMotion{kTRUE};
 
-   /// Which axis points up -- 0/1/2 for x/y/z, -1 for "no opinion", the default.
-   ///
-   /// The box axes draw the three faces pointing away from the camera, so the
-   /// panels sit behind the scene rather than in front of it. That is right for
-   /// a scene with no preferred direction, and wrong for one standing on a
-   /// floor: from eye height inside a room the far face along up is the
-   /// CEILING, so the floor -- the one surface you want ruled -- is the one not
-   /// drawn.
-   ///
-   /// Naming the up axis makes that face always the minimum one. A floor is
-   /// safe to draw even when it faces the camera, because the scene rests on
-   /// top of it; a near side wall would cut across the view, which is what the
-   /// back-face rule is there to prevent.
-   ///
-   /// Told, not inferred. REve's camera types encode it -- XOZ means y is up --
-   /// but Axis3D deliberately measures rather than reading type names, so as not
-   /// to carry a table that has to track the enum.
+   /// Which axis points up -- 0/1/2 for x/y/z, -1 for no opinion, the default.
+   /// Named so the box axis rules the floor rather than the ceiling.
    Int_t fAxesUpAxis{-1};
 
    Bool_t  fHasAxesBBox{kFALSE};  ///< see SetAxesBBox()
@@ -102,51 +82,21 @@ private:
    Float_t fRenderMaxHz{0.f};     ///< see SetRenderMaxHz(); 0 is uncapped
    bool      fBlackBackground{false};
 
-   /// How much the 3D axis labels shrink with distance, in [0, 1]. The client
-   /// scales each label's screen offset by pow(w_ref / w, fAxesAtten): 0 keeps
-   /// a constant pixel size at any distance, 1 shrinks exactly like geometry,
-   /// and in between is the readable compromise. Like the look parameters
-   /// below it is applied entirely on the client -- it is here so that every
-   /// client of the viewer agrees on it and it survives a reload.
-   ///
-   /// It is not a perceptual scale: how much it reads depends on the scene's
-   /// depth spread against the camera distance, so on a small scene viewed
-   /// from outside even 1 is barely visible. Which is why the setter clamps to
-   /// [-4, 8] rather than [0, 1]: 1 is the physically honest value, past it is
-   /// exaggeration, and below 0 is inverse perspective with the far labels
-   /// largest. Default 0, the safe look.
+   /// Distance attenuation of the 3D axis labels; see SetAxesAtten().
    Float_t   fAxesAtten{1.f};
 
-   /// Label size for the 3D axis, as a fraction of viewport height -- the units
-   /// ZText uses in every screen-space mode. Client-applied like fAxesAtten and
-   /// here for the same reason. Unlike attenuation this one is baked into the
-   /// glyph geometry, so a change costs a rebuild on the client; it is a knob to
-   /// set, not one to drag continuously.
+   /// 3D axis label size, as a fraction of viewport height. Baked into the
+   /// glyph geometry, so a change costs a rebuild on the client.
    Float_t   fAxesFontSize{0.015f};
 
-   /// Label size for the hover tooltip, same units and same reasoning as
-   /// fAxesFontSize. Separate from it because the two are read at different
-   /// distances and for different lengths of time: an axis number is glanced at
-   /// in passing, a tooltip is read.
+   /// Tooltip text size, same units as fAxesFontSize.
    Float_t   fTooltipFontSize{0.012f};
 
-   /// Opacity of the plate behind the tooltip and behind kept annotations, in
-   /// [0, 1]. Unlike the font size this DOES reach annotations already placed:
-   /// size is baked into their geometry and is part of what one is, where
-   /// opacity is pure appearance and wanting it changed means wanting it
-   /// changed everywhere.
+   /// Opacity of the plate behind the tooltip and kept annotations, in [0, 1].
+   /// Unlike the font size this does reach annotations already placed.
    Float_t   fTooltipAlpha{0.85f};
 
-   /// Look of the render, per viewer. These reach the client as plain fields and
-   /// are applied there; nothing about them needs a server round trip except
-   /// that the value is shared, so every client of the viewer agrees.
-   ///
-   /// fLightScale multiplies whatever intensities the client's own light rig
-   /// uses, so 1.0 reproduces the historical look. The default is below 1
-   /// deliberately: the rig was tuned against a compositing bug that darkened
-   /// everything translucent, and once that was fixed the lights were left
-   /// pushing about a third of the image above white, where the tone curve
-   /// flattens exactly the highlights that specular lives in.
+   /// Multiplier on the client's light intensities; see SetLightScale().
    Float_t   fLightScale{0.85};
    Int_t     fToneMapMode{kToneKnee};
    Float_t   fToneMapKnee{0.95};
@@ -192,58 +142,23 @@ public:
    Int_t GetAxesUpAxis() const { return fAxesUpAxis; }
    void  SetAxesUpAxis(int);
 
-   /// The volume the 3D axis spans, instead of whatever the scene happens to
-   /// contain.
-   ///
-   /// The scene bounding box is the union of what is in the scene, which is the
-   /// right default and the wrong answer whenever the content is not the
-   /// subject: a detector half-loaded, an event with two hits in it, a ball
-   /// bouncing in a room that is nowhere drawn. Then the axis measures the
-   /// content rather than the space, and rescales as the content comes and goes.
-   ///
-   /// Saying it outright retires the trick of putting something invisible at
-   /// the extremities to inflate the box from inside -- corner points, or the
-   /// four transparent jet cones mkFit's Shell.cc uses at twice the tracker
-   /// radius. Those work, but they are an element that exists to be counted,
-   /// and they have to be kept in step with a volume nobody wrote down.
-   ///
-   /// Only the axis and the clip box follow this. Camera framing still uses the
-   /// real content, so declaring a large volume does not push the view away
-   /// from what is actually there.
+   /// The volume the 3D axis spans, instead of whatever the scene contains --
+   /// which otherwise rescales as content comes and goes. Only the axis and the
+   /// clip box follow it; camera framing still uses the real content.
    void SetAxesBBox(Float_t xmin, Float_t ymin, Float_t zmin,
                     Float_t xmax, Float_t ymax, Float_t zmax);
    void ClearAxesBBox();
    Bool_t HasAxesBBox() const { return fHasAxesBBox; }
 
    /// Cap on how often this viewer applies streamed motion, in updates per
-   /// second. Zero freezes it where it stands.
-   ///
-   /// Distinct from fExtrapolateMotion, which only decides whether the client
-   /// draws between updates. Turning that off still leaves the object stepping
-   /// along at whatever rate the server sends -- which is why it does not read
-   /// as "stop". This is the one that stops it.
+   /// second. Zero freezes it, which fExtrapolateMotion does not -- that only
+   /// decides whether the client draws between updates.
    Float_t GetMotionMaxHz() const { return fMotionMaxHz; }
    void    SetMotionMaxHz(Float_t);
 
    /// Cap on how often the animation loop redraws this viewer, in frames per
-   /// second. Zero means no cap -- redraw on every display frame.
-   ///
-   /// The third knob and the cheapest. Animation renders once per display
-   /// frame, and a render is almost entirely fixed cost: measured on a scene of
-   /// two objects, 97% of the frame is RenderCore's pass chain and 3% is
-   /// everything the viewer computes before it. That cost does not shrink with
-   /// the scene, so a trivial scene pays nearly what a detector pays, and
-   /// halving the frame rate halves it.
-   ///
-   /// Between the three: MotionMaxHz decides how often the stream is ACTED on,
-   /// this decides how often the result is DRAWN, and fExtrapolateMotion
-   /// decides whether anything is drawn between updates at all. Smooth at 30
-   /// frames costs half of smooth at 60 and is hard to tell apart; stepping at
-   /// 10 is cheaper still and obvious.
-   ///
-   /// Note the zeros differ, deliberately: zero here means uncapped, because a
-   /// viewer that never redraws would be useless, while zero MotionMaxHz means
-   /// frozen, which is a state somebody actually wants.
+   /// second. Zero means uncapped -- note fMotionMaxHz's zero means frozen.
+   /// A render is nearly all fixed cost, so halving the rate halves it.
    Float_t GetRenderMaxHz() const { return fRenderMaxHz; }
    void    SetRenderMaxHz(Float_t);
 
@@ -272,10 +187,8 @@ public:
    void SetToneMapKnee(Float_t k);
 
    /// Ask the clients to pick a light scale that keeps the brightest channel
-   /// just below white. Only the client can do this -- the dynamic range is a
-   /// property of the rendered buffer, which exists nowhere else -- so this
-   /// just requests it, and the client reports its choice back through
-   /// SetLightScale(), which then reaches every other client of this viewer.
+   /// just below white. Only the client can measure that, so it reports its
+   /// choice back through SetLightScale().
    void AutoTuneLights();
 
    void DisconnectClient();

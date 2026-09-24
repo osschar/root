@@ -19,8 +19,49 @@ using namespace ROOT::Experimental;
 
 /** \class REveSMorph
 \ingroup REve
-Parametric, texture-mapped surface of spherical topology. See the header for
-the parametrisation and for why the geometry is built on the client.
+A parametric, texture-mapped surface of spherical topology -- a sphere that
+can be twisted, pinched and sheared, and cut down to a patch in theta and
+phi. Ported from Gled's `SMorph` (libsets/Geom1/Glasses/SMorph.{h,cxx}),
+whose parameter names it keeps so the two can be read side by side.
+
+**The geometry is built on the client, not here.** That is unusual for REve,
+where tessellation is normally server-side, and it is deliberate: this
+surface is textured, and `REveRenderData` has no channel for texture
+coordinates -- only vertices, normals, indices and the transformation
+matrix. Rather than widen the wire format for every element that will never
+have a UV, the parameters are streamed and `makeSMorph` in
+`EveElementsRCore.js` runs the same construction there. `REveLogo` streams
+itself the same way and for a related reason.
+
+The surface is generated at unit size and scaled by the element's own
+transformation, exactly as Gled's SMorph used its ZNode scale. So the radius
+costs nothing to animate: it rides in `fMainTrans` along with position and
+orientation, and a change to any of them streams as one matrix under
+kCBTransBBox without the client rebuilding anything. Everything else here is
+shape, and changing it does force a rebuild -- hence StampObjProps().
+
+The parametrisation, with ct = cos(theta), st = sin(theta):
+
+    twist = ct * fTx,  conv = ct * fCx
+    x = ct
+    y = (1 + conv) * st * cos(phi + twist)
+    z = (1 + conv) * st * sin(phi + twist)
+
+followed by a rotation about z through x * fRz, which shears the whole body
+along its polar axis. Note the polar axis is **x**, as in the original, not
+the more usual z. The normal is taken to be the position itself, which is
+exact for the unmorphed sphere and a good approximation for small fTx, fCx
+and fRz -- also as in the original.
+
+Texture coordinates are laid out as
+
+    u = fTexX0 + fTexXC * phi / 2pi
+    v = fTexY0 + fTexYC * acos(ct) / pi
+
+with fTexYOff, if set, adding int(v) * fTexYOff to u, which offsets
+successive wraps against each other -- a brick bond rather than a grid.
+
+Worked example: `tutorials/visualisation/eve7/boing.C`.
 */
 
 ////////////////////////////////////////////////////////////////////////////////

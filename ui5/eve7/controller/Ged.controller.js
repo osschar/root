@@ -370,7 +370,7 @@ sap.ui.define([
          // box style -- unreachable from the GUI even after the client learned
          // to draw it.
          // Whether this viewer evaluates streamed trajectories between updates
-         // (REveElement::SetMotion) or holds each object where the last update
+         // (REveTrans::SetMotion) or holds each object where the last update
          // put it. Off is how you see the actual update rate.
          this.makeAxesTypeSelector(el);
          // Shown unconditionally: the panel is built when the viewer is

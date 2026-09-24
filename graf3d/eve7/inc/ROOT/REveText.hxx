@@ -30,10 +30,8 @@ private:
 
 protected:
    std::string fText {"<no-text>"};
-   /// Default must be a face ROOT ships, or an REveText left at the default asks for
-   /// something no installation has: only Liberation Mono and Serif are in
-   /// $ROOTSYS/fonts, not Sans. Serif is also what REveViewer and GlViewerRCore
-   /// already hardcode for the viewer axes, so the default now agrees with them.
+   /// Default must be a face ROOT ships: only Liberation Mono and Serif are in
+   /// $ROOTSYS/fonts, not Sans. Serif is also what the viewer axes hardcode.
    std::string fFont {"LiberationSerif-Regular"};
    REveVector  fPosition {0, 0, 0};
    Float_t     fFontSize {80};
@@ -55,13 +53,9 @@ protected:
    static bool SetDefaultSdfFontDir();
 
 public:
-   /// Anchoring: SetPosition() says where the text goes, these say which point of
-   /// it lands there. Same model as TGLFont's ETextAlignH_e / ETextAlignV_e.
-   /// kOrigin is the default and preserves the historical behaviour -- the
-   /// position is the text origin (pen start), which sits a little inside the box
-   /// because of the frame border. The others are relative to the box, which is
-   /// what a tick label wants: kCenterH/kTop to hang under a horizontal axis,
-   /// kRight/kCenterV against a vertical one.
+   /// Anchoring: SetPosition() says where the text goes, these say which point
+   /// of it lands there. kOrigin is the default and historical; the others are
+   /// relative to the box, which is what a tick label wants.
    enum EAlignH_e { kOriginH = 0, kLeft, kCenterH, kRight };
    enum EAlignV_e { kOriginV = 0, kTop, kCenterV, kBottom };
 
@@ -86,9 +80,8 @@ public:
    void SetMode(Int_t mode) { fMode = mode;}
 
    /// Whether the client may resize this element by dragging its corner grip.
-   /// Moving is governed by SetPickable(); a pickable element that is not
-   /// resizable can be repositioned but keeps its size, which is what you want
-   /// for a fixed-format label such as a run/event header.
+   /// Moving is governed by SetPickable(), so a pickable element that is not
+   /// resizable can be repositioned but keeps its size.
    Bool_t GetResizable() const { return fResizable; }
    void SetResizable(Bool_t r) { fResizable = r; StampObjProps(); }
 
@@ -96,16 +89,9 @@ public:
    Int_t GetAlignV() const { return fAlignV; }
    void SetTextAlign(Int_t h, Int_t v) { fAlignH = h; fAlignV = v; StampObjProps(); }
 
-   /// Make this text act as a button: a click that does not turn into a drag
-   /// makes the client send `mir` to `target` (to this element if null).
-   ///
-   /// This is the one place where an overlay element is deliberately not
-   /// client-local. Moving and resizing stay local because they are pure
-   /// presentation, but a button exists to change server state, so the round
-   /// trip is the point rather than a cost. Note the asymmetry it introduces:
-   /// the click is dispatched by the viewer that owns the overlay, while the
-   /// effect arrives back through the normal scene stream, so every subscribed
-   /// client sees it -- a button in one view is not private to that view.
+   /// Make this text a button: a click that does not become a drag sends `mir`
+   /// to `target` (this element if null). The one overlay action that is not
+   /// client-local, so every subscribed client sees the effect.
    void SetClickAction(const std::string &mir, REveElement *target = nullptr);
    const std::string &GetClickMir() const { return fClickMir; }
    ElementId_t GetClickTargetId() const { return fClickTargetId; }
@@ -115,10 +101,9 @@ public:
    /// destroyed element -- and at an id free to be reused by an unrelated one.
    void RemoveAunt(REveAunt *au) override;
 
-   /// Stroke weight, applied by moving the SDF threshold rather than by loading
-   /// a heavier face -- so it is continuous and needs no second atlas. Worth a
-   /// small positive value for anything rendered only a few pixels tall, where
-   /// a one-pixel stroke otherwise reads as thin and ragged.
+   /// Stroke weight, applied by moving the SDF threshold rather than loading a
+   /// heavier face, so it is continuous and needs no second atlas. Worth a
+   /// small positive value for text only a few pixels tall.
    Float_t GetFontWeight() const { return fFontWeight; }
    void SetFontWeight(Float_t w) { fFontWeight = w; StampObjProps(); }
 

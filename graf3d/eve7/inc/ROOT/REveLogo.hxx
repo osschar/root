@@ -19,35 +19,13 @@
 namespace ROOT {
 namespace Experimental {
 
-////////////////////////////////////////////////////////////////////////////////
-/// REveLogo
-///
-/// A screen-space image for an overlay scene: an experiment logo, a watermark.
-///
-/// Rendered client-side as a RenderCore ZSprite in screen space, so the size is
-/// in CSS pixels and stays constant as the camera moves, and the shape comes
-/// from the image's own alpha rather than from the quad. Like other overlay
-/// elements it can be moved, and resized from its corner grip, entirely in the
-/// client -- nothing is sent back, so two people watching the same scene place
-/// their logo independently.
-///
-/// The image is served from a directory registered once with SetImageDir(),
-/// which maps it under "eve-images/" the same way REveText maps its SDF fonts.
-/// The images themselves are not shipped with ROOT; point this at wherever the
-/// experiment keeps them.
-////////////////////////////////////////////////////////////////////////////////
 
 class REveLogo : public REveElement
 {
 public:
-   /// Where the image comes from.
-   ///   kImageDir a directory registered with SetImageDir(), which is how an
-   ///             experiment serves assets from its own tree. The default.
-   ///   kTextures ui5/eve7/textures/, the ZSprite template textures shipped with
-   ///             ROOT -- markers, not general artwork. Only useful if you
-   ///             actually want one of those.
-   ///   kRemote   an absolute URL the browser fetches itself; detected
-   ///             automatically from the file string.
+   /// Where the image comes from: a directory registered with SetImageDir()
+   /// (the default), ui5/eve7/textures/, or an absolute URL the browser fetches
+   /// itself, which is detected from the file string.
    enum EImageSource_e { kImageDir = 0, kTextures, kRemote };
 
 private:
@@ -80,18 +58,8 @@ public:
    static const std::string &GetImageDir() { return sImageDir; }
 
    /// Either a file name inside the registered image directory, or an absolute
-   /// URL, which the client then fetches directly.
-   ///
-   /// A remote URL has three ways to fail, none of them ours, and all of them
-   /// silent in the sense that the logo simply does not appear:
-   ///   - CORS. The image is used as a WebGL texture, and texImage2D from a
-   ///     cross-origin image throws unless the remote server sends
-   ///     Access-Control-Allow-Origin. Merely being fetchable is not enough.
-   ///   - Mixed content. An http:// image is blocked outright on an https page.
-   ///   - Certificates. A self-signed or expired cert kills the fetch unless the
-   ///     user has already accepted it in that browser.
-   /// Old institutional document servers tend to fail all three. For anything
-   /// that has to work, serve the file locally via SetImageDir().
+   /// URL the client fetches directly. A remote URL fails silently on CORS,
+   /// mixed content or a bad certificate; serve locally via SetImageDir().
    const std::string &GetFile() const { return fFile; }
    void SetFile(std::string_view f) { fFile = f; StampObjProps(); }
 

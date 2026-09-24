@@ -5,7 +5,7 @@ sap.ui.define([], function() {
    /** Client-side evaluation of streamed motion.
      *
      * The server may describe an element not by where it is but by how it is
-     * moving -- REveElement::SetMotion -- sending position (in the usual
+     * moving -- REveTrans::SetMotion -- sending position (in the usual
      * transformation matrix), velocity, acceleration, and a window `max_dt`
      * for how long the trajectory may be trusted. This evaluates
      *
@@ -15,11 +15,10 @@ sap.ui.define([], function() {
      * rate stops being visible. Under constant acceleration that is the exact
      * trajectory, not an approximation.
      *
-     * Rotation is extrapolated too, from an angular velocity in the world
-     * frame -- axis by direction, rad/s by length. It has to be: a spinning
-     * object whose flight is smooth but whose spin jumps once per update looks
-     * WORSE than one that does neither, because the two disagree and the jump
-     * is what the eye follows.
+     * Rotation is extrapolated too, from a spin axis and a rate in the local
+     * frame. It has to be: a spinning object whose flight is smooth but whose
+     * spin jumps once per update looks WORSE than one that does neither,
+     * because the two disagree and the jump is what the eye follows.
      *
      * Scale is not extrapolated and does not need to be -- it rides in the
      * rotated columns, and a rotation preserves their lengths.

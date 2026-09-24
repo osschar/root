@@ -17,9 +17,9 @@
 ///     It is placed by a matrix per update and steps at whatever rate those
 ///     arrive.
 ///
-///   - SetMotion() additionally says how a thing is MOVING -- velocity,
-///     acceleration, angular velocity, and how long the trajectory may be
-///     trusted. The client then evaluates it on its own frame clock and draws
+///   - REveTrans::SetMotion() additionally says how a thing is MOVING --
+///     velocity, acceleration, a spin axis and rate, and how long the
+///     trajectory may be trusted. The client then evaluates it on its own frame clock and draws
 ///     smoothly between updates. ONLY THE BALL DOES THIS.
 ///
 /// So the ball is smooth at the display rate however rarely the server runs,

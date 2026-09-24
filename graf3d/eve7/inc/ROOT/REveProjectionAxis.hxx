@@ -22,35 +22,6 @@ namespace Experimental {
 
 class REveProjectionManager;
 
-////////////////////////////////////////////////////////////////////////////////
-/// REveProjectionAxis
-///
-/// Scales and tick labels for a projected view, the REve counterpart of
-/// TEveProjectionAxes.
-///
-/// Ticks sit at round numbers in the *original* space and are placed at their
-/// projected positions, so under a non-linear projection their spacing on screen
-/// is deliberately uneven -- that unevenness is the information. The projection
-/// itself can be arbitrarily non-trivial and lives only on the server, so the
-/// mapping original -> projected is done here, once, and the result is streamed.
-///
-/// The client is then left with projected -> screen, which for the orthographic
-/// camera of a 2D projected view is affine and which it already owns. That is
-/// what keeps zooming and panning free of server round-trips.
-///
-/// For the same reason the tick set is deliberately **over-provided**: rather
-/// than computing exactly what fits the current frustum, a generous range at a
-/// finer subdivision is sent, and the client filters it -- discarding what falls
-/// outside the view and what would overlap. Re-streaming is then only needed when
-/// the projection or the scene extent changes, not on every zoom.
-///
-/// The projection manager is held as an aunt, so the link does not imply
-/// ownership and is cleaned up on either side.
-///
-/// Inherits REveText for its style: font, size, colour and the frame settings
-/// apply to the tick labels. Of the inherited fields, fText is the axis title;
-/// fPosition, fMode and fResizable do not apply.
-////////////////////////////////////////////////////////////////////////////////
 
 class REveProjectionAxis : public REveText
 {
@@ -81,13 +52,9 @@ protected:
    ELabMode_e  fLabMode{kValue};
    EAxesMode_e fAxesMode{kAll};
 
-   /// As TAttAxis: n1 + 100 * n2, primary and secondary divisions. Deliberately
-   /// finer than TAttAxis's usual 510. A projected axis is laid out by the
-   /// client, which drops every label that will not fit, so asking for too few
-   /// leaves it nothing to choose from: THLimitsFinder answers 5 divisions of
-   /// [-600, 600] with a step of 500, i.e. three labels, two of which fall in
-   /// the corners against the vertical scale and are discarded. Over-provide and
-   /// let the filter decide -- the same bargain the tick range itself makes.
+   /// As TAttAxis: n1 + 100 * n2. Deliberately finer than the usual 510,
+   /// because the client drops every label that will not fit and too few
+   /// leaves it nothing to choose from.
    Int_t   fNdivisions{1010};
    Float_t fRangeFactor{2.0};  ///< over-provision: extend past the scene extent by this factor
    /// Take the viewer's foreground colour instead of fTextColor/fLineColor. On by

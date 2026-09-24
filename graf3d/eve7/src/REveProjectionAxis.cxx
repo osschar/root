@@ -24,8 +24,31 @@ using namespace ROOT::Experimental;
 
 /** \class REveProjectionAxis
 \ingroup REve
-Scales and tick labels for a projected view. See the header for the reasoning
-behind computing ticks on the server and over-providing them.
+Scales and tick labels for a projected view, the REve counterpart of
+TEveProjectionAxes.
+
+Ticks sit at round numbers in the *original* space and are placed at their
+projected positions, so under a non-linear projection their spacing on screen
+is deliberately uneven -- that unevenness is the information. The projection
+itself can be arbitrarily non-trivial and lives only on the server, so the
+mapping original -> projected is done here, once, and the result is streamed.
+
+The client is then left with projected -> screen, which for the orthographic
+camera of a 2D projected view is affine and which it already owns. That is
+what keeps zooming and panning free of server round-trips.
+
+For the same reason the tick set is deliberately **over-provided**: rather
+than computing exactly what fits the current frustum, a generous range at a
+finer subdivision is sent, and the client filters it -- discarding what falls
+outside the view and what would overlap. Re-streaming is then only needed when
+the projection or the scene extent changes, not on every zoom.
+
+The projection manager is held as an aunt, so the link does not imply
+ownership and is cleaned up on either side.
+
+Inherits REveText for its style: font, size, colour and the frame settings
+apply to the tick labels. Of the inherited fields, fText is the axis title;
+fPosition, fMode and fResizable do not apply.
 */
 
 namespace {

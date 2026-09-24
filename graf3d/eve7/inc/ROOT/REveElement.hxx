@@ -325,15 +325,9 @@ public:
 
    // Change-stamping and change bits
    //---------------------------------
-   //
-   // kCBTransBBox is the cheap-update bit: it streams the main transformation
-   // (plus whatever WriteTransJson() adds) as JSON only, and the client applies
-   // it to the renderer object it already has instead of rebuilding it. Anything
-   // that invalidates geometry must still stamp kCBObjProps.
-   //
-   // The bounding-box half of the name is historical: it told the renderer to
-   // re-push bounding boxes up the scene graph. RenderCore recomputes those on
-   // every render step, so nothing has to be streamed for it.
+   // kCBTransBBox streams the transformation as JSON only; the client applies
+   // it to the object it already has. Anything that invalidates geometry must
+   // still stamp kCBObjProps. The bounding-box half of the name is historical.
 
    enum EChangeBits
    {
