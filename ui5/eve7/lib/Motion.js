@@ -230,7 +230,8 @@ sap.ui.define([], function() {
             t0:     mot.t0,
             vel:    mot.vel,
             acc:    mot.acc,
-            omega:  mot.omega || [0, 0, 0],
+            axis:   mot.axis  || [0, 0, 1],
+            rate:   mot.rate  || 0,
             max_dt: mot.max_dt
          });
 
@@ -307,14 +308,14 @@ sap.ui.define([], function() {
                touched = true;
             }
 
-            // Spin: turn the stored basis by |omega|*dt about omega, in the
-            // world frame, so it composes on the left of the base rotation.
-            const w = e.omega;
-            const wl = Math.sqrt(w[0]*w[0] + w[1]*w[1] + w[2]*w[2]);
-
-            if (wl > 1e-9) {
-               const th = wl * dt;
-               const ux = w[0]/wl, uy = w[1]/wl, uz = w[2]/wl;
+            // Spin: turn the stored basis by rate*dt about the axis. One
+            // Rodrigues rotation, so there is no axis ordering. The axis is in
+            // the LOCAL frame, so R composes on the RIGHT of the base basis:
+            // each new column is a combination of the old columns. The server
+            // sends the axis normalised.
+            if (e.rate !== 0) {
+               const th = e.rate * dt;
+               const ux = e.axis[0], uy = e.axis[1], uz = e.axis[2];
                const c = Math.cos(th), s = Math.sin(th), t = 1 - c;
 
                // Rodrigues, row-major.
@@ -322,15 +323,14 @@ sap.ui.define([], function() {
                           t*ux*uy + s*uz,   t*uy*uy + c,     t*uy*uz - s*ux,
                           t*ux*uz - s*uy,   t*uy*uz + s*ux,  t*uz*uz + c];
 
+               // new_col[j] = sum_k old_col[k] * R[k][j]. Column lengths survive
+               // while the basis scale is uniform, which is what a local-frame
+               // spin needs; a non-uniform scale would shear.
                const r = e.r0;
-               // Each of the three basis columns through R. Lengths survive, so
-               // whatever scale the columns carried is still there afterwards.
-               for (let cIdx = 0; cIdx < 3; ++cIdx) {
-                  const a0 = r[cIdx*3], a1 = r[cIdx*3 + 1], a2 = r[cIdx*3 + 2];
-                  const o = cIdx * 4;
-                  m[o]     = R[0]*a0 + R[1]*a1 + R[2]*a2;
-                  m[o + 1] = R[3]*a0 + R[4]*a1 + R[5]*a2;
-                  m[o + 2] = R[6]*a0 + R[7]*a1 + R[8]*a2;
+               for (let j = 0; j < 3; ++j) {
+                  const o = j * 4;
+                  for (let i = 0; i < 3; ++i)
+                     m[o + i] = r[i] * R[j] + r[3 + i] * R[3 + j] + r[6 + i] * R[6 + j];
                }
                touched = true;
             }

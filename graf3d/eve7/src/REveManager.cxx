@@ -1110,7 +1110,7 @@ void REveManager::SendMotionChanges()
 
    nlohmann::json msg = {};
    msg["content"] = "Motion";
-   msg["t"]       = ServerTimeMs();
+   msg["t"]       = REveUtil::ServerTimeMs();
    msg["els"]     = arr;
 
    std::string data = msg.dump();
@@ -1297,14 +1297,6 @@ void REveManager::SendBinary(unsigned connid, const void *data, std::size_t len)
 /// state rather than a sequence of edits: the next round carries the newer
 /// state anyway, so the skipped one had nothing to add.
 
-////////////////////////////////////////////////////////////////////////////////
-
-double REveManager::ServerTimeMs()
-{
-   using clock = std::chrono::steady_clock;
-   static const clock::time_point origin = clock::now();
-   return std::chrono::duration<double, std::milli>(clock::now() - origin).count();
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 

@@ -13,7 +13,6 @@
 #include <ROOT/REveRenderData.hxx>
 #include <ROOT/REveTrans.hxx>
 
-#include <algorithm>
 #include <cmath>
 
 using namespace ROOT::Experimental;
@@ -30,51 +29,6 @@ REveSMorph::REveSMorph(const std::string &n, const std::string &t) : REveElement
 {
    SetMainColorPtr(&fColor);
 }
-
-////////////////////////////////////////////////////////////////////////////////
-/// Shape setters. Every one of these changes the generated geometry, so each
-/// stamps kCBObjProps and the client rebuilds. Size does not belong here -- it
-/// is the transformation, see SetRadius().
-///
-/// The clamps double as the GUI ranges: Ged sliders for this class mirror them
-/// exactly, so moving a clamp means moving the slider with it. (That
-/// duplication is what the "extract Ged descriptions at build time" item in
-/// REVE-OPEN-ITEMS.md is about -- in Gled these bounds were written once, in
-/// the member comment, and the GUI was generated from them.)
-
-void REveSMorph::SetTLevel(Int_t l)
-{
-   fTLevel = std::clamp(l, 2, 200);
-   StampObjProps();
-}
-
-void REveSMorph::SetPLevel(Int_t l)
-{
-   fPLevel = std::clamp(l, 3, 200);
-   StampObjProps();
-}
-
-void REveSMorph::SetTx(Float_t v) { fTx = std::clamp(v, -2.f, 2.f); StampObjProps(); }
-void REveSMorph::SetCx(Float_t v) { fCx = std::clamp(v, -2.f, 2.f); StampObjProps(); }
-void REveSMorph::SetRz(Float_t v) { fRz = std::clamp(v, -2.f, 2.f); StampObjProps(); }
-
-/// Theta and phi extents. Deliberately not cross-checked: fThetaMin above
-/// fThetaMax sweeps the surface backwards, which is harmless and occasionally
-/// what you want. The original did not guard it either.
-void REveSMorph::SetThetaMin(Float_t v) { fThetaMin = std::clamp(v, 0.f, 1.f); StampObjProps(); }
-void REveSMorph::SetThetaMax(Float_t v) { fThetaMax = std::clamp(v, 0.f, 1.f); StampObjProps(); }
-void REveSMorph::SetPhiMean(Float_t v)  { fPhiMean  = std::clamp(v, 0.f, 1.f); StampObjProps(); }
-void REveSMorph::SetPhiRange(Float_t v) { fPhiRange = std::clamp(v, 0.f, 1.f); StampObjProps(); }
-
-void REveSMorph::SetEquiSurf(Bool_t x) { fEquiSurf = x; StampObjProps(); }
-
-void REveSMorph::SetTexture(const std::string &f) { fTexture = f; StampObjProps(); }
-
-void REveSMorph::SetTexX0(Float_t v)   { fTexX0   = std::clamp(v, -1e3f, 1e3f); StampObjProps(); }
-void REveSMorph::SetTexY0(Float_t v)   { fTexY0   = std::clamp(v, -1e3f, 1e3f); StampObjProps(); }
-void REveSMorph::SetTexXC(Float_t v)   { fTexXC   = std::clamp(v, -1e3f, 1e3f); StampObjProps(); }
-void REveSMorph::SetTexYC(Float_t v)   { fTexYC   = std::clamp(v, -1e3f, 1e3f); StampObjProps(); }
-void REveSMorph::SetTexYOff(Float_t v) { fTexYOff = std::clamp(v, -1e3f, 1e3f); StampObjProps(); }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Uniform scale on the main transformation.

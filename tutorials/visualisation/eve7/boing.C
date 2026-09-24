@@ -227,18 +227,19 @@ public:
       // client cannot see coming. Up to it the extrapolation is exact; past it
       // the ball simply stops, which is visible and honest, rather than
       // continuing through the floor.
-      Float_t vel[3] = {(Float_t)fVx, (Float_t)fVy, (Float_t)fVz};
-      Float_t acc[3] = {0.f, (Float_t)kGrav, 0.f};
+      REveVectorD vel(fVx, fVy, fVz);
+      REveVectorD acc(0., kGrav, 0.);
 
-      // Angular velocity in the WORLD frame: the ball turns about its own polar
-      // axis, which after standing it up and leaning it over is e1. Without
-      // this the flight is smooth and the spin jumps once per update, and the
-      // two disagreeing is more distracting than neither being smooth.
-      Float_t omega[3] = {(Float_t)(kSpinRate * e1[0]),
-                          (Float_t)(kSpinRate * e1[1]),
-                          (Float_t)(kSpinRate * e1[2])};
+      // Spin about the ball's own polar axis, which for an SMorph is the local
+      // x. Being a local-frame axis it is the same (1,0,0) on every update,
+      // however the ball is standing -- the orientation is already in the
+      // matrix. Without the spin the flight is smooth and the turn jumps once
+      // per update, and the two disagreeing is more distracting than neither
+      // being smooth.
+      REveVectorD spin_axis(1., 0., 0.);
 
-      fBall->SetMotion(vel, acc, omega, (Float_t)TimeToNextBounce());
+      fBall->RefMainTrans().SetMotion(vel, acc, spin_axis, kSpinRate,
+                                      TimeToNextBounce());
 
       // The shadow, tightening as the ball comes down. One more matrix -- no
       // second element type, no shadow pass, no light.

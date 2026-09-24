@@ -11,6 +11,7 @@
 
 #include <ROOT/REveTrans.hxx>
 #include <ROOT/REveTypes.hxx>
+#include <ROOT/REveUtil.hxx>
 
 #include "TBuffer.h"
 #include "TClass.h"
@@ -39,6 +40,73 @@
 #define F33 15
 
 using namespace ROOT::Experimental;
+
+////////////////////////////////////////////////////////////////////////////////
+/// Declare how this transformation is changing. Position comes from the matrix
+/// as before; this adds only the rate of change, so a transformation with no
+/// motion set behaves exactly as it always did.
+
+void REveTrans::SetMotion(const REveVectorD &vel, const REveVectorD &acc, Double_t max_dt)
+{
+   SetMotion(vel, acc, REveVectorD(0, 0, 1), 0., max_dt);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// As above, with a spin: an axis and a rate in rad/s about it. The client
+/// turns the basis by rate*dt about the axis, as a single Rodrigues rotation,
+/// so no axis ordering is involved.
+///
+/// The axis is in the LOCAL frame, in the sense of RotateLF(), and the rotation
+/// composes on the right of the matrix. A body turning about its own axis is
+/// therefore stated once: the axis is a property of the object, and only the
+/// rate varies. It is normalised here, so a caller may pass any length.
+///
+/// Right-composition mixes the basis columns, so it preserves the object only
+/// while the basis scale is uniform. A local-frame spin on a non-uniformly
+/// scaled transformation would shear it.
+///
+/// Rotation has to extrapolate too. Without it the position glides while the
+/// spin jumps once per update, and the two disagreeing is worse than neither
+/// being smooth.
+///
+/// t0 is stamped here rather than at stream time. The manager may hold a round
+/// back while clients catch up, so stamping later would shift every trajectory
+/// forward by however long the link was congested -- the very lag this exists
+/// to remove.
+
+void REveTrans::SetMotion(const REveVectorD &vel, const REveVectorD &acc,
+                          const REveVectorD &spin_axis, Double_t spin_rate,
+                          Double_t max_dt)
+{
+   if (!fDeltaTrans)
+      fDeltaTrans = std::make_unique<REveDeltaTrans>();
+
+   REveDeltaTrans &d = *fDeltaTrans;
+   d.fVel = vel;
+   d.fAcc = acc;
+
+   const Double_t al = spin_axis.Mag();
+   if (al > 1e-9) {
+      d.fSpinAxis  = spin_axis;
+      d.fSpinAxis *= 1. / al;
+      d.fSpinRate  = spin_rate;
+   } else {
+      d.fSpinAxis.Set(0., 0., 1.);
+      d.fSpinRate = 0.;
+   }
+
+   d.fMaxDt    = max_dt;
+   d.fMotionT0 = REveUtil::ServerTimeMs();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// Stop extrapolating: the element holds wherever the matrix puts it.
+
+void REveTrans::ClearMotion()
+{
+   fDeltaTrans.reset();
+}
+
 
 /** \class REveTrans
 \ingroup REve
@@ -92,6 +160,8 @@ REveTrans::REveTrans(const REveTrans& t) :
    fEditScale(kTRUE)
 {
    SetTrans(t, kFALSE);
+   if (t.fDeltaTrans)
+      fDeltaTrans = std::make_unique<REveDeltaTrans>(*t.fDeltaTrans);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

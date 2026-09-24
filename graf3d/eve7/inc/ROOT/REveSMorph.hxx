@@ -16,6 +16,7 @@
 
 #include <TAttBBox.h>
 
+#include <algorithm>
 #include <string>
 
 namespace ROOT {
@@ -119,43 +120,53 @@ public:
    REveSMorph(const std::string &n = "REveSMorph", const std::string &t = "");
    ~REveSMorph() override = default;
 
+   /// Shape and texture parameters. Each changes the generated geometry, so each
+   /// stamps kCBObjProps and the client rebuilds. Size is not here: it is the
+   /// transformation, see SetRadius().
+   ///
+   /// The clamps double as the GUI ranges, mirrored exactly by this class's Ged
+   /// sliders, so moving a clamp moves the slider with it. Theta and phi extents
+   /// are deliberately not cross-checked: fThetaMin above fThetaMax sweeps the
+   /// surface backwards, which is harmless and occasionally wanted.
+   /// @{
    Int_t GetTLevel() const { return fTLevel; }
    Int_t GetPLevel() const { return fPLevel; }
-   void  SetTLevel(Int_t l);
-   void  SetPLevel(Int_t l);
+   void  SetTLevel(Int_t l) { fTLevel = std::clamp(l, 2, 200); StampObjProps(); }
+   void  SetPLevel(Int_t l) { fPLevel = std::clamp(l, 3, 200); StampObjProps(); }
 
    Float_t GetTx() const { return fTx; }
    Float_t GetCx() const { return fCx; }
    Float_t GetRz() const { return fRz; }
-   void    SetTx(Float_t v);
-   void    SetCx(Float_t v);
-   void    SetRz(Float_t v);
+   void    SetTx(Float_t v) { fTx = std::clamp(v, -2.f, 2.f); StampObjProps(); }
+   void    SetCx(Float_t v) { fCx = std::clamp(v, -2.f, 2.f); StampObjProps(); }
+   void    SetRz(Float_t v) { fRz = std::clamp(v, -2.f, 2.f); StampObjProps(); }
 
    Float_t GetThetaMin()  const { return fThetaMin; }
    Float_t GetThetaMax()  const { return fThetaMax; }
    Float_t GetPhiMean()   const { return fPhiMean; }
    Float_t GetPhiRange()  const { return fPhiRange; }
-   void    SetThetaMin(Float_t v);
-   void    SetThetaMax(Float_t v);
-   void    SetPhiMean(Float_t v);
-   void    SetPhiRange(Float_t v);
+   void    SetThetaMin(Float_t v)  { fThetaMin = std::clamp(v, 0.f, 1.f); StampObjProps(); }
+   void    SetThetaMax(Float_t v)  { fThetaMax = std::clamp(v, 0.f, 1.f); StampObjProps(); }
+   void    SetPhiMean(Float_t v)   { fPhiMean  = std::clamp(v, 0.f, 1.f); StampObjProps(); }
+   void    SetPhiRange(Float_t v)  { fPhiRange = std::clamp(v, 0.f, 1.f); StampObjProps(); }
 
    Bool_t GetEquiSurf() const { return fEquiSurf; }
-   void   SetEquiSurf(Bool_t x);
+   void   SetEquiSurf(Bool_t x) { fEquiSurf = x; StampObjProps(); }
 
    const std::string &GetTexture() const { return fTexture; }
-   void SetTexture(const std::string &f);
+   void SetTexture(const std::string &f) { fTexture = f; StampObjProps(); }
 
    Float_t GetTexX0()   const { return fTexX0; }
    Float_t GetTexY0()   const { return fTexY0; }
    Float_t GetTexXC()   const { return fTexXC; }
    Float_t GetTexYC()   const { return fTexYC; }
    Float_t GetTexYOff() const { return fTexYOff; }
-   void    SetTexX0(Float_t v);
-   void    SetTexY0(Float_t v);
-   void    SetTexXC(Float_t v);
-   void    SetTexYC(Float_t v);
-   void    SetTexYOff(Float_t v);
+   void    SetTexX0(Float_t v)   { fTexX0   = std::clamp(v, -1e3f, 1e3f); StampObjProps(); }
+   void    SetTexY0(Float_t v)   { fTexY0   = std::clamp(v, -1e3f, 1e3f); StampObjProps(); }
+   void    SetTexXC(Float_t v)   { fTexXC   = std::clamp(v, -1e3f, 1e3f); StampObjProps(); }
+   void    SetTexYC(Float_t v)   { fTexYC   = std::clamp(v, -1e3f, 1e3f); StampObjProps(); }
+   void    SetTexYOff(Float_t v) { fTexYOff = std::clamp(v, -1e3f, 1e3f); StampObjProps(); }
+   /// @}
 
    /// Uniform scale on the main transformation. A convenience, and a reminder
    /// that size here is transformation and not geometry: this stamps

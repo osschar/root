@@ -56,12 +56,6 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
                obj3d.geo_object = elem.fMasterId || elem.fElementId;
                obj3d.geo_name = elem.fName; // used for highlight
 
-               // A declared bounding box wins over whatever RenderCore would
-               // measure. Applied for every element type, once, rather than in
-               // each maker.
-               if (elem.fixed_bbox && typeof this.creator.applyFixedBBox == "function")
-                  this.creator.applyFixedBBox(elem, obj3d);
-
                if (elem.render_data.matrix) {
                   if (this.mgr.is_rcore) {
                      obj3d.setMatrixFromArray(elem.render_data.matrix);
@@ -219,8 +213,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
             // depends on where a track happens to be this frame -- the axis is
             // supposed to be the fixed thing you read positions against.
             //
-            // An element that genuinely wants to set the extent can say so, with
-            // REveElement::SetFixedBBox().
+            // A viewer that wants a fixed extent says so, with
+            // REveViewer::SetAxesBBox().
             this.glctrl.viewer.request_render(this.need_bbox_update);
             this.need_bbox_update = false;
          }

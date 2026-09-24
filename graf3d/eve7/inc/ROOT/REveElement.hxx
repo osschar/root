@@ -93,14 +93,6 @@ protected:
    Color_t          fDefaultColor{kPink};  //  Default color for sub-classes that enable it.
    Color_t         *fMainColorPtr{nullptr};//  Pointer to main-color variable.
 
-   Bool_t           fHasFixedBBox{kFALSE}; ///< see SetFixedBBox()
-   Float_t          fFixedBBox[6]{};       ///< xmin, ymin, zmin, xmax, ymax, zmax
-
-   Bool_t           fHasMotion{kFALSE};    ///< see SetMotion()
-   Float_t          fVel[3]{}, fAcc[3]{};  ///< units/s and units/s^2
-   Float_t          fOmega[3]{};           ///< angular velocity, world frame, rad/s
-   Float_t          fMaxDt{0.f};           ///< seconds the trajectory may be trusted
-   Double_t         fMotionT0{0.};         ///< REveManager::ServerTimeMs() when set
    std::unique_ptr<REveTrans> fMainTrans;   //  Pointer to main transformation matrix.
 
    void            *fUserData{nullptr};     ///<! Externally assigned and controlled user data.
@@ -267,75 +259,6 @@ public:
    virtual Int_t WriteCoreJson(nlohmann::json &cj, Int_t rnr_offset);
    virtual void  WriteTransJson(nlohmann::json &cj);
    virtual void  BuildRenderData();
-
-   // Declared bounding box
-   //----------------------
-   //
-   // Every ComputeBBox() in REve derives the box from the geometry. This says
-   // what the box *is*, whatever the geometry does, and it is streamed and
-   // applied for any element type.
-   //
-   // Two uses, and they pull in opposite directions:
-   //
-   //   - Smaller than the geometry. A floor slab whose visible top is the plane
-   //     of interest can declare only that plane, so the scene box -- and the
-   //     3D axis, which takes its extents from it -- stops there while the slab
-   //     is drawn below.
-   //   - Larger than the geometry. One element can then declare the volume of
-   //     the whole scene, which keeps the axis and the camera still while
-   //     sparse content comes and goes. That is the trick mkFit's Shell.cc
-   //     plays with four transparent jet cones at twice the tracker radius, and
-   //     boing.C with eight corner points; either would be retired by saying it
-   //     outright.
-   //
-   // Not to be confused with what REveBoxSet and REvePointSet stream in the
-   // render-data normals channel: those are *computed* boxes that have to be
-   // sent because the types are drawn instanced -- one primitive plus a texture
-   // of placements -- so RenderCore cannot see their extent at all.
-
-   // Streamed motion
-   //----------------
-   //
-   // Instead of "here is where it is", say "here is its state of motion, and
-   // how long you may trust it": position (from fMainTrans), velocity,
-   // acceleration, and a window. The client evaluates
-   //
-   //     p(t) = p0 + v*dt + 0.5*a*dt^2,   dt = min(now - t0, max_dt)
-   //
-   // on its own frame clock, so it draws smooth motion between updates and a
-   // low update rate stops being visible. Under constant acceleration that is
-   // not an approximation -- it is the trajectory -- so a ball in free fall is
-   // exact between updates however far apart they are.
-   //
-   // fMaxDt is what makes it safe. Extrapolation is only valid until something
-   // the client cannot know about happens -- a bounce, a scattering, a new
-   // event -- so the window says how long the trajectory holds. Past it the
-   // client stops at the last valid point. A stalled client then freezes, which
-   // is obvious and honest, instead of sailing the object through the floor,
-   // which looks like a physics bug.
-   //
-   // Set it to the time to the next known discontinuity where that is known.
-   //
-   // Rotation is extrapolated the same way, from an angular velocity vector in
-   // the world frame: direction is the axis, length the rate in rad/s. Without
-   // it a spinning object's position glides while its spin jumps once per
-   // update, and the jump is the thing the eye goes to -- worse than not
-   // extrapolating at all, because the two disagree.
-   //
-   // Position and orientation still travel in fMainTrans as before -- this only
-   // adds how they are changing, so an element with no motion set behaves
-   // exactly as it always did.
-
-   void SetMotion(const Float_t vel[3], const Float_t acc[3], Float_t max_dt);
-   void SetMotion(const Float_t vel[3], const Float_t acc[3], const Float_t omega[3],
-                  Float_t max_dt);
-   void ClearMotion();
-   Bool_t HasMotion() const { return fHasMotion; }
-
-   void SetFixedBBox(Float_t xmin, Float_t ymin, Float_t zmin,
-                     Float_t xmax, Float_t ymax, Float_t zmax);
-   void ClearFixedBBox() { fHasFixedBBox = kFALSE; StampObjProps(); }
-   Bool_t HasFixedBBox() const { return fHasFixedBBox; }
 
    void* GetUserData() const   { return fUserData; }
    void  SetUserData(void* ud) { fUserData = ud;   }
