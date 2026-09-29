@@ -213,8 +213,8 @@ public:
    bool AnySceneChanged() const;
 
    /// Changes are stamped but not yet streamed, because the clients had not
-   /// finished with the previous round when EndChange() ran. Flushed by the
-   /// last acknowledgement. Guarded by fServerState.fMutex.
+   /// acknowledged the previous scene changes when EndChange() ran. Flushed by
+   /// the last acknowledgement. Guarded by fServerState.fMutex.
    bool fPendingSceneChanges{false};
 
    void DisableRedraw() { printf("REveManager::DisableRedraw obsolete \n"); }

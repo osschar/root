@@ -873,7 +873,7 @@ void REveManager::WindowDisconnect(unsigned connid)
          StreamSceneChangesToJson();
          SendSceneChanges();
       } else {
-         // No one left to send to; the stamps stay for the next round.
+         // No one left to send to; the stamps stay for the next EndChange().
          fPendingSceneChanges = false;
          fServerState.fVal = ServerState::Waiting;
       }
@@ -923,8 +923,8 @@ void REveManager::WindowData(unsigned connid, const std::string &arg)
 
       if (fServerState.fVal == ServerState::UpdatingClients && ClientConnectionsFree()) {
          if (fPendingSceneChanges) {
-            // Changes stamped while this round was in flight. Sending them
-            // leaves a new round outstanding.
+            // Changes stamped while the previous ones were in flight. Sending
+            // them leaves the clients busy again.
             fPendingSceneChanges = false;
             StreamSceneChangesToJson();
             SendSceneChanges();
@@ -1073,10 +1073,10 @@ void REveManager::StreamSceneChangesToJson()
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Send transformation-only changes on the motion channel: the same websocket,
-/// outside the round protocol, with no BeginChanges/EndChanges and no
-/// acknowledgement. A connection for which RWebWindow::CanSend(id, true) is
-/// false skips the message. Each message is absolute state, but a client that
-/// skips the last one keeps the old state until the element changes again.
+/// outside the BeginChanges/EndChanges cycle, with no acknowledgement. A
+/// connection for which RWebWindow::CanSend(id, true) is false skips the
+/// message. Each message is absolute state, but a client that skips the last
+/// one keeps the old state until the element changes again.
 
 void REveManager::SendMotionChanges()
 {
@@ -1330,10 +1330,11 @@ void REveManager::BeginChange()
 }
 
 //____________________________________________________________________
-/// Close a round of changes and stream it. If the clients have not yet
-/// acknowledged the previous round, keep the stamps and let the last
+/// Stop accepting changes and stream them. If the clients have not yet
+/// acknowledged the previous changes, keep the stamps and let the last
 /// acknowledgement in WindowData() flush them. Stamps coalesce per element.
-/// Motion changes are sent in either case. MIR rounds are not held back.
+/// Motion changes are sent in either case. Changes made by a MIR are not held
+/// back.
 
 void REveManager::EndChange()
 {
@@ -1343,12 +1344,13 @@ void REveManager::EndChange()
 
    std::unique_lock<std::mutex> lock(fServerState.fMutex);
 
-   // Motion is outside the round, so it is sent even when the round is held.
+   // Motion is outside the change cycle, so it is sent even when changes
+   // are held.
    SendMotionChanges();
 
    if ( ! fConnList.empty() && ! ClientConnectionsFree())
    {
-      // Previous round still outstanding. Leave everything stamped.
+      // Previous changes not yet acknowledged. Leave everything stamped.
       if (AnySceneChanged())
          fPendingSceneChanges = true;
 

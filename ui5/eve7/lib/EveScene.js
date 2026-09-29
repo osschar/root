@@ -203,7 +203,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
             }
 
             // Recompute the scene bounding box only after elements were added,
-            // removed or rebuilt, not after a round that only moved them. The
+            // removed or rebuilt, not after changes that only moved them. The
             // 3D axis is sized from this box and would otherwise follow moving
             // objects. REveViewer::SetAxesBBox() fixes the axis extent instead.
             this.glctrl.viewer.request_render(this.need_bbox_update);
@@ -257,7 +257,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
       }
 
       /** Apply one element of a "Motion" message: the same update as a
-        * kCBTransBBox change, outside the change round. */
+        * kCBTransBBox change, outside the BeginChanges/EndChanges cycle. */
       sceneElementMotion(msg)
       {
          let el = this.mgr.GetElement(msg.fElementId);

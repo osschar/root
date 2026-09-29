@@ -55,7 +55,7 @@ void REveTrans::SetMotion(const REveVectorD &vel, const REveVectorD &acc, Double
 /// As above, with a spin of `spin_rate` rad/s about `spin_axis`. The axis is
 /// in the local frame, as for RotateLF(), and is normalised here. A spin on a
 /// non-uniformly scaled transformation shears it. t0 is stamped now, not at
-/// stream time, so a round that is held back does not shift the trajectory.
+/// stream time, so changes that are held back do not shift the trajectory.
 
 void REveTrans::SetMotion(const REveVectorD &vel, const REveVectorD &acc,
                           const REveVectorD &spin_axis, Double_t spin_rate,

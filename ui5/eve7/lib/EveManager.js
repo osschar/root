@@ -798,7 +798,7 @@ sap.ui.define([], function() {
       }
 
       /** Apply a "Motion" message: transformation-only updates sent outside the
-        * change round, with no BeginChanges/EndChanges and no acknowledgement.
+        * BeginChanges/EndChanges cycle, with no acknowledgement.
         * Only EveScene implements sceneElementMotion, so the element tree and
         * the editor never see these. */
       ImportMotion(resp)
