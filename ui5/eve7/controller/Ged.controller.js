@@ -315,16 +315,9 @@ sap.ui.define([
          }
       },
 
-      // REveSMorph. Every control here is a slider because every parameter is
-      // continuous and clamped server-side, and the ranges mirror those clamps
-      // exactly -- REveSMorph::SetTx and friends take [-10, 10], the extents
-      // [0, 1], the tessellation [2, 200] / [3, 200]. Move a clamp and this must
-      // move with it.
-      //
-      // That duplication is the point of the "extract Ged descriptions at build
-      // time" item in REVE-OPEN-ITEMS.md: in Gled, from which this class comes,
-      // the range lived once in the member's own comment and the GUI was
-      // generated from it. Here it is written twice and kept in step by hand.
+      // REveSMorph. The Tx, Cx, Rz ([-2, 2]) and extent ([0, 1]) sliders match
+      // the clamps in the REveSMorph setters; the tessellation and texture
+      // sliders cover less than their clamps. Keep them in step by hand.
       buildREveSMorphSetter : function(el)
       {
          this.buildREveElementSetter(el);
@@ -365,27 +358,15 @@ sap.ui.define([
 
       buildREveViewerSetter: function(el)
       {
-         // Axes are a three-value enum (REveViewer::EAxesType), not a flag. A
-         // checkbox could only ever send 0 or 1, which left kAxesEdge -- the
-         // box style -- unreachable from the GUI even after the client learned
-         // to draw it.
-         // Whether this viewer evaluates streamed trajectories between updates
-         // (REveTrans::SetMotion) or holds each object where the last update
-         // put it. Off is how you see the actual update rate.
+         // AxesType is a three-value enum, REveViewer::EAxesType, so it gets a
+         // selector rather than a checkbox.
          this.makeAxesTypeSelector(el);
-         // Shown unconditionally: the panel is built when the viewer is
-         // selected, not when AxesType changes, so hiding these while the axes
-         // are off would leave them missing after they are switched on.
+         // Shown whatever AxesType is: the panel is built on viewer selection,
+         // not on an AxesType change, so hidden rows would stay hidden after
+         // the axes are switched on.
          //
-         // Both are sliders because both are bounded and clamped server-side --
-         // see makeSliderSetter. The ranges mirror those clamps exactly:
-         // REveViewer::SetAxesAtten takes [-4, 8] and SetAxesFontSize
-         // [0.004, 0.15]. If a clamp moves, move these with it.
-         //
-         // Both ranges run well past the sensible value on purpose, so the
-         // tooltip has to say where sensible IS -- otherwise the control
-         // implies that its midpoint is the neutral choice, and for
-         // attenuation the midpoint is 2, which is nothing of the kind.
+         // The axis sliders cover less than the server clamps (SetAxesAtten takes
+         // [-4, 8]), and their tooltips say where the useful values are.
          this.makeSliderSetter(el.AxesAtten, "AxesAtten", "SetAxesAtten",
                                { min: 0, max: 4, step: 0.2, tickmarks: false,
                                  tip: "Label shrink with distance. 0 = constant "
@@ -416,17 +397,12 @@ sap.ui.define([
                                     + "is behind it." });
          this.makeBoolSetter(el.BlackBg, "BlackBackground");
 
-         // Motion, last and folded away. Three knobs that only matter while
-         // something is actually moving, which for most scenes is never -- and
-         // they are the ones you reach for when it is too slow or too jumpy,
-         // not the ones you set to make a picture.
+         // Motion settings, in a collapsed panel since they matter only while
+         // something moves:
          //
-         // They are also easy to confuse with each other, so they read better
-         // together under one heading than scattered among the axis settings:
-         //
-         //   MotionMaxHz        how often the update stream is ACTED on
-         //   RenderMaxHz        how often the result is DRAWN
-         //   ExtrapolateMotion  whether anything is drawn BETWEEN updates
+         //   MotionMaxHz        how often the update stream is applied
+         //   RenderMaxHz        how often the result is drawn
+         //   ExtrapolateMotion  whether anything is drawn between updates
          let motion = new sap.m.Panel({
             headerText: "Motion",
             expandable: true,
@@ -753,9 +729,6 @@ sap.ui.define([
             }
          });
 
-         // Label first and in the shared column, like every other row. This
-         // one used to put the checkbox first, which broke the label column
-         // wherever a panel mixed a bool with anything else.
          this.makeGedRow(labelName, widget, null, gedFrame);
       },
 
@@ -794,19 +767,9 @@ sap.ui.define([
          gedFrame.addContent(frame);
       },
 
-      /** One row of the editor: a label in a fixed-width column, then the
-       * control, both vertically centred.
-       *
-       * Every setter used to build its own HorizontalLayout, which aligns
-       * nothing: labels came before some controls and after others, each column
-       * was as wide as its own text, and nothing lined up down the panel. An
-       * HBox with a fixed label width gives a single left edge for the labels
-       * and a single left edge for the controls, which is the whole of what
-       * "aligned" means here.
-       *
-       * LABEL_W has to clear the longest name in use -- "BlackBackground" today
-       * -- or the column wraps and the row heights go ragged.
-       */
+      /** One row of the editor: a label in a fixed 130px column, then the
+       * control, both vertically centred. The width must fit the longest label
+       * in use, currently "ExtrapolateMotion", or rows wrap and go ragged. */
       makeGedRow : function(labelText, widget, tip, gedFrame) {
          if (!gedFrame)
             gedFrame = this.getView().byId("GED");
@@ -824,18 +787,10 @@ sap.ui.define([
          return row;
       },
 
-      /** A continuous value, as a slider rather than a text field.
-       *
-       * For a bounded quantity a slider is the honest control: it shows the
-       * range, which a number field does not, and it cannot be given a value
-       * outside it -- so the server-side clamp never has to silently contradict
-       * what was typed. Attenuation is the case that made this obvious: typing
-       * 100 into the field got you 1, with nothing to say so.
-       *
-       * The MIR goes on `change` (drag released), not `liveChange`: every step
-       * of a drag would otherwise be a round trip, and for the font size each
-       * one costs a geometry rebuild on every client of the viewer.
-       */
+      /** A bounded continuous value, as a slider with a numeric readout. The
+       * slider shows the range and cannot leave it, so a server-side clamp never
+       * contradicts what was entered. The MIR is sent when the drag pauses for
+       * the idle delay, and again on release. */
       makeSliderSetter : function(val, labelName, funcName, opts, gedFrame)
       {
          if (!gedFrame)
@@ -846,11 +801,9 @@ sap.ui.define([
 
          let gcm = this;
 
-         // How long the drag has to be still before the value is sent. Reuses
-         // the HTimeout user arg that already governs the hover-highlight
-         // delay, rather than inventing a second idle constant: both answer the
-         // same question, "has the pointer stopped?", and one knob should move
-         // them together. Client default 250 ms, as in GL.controller.
+         // How long the drag must pause before the value is sent: the HTimeout
+         // user arg, which also sets the hover-highlight delay. 250 ms if unset,
+         // as in GL.controller.
          let idle = this.mgr?.handle?.getUserArgs?.("HTimeout");
          if (idle === undefined || !(idle > 0)) idle = 250;
 
@@ -862,16 +815,11 @@ sap.ui.define([
          const max  = (opts.max  !== undefined) ? opts.max  : 1;
          const step = (opts.step !== undefined) ? opts.step : 0.05;
 
-         // Decimals to show, taken from the step: 0.2 wants one, 0.001 wants
-         // three. Deriving it means a range change cannot leave the readout
-         // rounding away the very digits the step can reach.
+         // Decimals shown, derived from the step: 0.2 gives one, 0.001 three.
          const dec = Math.max(0, -Math.floor(Math.log10(step)));
 
-         // A readout beside the slider, not above it. showAdvancedTooltip puts
-         // the value in a chip over the handle, but UI5 leaves that chip up
-         // after the drag ends, so it both obscures the row and lies about
-         // whether anything is being dragged. A plain Text is always there,
-         // never moves, and is legible while the pointer is elsewhere.
+         // A fixed readout beside the slider. showAdvancedTooltip is off because
+         // UI5 leaves its value chip over the handle after the drag ends.
          let readout = new mText({
             text: Number(val).toFixed(dec),
             width: "42px",
@@ -890,18 +838,14 @@ sap.ui.define([
             enableTickmarks: !!opts.tickmarks,
             showAdvancedTooltip: false,
 
-            // Live, but only once the drag has paused. Sending on every
-            // liveChange is a round trip per pixel, and for the font size a
-            // geometry rebuild on every client of the viewer with it; sending
-            // only on release gives no feedback at all while you hunt for the
-            // value. Idle-debounced gets both: the handle tracks the pointer,
-            // the scene catches up the moment you hesitate.
+            // Send once the drag pauses for `idle` ms. Sending on every
+            // liveChange would be a round trip per step, and a font-size change
+            // rebuilds label geometry on every client of the viewer.
             liveChange: function(event) {
                const v = event.getParameter("value");
                const sl = event.getSource();
                gcm.beginInteraction();
-               // The readout is local and immediate -- it must track the handle
-               // even while the MIR is still being held back.
+               // The readout follows the handle at once, ahead of the held-back MIR.
                readout.setText(Number(v).toFixed(dec));
                if (sl._ged_idle) clearTimeout(sl._ged_idle);
                sl._ged_idle = setTimeout(() => { delete sl._ged_idle; send(v); }, idle);
@@ -919,10 +863,8 @@ sap.ui.define([
             }
          });
 
-         // Wheel over the slider nudges it: one step, shift ten, ctrl+shift a
-         // hundred. A slider is a poor instrument for a small exact change --
-         // 150 pixels across a range of twenty is a tenth of a unit per pixel --
-         // and the wheel gives the step back without giving up the drag.
+         // The wheel over the slider moves it by one step, ten with shift, a
+         // hundred with ctrl+shift, for exact values a drag cannot hit.
          const wheelBump = function(ev) {
             ev.preventDefault();
 
@@ -958,11 +900,7 @@ sap.ui.define([
             }
          });
 
-         // The explanation goes on the LABEL as well as the slider.
-         // showAdvancedTooltip gives the slider its own value bubble -- which a
-         // slider needs, since there is otherwise nowhere to read the number --
-         // and that bubble can take the place of the plain hover tooltip. The
-         // label is the one hover target certain to carry the prose.
+         // The tip goes on the label as well as on the slider.
          this.makeGedRow(labelName,
                          new sap.m.HBox({ alignItems: "Center",
                                           items: [slider, readout] }),
@@ -988,7 +926,7 @@ sap.ui.define([
             }
          });
          widget.setType(sap.m.InputType.Number);
-         widget.setWidth("160px");   // match the sliders' control column
+         widget.setWidth("160px");
          this.makeGedRow(labelName, widget, null, gedFrame);
          return widget;
       },
@@ -1027,17 +965,9 @@ sap.ui.define([
          if ( ! (this.ged_visible && this.editorElement &&
                  this.editorElement.fElementId == elementId)) return;
 
-         // buildEditor() destroys and recreates every control, so running it
-         // while the pointer is on one snatches the control away mid-gesture:
-         // the slider jumps back to whatever the element held when the round
-         // was assembled, which is usually the value from one MIR ago. That is
-         // the whole of "the slider resets while I drag it" -- and why it seems
-         // to work for some elements, namely the ones whose setter does not
-         // echo back through here.
-         //
-         // Defer instead. The value under the pointer is already the one the
-         // user wants and the server has just agreed to it; anything else that
-         // changed will be picked up by the rebuild once the gesture ends.
+         // buildEditor() destroys and recreates every control, so a rebuild
+         // during a drag would reset the slider to the last streamed value.
+         // Defer it until the gesture ends; see beginInteraction().
          if (this.interacting) { this.rebuild_pending = true; return; }
 
          this.buildEditor();
@@ -1142,32 +1072,19 @@ sap.ui.define([
          gcm.makeGedRow("Camera Type", comboBox, null, gedFrame);
       },
       
-      /** Axis style: none, from the origin, or a box round the scene.
-       * Mirrors REveViewer::EAxesType -- keys are the enum values and go
-       * straight to SetAxesType(int). Modelled on makeCameraTypeSelector. */
+      /** Axis style: none, from the origin, or a box round the scene. Keys are
+       * REveViewer::EAxesType values and go straight to SetAxesType(int). */
       makeAxesTypeSelector: function(viewer) {
          let gedFrame = this.getView().byId("GED");
          let gcm = this;
 
          let current = viewer.AxesType ? viewer.AxesType : 0;
 
-         // sap.m.Select, NOT sap.m.ComboBox. A ComboBox is a free-text input
-         // with a dropdown attached: for a closed set of three values there is
-         // nothing to type, and its editable `value` is a second piece of state
-         // that can disagree with selectedKey. Constructed the way
-         // makeCameraTypeSelector does it -- selectedKey set before the model is
-         // attached -- it renders with getValue() === "", and once the user has
-         // been round the list the field can end up showing the texts run
-         // together ("BoxOriginOrigin"). Select has no such field.
-         //
-         // The items are a plain array rather than an aggregation binding, so
-         // there is no model to attach late and no synchronisation step to get
-         // wrong.
+         // sap.m.Select rather than sap.m.ComboBox: a closed set needs no text
+         // field, and a ComboBox's editable value can disagree with selectedKey.
+         // The items are a plain array, so there is no model binding to sync.
          let sel = new sap.m.Select({
-            // Wide enough for the longest item plus the arrow. "100%" made it
-            // collapse to the content width of a HorizontalLayout, which is as
-            // narrow as the CURRENT selection -- so picking a longer name than
-            // the one first shown clipped it.
+            // Fixed width, enough for the longest item plus the arrow.
             width: "110px",
             items: [
                new sap.ui.core.Item({ key: "0", text: "None" }),

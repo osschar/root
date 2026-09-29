@@ -26,14 +26,15 @@ sap.ui.define([
          let marker_scale = /^([\d\.]+)$/.        exec(urlParams.get('RQ_MarkerScale'));
          let line_scale = /^([\d\.]+)$/.          exec(urlParams.get('RQ_LineScale'));
 
-         // RQ_HdrStats=1 logs the dynamic range of the buffer feeding the final
-         // pass once, to judge whether the tone curve is earning its keep.
+         // RQ_HdrStats=1 logs, once, the dynamic range of the buffer that feeds
+         // the final pass.
          this.RQ_HdrStats = urlParams.get('RQ_HdrStats') == '1';
 
-         // Tone curve of the final pass. "knee" passes ROOT colours through
-         // unchanged below the knee and rolls highlights off smoothly above it;
-         // "exposure" is the old 1-exp(-2c), which lightens the whole range;
-         // "linear" clamps, which crushes lit surfaces that go over white.
+         // Initial tone curve of the final pass, Simple mode only; the viewer's
+         // streamed ToneMapMode replaces it on the first updateViewerAttributes().
+         // "knee" passes colours through below the knee and rolls highlights off
+         // above it. "exposure" is 1-exp(-2c) and lightens the whole range.
+         // "linear" clamps.
          let tm_mm = /^(knee|exposure|linear)$/.exec(urlParams.get('RQ_ToneMap'));
          this.RQ_ToneMap = (tm_mm) ? tm_mm[0] : "knee";
 
@@ -47,10 +48,9 @@ sap.ui.define([
          this.top_path = jsrp.substring(0, jsrp.length - 10);
          this.eve_path = this.top_path + 'rootui5sys/eve7/';
 
-         // 0 - error, 1 - warning, 2 - info, 3 - debug. Debug prints on every
-         // overlay pick and every picking pass, which is once per pointer move,
-         // so it drowns anything else in the console. Raise it with RQ_LogLevel
-         // when chasing a pick problem.
+         // 0 - error, 1 - warning, 2 - info, 3 - debug; set with RQ_LogLevel.
+         // Level 3 logs every overlay pick and turns on RenderCore's per-pick
+         // diagnostics (window.__RC_PICKDBG), so it is off by default.
          let log_mm = /^[0-3]$/.exec(urlParams.get('RQ_LogLevel'));
          this._logLevel = (log_mm) ? parseInt(log_mm[0]) : 1;
 
@@ -169,19 +169,10 @@ sap.ui.define([
          canvasParentDOM.setAttribute("id", vid);
          canvasParentDOM.style.width = "100%";
 
-         // Height must be "what the toolbar left over", not 100%. This div is a
-         // normal-flow sibling that follows the view's toolbar, so height:100%
-         // made it as tall as the entire view while starting below the toolbar
-         // -- overhanging the view's overflow:hidden edge by exactly the
-         // toolbar's height. GL still rendered that strip, so anything drawn
-         // hard against the bottom of the viewport was painted where the layout
-         // never shows it. A projection axis is what exposed this, being the
-         // only thing deliberately placed on the bottom edge.
-         //
-         // Done with flex rather than a computed pixel height so it needs no
-         // measurement, survives a toolbar that changes size, and degrades to
-         // the full height when there is no toolbar at all. min-height:0 is
-         // required or the flex item refuses to shrink below its content.
+         // The canvas div follows the view's toolbar, so it takes the leftover
+         // height as a flex item. height:100% would overhang the view's bottom
+         // edge by the toolbar height, and GL would draw into the hidden strip.
+         // min-height:0 lets the flex item shrink below its content.
          this.get_view().getDomRef().style.display = "flex";
          this.get_view().getDomRef().style.flexDirection = "column";
          canvasParentDOM.style.flex = "1 1 0";
@@ -213,10 +204,8 @@ sap.ui.define([
          //    this.RQ_SSAA /= this.canvas.pixelRatio;
          // }
 
-         // Stable handle for the browser console and for test harnesses. There is
-         // otherwise no way to reach a viewer, its scene or its materials from
-         // outside -- which is what makes things like setting a clipping plane by
-         // hand awkward. Cheap, and in the same spirit as __RC_PICKDBG.
+         // Handles for the browser console and test harnesses: every RCore
+         // viewer in window.__RC_VIEWERS, and the RenderCore module in window.__RC.
          (window.__RC_VIEWERS = window.__RC_VIEWERS || []).push(this);
          window.__RC = RC;   // the module itself, so RC.Vector3 & co. work in the console
 
@@ -267,17 +256,8 @@ sap.ui.define([
 
          this.createCameraAndLights();
 
-         // The overlay is a fixed (0,0)-(1,1) screen box, so it needs its own
-         // orthographic camera rather than the scene camera. Screen-mode ZText
-         // maps VPos to clip space itself and ignores this, but any ordinary mesh
-         // placed in the overlay -- GUI elements, frames, images -- needs it.
-         //
-         // NOTE for multi-user: this box is normalised, not aspect-corrected, so a
-         // client with a different window ratio sees the same fractions of its own
-         // viewport, not the same shape. ZText compensates by dividing x by the
-         // aspect; plain meshes would need the same treatment, or the box would
-         // have to move to NDC. Deliberately left as-is until we decide what
-         // "the same overlay" should mean across screens of different ratios.
+         // The overlay is a (0,0)-(1,1) screen box with its own orthographic
+         // camera. Screen-mode ZText ignores this camera; other overlay meshes use it.
          this.overlay_camera = new RC.OrthographicCamera(0, 1, 1, 0, -1000, 1000);
 
          this.rqt = new RC.RendeQuTor(this.renderer, this.scene, this.camera,
@@ -383,11 +363,8 @@ sap.ui.define([
       {
          let dome = this.canvas.canvasDOM;
 
-         // The tooltip used to be a div.eve_tooltip appended here. It is now a
-         // ZText in the overlay scene (see Annotations), so that it is in the
-         // framebuffer and therefore in screen captures, and so that it can
-         // later be kept, moved and resized by the machinery every other
-         // floating element already uses.
+         // The hover tooltip is a ZText in the overlay scene, owned by
+         // Annotations, so it appears in image captures.
 
 
          // Setup some event pre-handlers
@@ -442,21 +419,11 @@ sap.ui.define([
             this.addEventListener('pointerup', glc.mouseup_listener);
          });
 
-         // Re-run the hover pick once a pointer interaction ends.
-         //
-         // Nothing else does: pointermove only arms the hover timeout while no
-         // button is held, so after a rotation what sits under the cursor has
-         // changed and nothing has noticed. It cannot live in mouseup_listener
-         // either -- pointermove calls removeMouseupListener(), so that listener
-         // survives only a click that never moved, which is precisely not a
-         // drag. A plain pointerup handler is the one thing that always runs.
-         //
-         // At the END of the interaction, deliberately, never during it.
-         // elementHighlighted() reaches the server through
-         // elementSelectedSendMIR(), so re-picking while the camera moves would
-         // send a MIR per frame as the scene sweeps under a stationary cursor.
-         // The idle delay also means a drag that stops and immediately resumes
-         // costs nothing at all.
+         // Re-run the hover pick when a pointer interaction ends. pointermove
+         // arms the hover timeout only while no button is held, and any move
+         // removes mouseup_listener, so nothing else notices what a rotation
+         // brought under the cursor. Picking during the drag would send a
+         // highlight MIR per frame.
          dome.addEventListener('pointerup', function(event) {
             glc.removeMouseMoveTimeout();
             glc.mousemove_timeout = setTimeout(
@@ -613,10 +580,9 @@ sap.ui.define([
 
       recalcSceneBBox()
       {
-         // The axis is built FROM the bounding box, so it must not contribute
-         // TO it: its ticks reach past the box and every rebuild would push the
-         // box further out. Its labels would be worse -- their vertices are
-         // screen-space vec2, which expandByObject reads as 3D points at z=0.
+         // Exclude the axis: it is built from this box, and its ticks reach past
+         // it, so including it would grow the box on every rebuild. Its label
+         // vertices are screen-space vec2, which expandByObject would read as 3D.
          const ax = this.axis3d ? this.axis3d.group : null;
          if (ax) this.scene.remove(ax);
          this.scene_bbox.setFromObject( this.scene );
@@ -633,18 +599,10 @@ sap.ui.define([
          this.updateRenderBBox();
       }
 
-      /** The box the camera's near and far planes are fitted to.
-       *
-       * Not scene_bbox: the axis is excluded from that one on purpose, since it
-       * is built from it and would otherwise inflate itself every rebuild. But
-       * the axis DRAWS ticks, numbers and names outside the box, and
-       * optimizeNearFar fits the eight corners with 0.1% slack -- so anything
-       * beyond them is clipped, and as the camera turns a different part of the
-       * axis is beyond them. That is what decorations flickering in and out of
-       * existence during a slow rotation actually is.
-       *
-       * Recomputed whenever either input can have changed: the scene extent, or
-       * the axis style (which decides whether there is a margin at all). */
+      /** The box the camera's near and far planes are fitted to: axes_bbox or
+       * scene_bbox, widened by Axis3D.getRenderMargin() so that axis ticks and
+       * labels outside the box are not clipped. Call it when the scene extent
+       * or the axis style changes. */
       updateRenderBBox()
       {
          this.render_bbox = (this.axes_bbox || this.scene_bbox).clone();
@@ -757,22 +715,17 @@ sap.ui.define([
          this.applyRenderParams(eveView);
          this.recolourFgElements();
 
-         // AxesType is REveViewer::EAxesType -- kAxesNone/kAxesOrigin/kAxesEdge.
-         // Passed through whole rather than collapsed to a bool, so origin and
-         // box styles can finally be told apart. Attenuation rides along as a
-         // plain field: applied here, but held on the server so every client of
-         // the viewer agrees and it survives a reload.
-         // Font size before style: it is baked into the glyph geometry, so
-         // setting it after a rebuild would throw that geometry away again.
+         // AxesType is REveViewer::EAxesType: kAxesNone, kAxesOrigin or kAxesEdge.
+         // Font size is set before the style because setStyle() rebuilds and the
+         // size is baked into the glyph geometry.
          if (eveView.AxesFontSize !== undefined)
             this.axis3d.font_size = eveView.AxesFontSize;
          this.axis3d.setStyle(eveView.AxesType);
          if (eveView.AxesUpAxis !== undefined)
             this.axis3d.setUpAxis(eveView.AxesUpAxis);
 
-         // A declared axis volume replaces the computed scene box, for the axis
-         // and the clip box only -- camera framing still follows the content,
-         // so declaring a large volume does not push the view off it.
+         // A declared axis volume replaces scene_bbox for the axis and the
+         // near/far fit only. Camera framing still follows scene_bbox.
          if (eveView.AxesBBox) {
             let b = eveView.AxesBBox;
             this.axes_bbox = new RC.Box3(new RC.Vector3(b[0], b[1], b[2]),
@@ -797,8 +750,6 @@ sap.ui.define([
             this.annotations.setFontSize(eveView.TooltipFontSize);
          if (eveView.TooltipAlpha !== undefined && this.annotations)
             this.annotations.setPlateAlpha(eveView.TooltipAlpha);
-         // The axis style decides how far outside scene_bbox anything is drawn,
-         // so the clip-plane box has to follow it -- not only the scene extent.
          this.updateRenderBBox();
 
 
@@ -857,9 +808,7 @@ sap.ui.define([
          this.render_requested = false;
          this.overlay.updatePixelScale();
          this.overlay.updateProjectionAxes();
-         // Annotation buttons hang off their box's laid-out rect, and a drag
-         // moves that box through ovlSetPos without announcing it, so there is
-         // nothing to hook -- re-place them per frame instead.
+         // Re-placed every frame; see Annotations.layout() for why.
          if (this.annotations) this.annotations.layout();
          if (this.axis3d) this.axis3d.updateForCamera(this.camera);
          if (this.render_requested_recalc_sbbox) {
@@ -1097,15 +1046,9 @@ sap.ui.define([
             return null;
          }
 
-         // Walk up to the owning REve element -- but STOP at the root.
-         //
-         // Every overlay object used to be streamed from the server and so had
-         // an eve_el somewhere above it, and this loop relied on that: it ran
-         // off the top of the hierarchy and threw on null.parent for anything
-         // else. Client-local overlay elements -- kept annotations and their
-         // buttons -- have no eve_el at all and are exactly that case, so the
-         // pick threw before Overlay.onMouseDown() could set up a drag. That
-         // is why they could not be moved or resized.
+         // Walk up to the owning REve element, stopping at the root.
+         // Client-local overlay elements, such as kept annotations and their
+         // buttons, have no eve_el.
          let top_obj = state_overlay.object;
          while (top_obj && top_obj.eve_el === undefined)
             top_obj = top_obj.parent;
@@ -1123,8 +1066,8 @@ sap.ui.define([
          state_overlay.mouse = new RC.Vector2( ((x + 0.5) / state_overlay.w) * 2 - 1,
                                       -((y + 0.5) / state_overlay.h) * 2 + 1 );
 
-         // Same for the control: a client-local element has none, and needs
-         // none -- dragging and resizing go through ovlGetPos/ovlSetPos.
+         // A client-local element has no control either. Overlay drags and
+         // resizes it through ovlGetPos/ovlSetPos.
          let ctrl_obj = state_overlay.object;
          while (ctrl_obj && ctrl_obj.get_ctrl === undefined)
             ctrl_obj = ctrl_obj.parent;
@@ -1255,9 +1198,7 @@ sap.ui.define([
          this._ttip_key = GlViewerRCore.ttipKey(pstate, idx);
          this.highlighted_top_object = pstate.top_object;
 
-         // Position and edge-flipping now belong to the tooltip itself: it is a
-         // ZText in the overlay scene, so it knows its own laid-out box and does
-         // not need the DOM offset arithmetic this used to do against the view.
+         // Annotations positions the tooltip and flips it at the viewport edges.
          this.annotations.showTooltip(this._ttip_text, x, y);
       }
 
@@ -1270,20 +1211,11 @@ sap.ui.define([
 
       /** The text an annotation should carry for this pick.
        *
-       * Prefer what the tooltip is actually showing. For secondary-selectable
-       * elements -- REveDataItemList, REveDigitSet, REveCaloData, REveGeoTopNode
-       * -- that text came from the server: REveSelection streams
-       * GetHighlightTooltip() in the highlight record and remoteToolTip() installs
-       * it. Those elements have no client-side tooltip of their own, so
-       * ctrl.getTooltipText() falls through to EveElemControl's fTitle || fName,
-       * which is a single line. Recomputing it here is what made an annotation on
-       * a FireworksWeb collection item keep the first line and drop every line the
-       * server had added -- while the tooltip beside it showed all of them.
-       *
-       * The key guards against annotating text that belongs to something else:
-       * the menu's own DOM opening over the canvas fires pointerleave, which
-       * clears the highlight but not the text, and the menu takes a fresh pick
-       * that need not land on what was last hovered. */
+       * Returns the displayed tooltip text when it belongs to this pick, since
+       * that text may have come from the server through remoteToolTip() and be
+       * longer than ctrl.getTooltipText(). The key check is needed because the
+       * context menu takes its own pick, which need not hit the last hovered
+       * element. */
       tooltipTextForPick(pstate, idx)
       {
          const key = GlViewerRCore.ttipKey(pstate, idx);
@@ -1362,21 +1294,14 @@ sap.ui.define([
             let data = { "p": pstate, "v": this, "cctrl": this.controls};
             menu.add("Set Camera Center", data, this.setCameraCenter.bind(data));
 
-            // Built from THIS pick, not from the live hover tooltip.
-            //
-            // The tooltip is already gone by now: the menu's DOM opens over the
-            // canvas, the canvas gets pointerleave, and that clears the
-            // highlight and hides the tooltip -- so an entry gated on the
-            // tooltip being visible could never be reached. This pick has
-            // everything the tooltip had anyway, and depth besides.
+            // Built from this pick, not from the hover tooltip: opening the menu
+            // fires pointerleave on the canvas, which hides the tooltip.
             if (this.annotations) {
                const idx = pstate.ctrl ? pstate.ctrl.extractIndex(pstate.instance) : null;
                const txt = this.tooltipTextForPick(pstate, idx);
                if (txt) {
-                  // What the annotation is ABOUT. Kept so it can die with its
-                  // subject -- in an event display the picked object is gone by
-                  // the next event, and an annotation that outlives it points
-                  // confidently at whatever has taken its place.
+                  // The annotation's subject. Annotations removes the annotation
+                  // when this element goes away, typically on the next event.
                   const tgt = { elementId: pstate.eve_el.fElementId,
                                 sceneId:   pstate.eve_el.fSceneId };
                   const d = { a: this.annotations, txt: txt, tgt: tgt,
@@ -1384,8 +1309,7 @@ sap.ui.define([
                   menu.add("Annotate", d,
                            function(q) { q.a.keepAt(q.txt, q.ox, q.oy, null, q.tgt); });
 
-                  // The same pick already carries depth -- that is what "Set
-                  // Camera Center" uses -- so the 3D point costs nothing extra.
+                  // The pick was taken with depth, so it also gives a 3D anchor.
                   const w = this.annotations.worldFromPick(pstate);
                   if (w) {
                      const dc = { a: this.annotations, txt: txt, tgt: tgt,
@@ -1444,10 +1368,10 @@ sap.ui.define([
 
       handleMouseSelect(event)
       {
-         // A press that landed on an overlay element belongs to the overlay.
-         // pointerup runs before the compatibility mouseup that ends the overlay
-         // drag, so overlay.drag is still set here -- without this, clicking an
-         // overlay button would also clear the scene selection behind it.
+         // A press on an overlay element belongs to the overlay. pointerup runs
+         // before the compatibility mouseup that ends the overlay drag, so
+         // overlay.drag is still set here. Without this check a click on an
+         // overlay button would also clear the scene selection.
          if (this.overlay.drag) return;
 
          let x = event.offsetX * this.canvas.pixelRatio;
@@ -1467,11 +1391,9 @@ sap.ui.define([
 
       }
 
-      /** Re-colour elements that follow the viewer's foreground colour.
-       *
-       * Chrome -- a projection axis, say -- has to stay legible when the
-       * background flips, and the flip happens long after the object was built,
-       * so the colour cannot simply be baked in at construction. */
+      /** Re-colour every object flagged use_fg_color with the viewer's
+       * foreground colour. The background can change after the object was
+       * built, so the colour cannot be fixed at construction. */
       recolourFgElements()
       {
          let fg = this.fgCol;
@@ -1482,11 +1404,9 @@ sap.ui.define([
          if (this.scene) this.scene.traverse(recolour);
       }
 
-      /** Apply the viewer's look parameters: light scale and tone curve.
-       *
-       * The authored intensity of each light is remembered the first time it is
-       * seen, and the scale is always applied to that -- scaling the current
-       * value would compound on every viewer update. */
+      /** Apply the viewer's light scale, tone curve and auto-tune request.
+       * The scale multiplies each light's intensity as first seen, so repeated
+       * updates do not compound. */
       applyRenderParams(eveView)
       {
          if (!eveView) return;
@@ -1526,8 +1446,8 @@ sap.ui.define([
          let eveView = this.controller.mgr.GetElement(this.controller.eveViewerId);
          let cur = (eveView && eveView.LightScale !== undefined) ? eveView.LightScale : 1.0;
 
-         // Ambient is not scaled by the lights alone, so this is approximate --
-         // aim just under white and let a second request refine it if needed.
+         // Approximate: unlit and emissive colour does not scale with the
+         // lights. Aim just under white; a second request refines it.
          const target = 0.98;
          let next = cur * target / st.max_channel;
          next = Math.min(Math.max(next, 0.05), 8.0);
@@ -1539,16 +1459,11 @@ sap.ui.define([
                                      "ROOT::Experimental::REveViewer");
       }
 
-      /** GL resource recycling, called by EveManager around a scene rebuild --
-       * see the block comment at the top of this file. A GL buffer or texture
-       * is only a cache of the BufferAttribute or Texture holding the data, so
-       * nothing has to track what a dropped element owned: age everything
-       * first, rebuild, then drop whatever the rebuild did not reach for.
-       *
-       * REve is what drives this because REve is the only one that knows when
-       * the scene has finished changing. RenderCore sees a stream of draws and
-       * cannot tell an element that was removed from one that simply was not
-       * visible this frame. */
+      /** Age every GL buffer and texture before a scene rebuild. EveManager
+       * calls this, then clearAttributesAndTextures() after the rebuild, which
+       * drops whatever the rebuild did not touch. A GL resource is only a cache
+       * of its BufferAttribute or Texture, so no element has to track what it
+       * allocated. */
       timeStampAttributesAndTextures() {
          try {
             this.renderer.ageResources();

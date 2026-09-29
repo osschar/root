@@ -723,14 +723,12 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager) {
          );
       }
 
-      // `repeat` gives the texture RepeatWrapping instead of ClampToEdge, which
-      // is what makes tiling coefficients such as REveSMorph's fTexXC mean
-      // anything -- clamped, the second wrap onwards is a smear of edge pixels.
+      // `repeat` selects RepeatWrapping instead of ClampToEdge, for tiling
+      // coefficients such as REveSMorph's fTexXC.
       //
-      // The cache is keyed on the URL, and the same image fetched with two
-      // wrappings would silently get whichever arrived first. The "#repeat"
-      // fragment keeps the two apart: it makes a distinct key, and the browser
-      // strips it before the request, so both still fetch one file.
+      // The texture cache is keyed on the URL. The "#repeat" fragment gives the
+      // repeating variant its own key; the browser strips it, so both variants
+      // fetch the same file.
       GetRgbaTexture(name, callback, repeat) {
          let url = this.viewer.eve_path + 'textures/' + name;
          let wrap = repeat ? RC.Texture.WRAPPING.RepeatWrapping
@@ -880,11 +878,9 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager) {
             () => this.viewer.request_render()
          );
 
-         // No position here: a text with a transform gets its matrix by the ordinary
-         // route -- REveElement::BuildRenderData writes fMainTrans into the render
-         // data and EveScene applies it with setMatrixFromArray. Writing .position
-         // did nothing, since GlViewerRCore turns quaternions and auto-update off.
-         // Movable if pickable; resizable only if the element says so.
+         // No position here: REveElement::BuildRenderData writes fMainTrans into
+         // the render data and EveScene applies it with setMatrixFromArray().
+         // Movable if pickable; resizable unless the element turns it off.
          text.resizable = (el.fResizable === undefined) ? true : !!el.fResizable;
          if (el.fPickable) this.RcPickable(el, text);
          return text;
@@ -893,10 +889,9 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager) {
       //==============================================================================
       // makeLogo
       //
-      // A screen-space image for an overlay scene, drawn as a ZSprite: constant
-      // pixel size, shape taken from the image alpha. Implements the same small
-      // interaction interface as ZText, so the viewer's move / corner-resize
-      // handling drives it with no extra code.
+      // A screen-space image for an overlay scene, drawn as an RC.ZLogo (a
+      // ZSprite): constant pixel size, shape from the image alpha. It implements
+      // the ZText interaction interface, so Overlay moves and resizes it as is.
       //==============================================================================
 
       makeLogo(el, rnr_data)
@@ -909,9 +904,9 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager) {
             resizable: el.fResizable
          });
 
-         // 0 a directory registered with REveLogo::SetImageDir, 1 the ZSprite
-         // template textures shipped in ui5/eve7/textures, 2 an absolute URL the
-         // browser fetches itself -- see the CORS caveats on REveLogo::SetFile.
+         // fSource is REveLogo::EImageSource_e: kImageDir (0) is the directory
+         // registered with REveLogo::SetImageDir, kTextures (1) is ui5/eve7/textures,
+         // kRemote (2) is an absolute URL. See REveLogo::GetFile for CORS caveats.
          let url;
          switch (el.fSource) {
             case 2:  url = el.fFile; break;
@@ -942,15 +937,9 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager) {
       //==============================================================================
       // makeSMorph
       //
-      // A parametric, texture-mapped surface of spherical topology. The server
-      // (REveSMorph) sends only the parameters -- the geometry is generated
-      // here, because the surface is textured and REveRenderData carries no UV
-      // channel. Ported from Gled's SMorph::Triangulate / Messofy, whose
-      // parameter names it keeps.
-      //
-      // The surface is built at unit size; size, position and orientation all
-      // live in the element's transformation, which is why an animated SMorph
-      // streams one matrix per frame and never comes back through here.
+      // Generates the REveSMorph surface from its parameters, at unit size; the
+      // element's transformation carries size, position and orientation. See the
+      // REveSMorph class doc for why the geometry is built on the client.
       //==============================================================================
 
       makeSMorph(el, rnr_data)
@@ -1005,8 +994,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager) {
                const y = (1 + conv) * st * Math.cos(phi + twist);
                const z = (1 + conv) * st * Math.sin(phi + twist);
 
-               // Shear about z, growing along the polar axis -- which is x here,
-               // not z, exactly as in SMorph.
+               // Rotate about z by an angle proportional to x, which is the
+               // polar axis here, as in SMorph.
                const a = x * el.fRz, ca = Math.cos(a), sa = Math.sin(a);
                const X = x * ca - y * sa;
                const Y = x * sa + y * ca;
@@ -1048,23 +1037,16 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager) {
 
          let mop = 1 - el.fMainTransparency / 100;
          let mat = this.RcFancyMaterial(RcCol(el.fMainColor), mop);
-         // Two-sided: a partial sweep in theta or phi is an open shell, and the
-         // inside of it is exactly what you cut it open to see.
+         // Two-sided: a partial sweep in theta or phi is an open shell.
          mat.side = RC.FRONT_AND_BACK_SIDE;
 
          // RcFancyMaterial's specular is a green-tinted (0.3, 0.4, 0.3), which
-         // suits a solid-colour detector shape but casts a wash over a texture
-         // and takes white squares off-white. Neutral and weaker here: the
-         // texture is the thing being looked at.
+         // tints a texture. Use a weaker neutral one.
          mat._specular = new RC.Color(0.12, 0.12, 0.12);
          mat._shininess = 24;
 
-         // The server's bounding box, analytic and exact, as JSON in min-then-max
-         // order. Not out of the normals channel, where makeBoxSet and makeHit
-         // read theirs: those types are drawn instanced, one primitive plus a
-         // data texture of placements, so RenderCore cannot see their extent at
-         // all. This one generates real geometry and could be measured -- the
-         // box is sent only because the server already has it in closed form.
+         // The server's analytic bounding box, sent as JSON in min-then-max
+         // order rather than in the normals channel that makeBoxSet and makeHit use.
          let bb = el.bbox;
          if (bb && bb.length >= 6)
             geo.setExternalBoundingBox(new RC.Box3(new RC.Vector3(bb[0], bb[1], bb[2]),
@@ -1085,18 +1067,16 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function (EveManager) {
       //==============================================================================
       // makeProjectionAxis
       //
-      // Ticks arrive in PROJECTED coordinates and deliberately over-provided --
-      // a wider range and finer subdivision than any one view needs. Mapping them
-      // to screen is affine under the orthographic camera of a 2D projected view,
-      // so GlViewerRCore recomputes the layout locally on zoom and pan; nothing
-      // goes back to the server until the projection itself changes.
+      // Ticks arrive in projected coordinates, over a wider range and at a finer
+      // subdivision than any one view needs. Under the orthographic camera of a
+      // 2D view the map to screen is affine, so Overlay.updateProjectionAxes()
+      // re-lays them on zoom and pan without a round trip to the server.
       //==============================================================================
 
       makeProjectionAxis(el, rnr_data)
       {
-         // An axis is chrome: unless told otherwise it takes the viewer's
-         // foreground colour, so it stays legible when the background flips.
-         // Its own colours would leave it black on black.
+         // Unless fUseFgColor is false, the axis takes the viewer's foreground
+         // colour, so it stays legible when the background changes.
          let use_fg = (el.fUseFgColor === undefined) ? true : !!el.fUseFgColor;
          let txt_col = use_fg ? this.viewer.fgCol : RcCol(el.fTextColor);
 
