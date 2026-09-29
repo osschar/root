@@ -122,7 +122,7 @@ sap.ui.define([], function() {
          /** Edge-on key plus octant key the current geometry was built for,
           * from _degenKey() and _octantKey(). updateForCamera() rebuilds when
           * it changes. Null means not built for any camera. */
-         this._octant = null;
+         this._camSig = null;
       }
 
       /** Origin, box, or nothing. */
@@ -157,8 +157,6 @@ sap.ui.define([], function() {
             this.viewer.request_render();
          }
       }
-
-      getFontSize() { return this.font_size; }
 
       /** How far past the bounding box the camera's clip box must extend for
        * this axis, in world units.
@@ -196,7 +194,6 @@ sap.ui.define([], function() {
 
       rebuild() {
          this.clear();
-         this._octant = null;
          this._camSig = null;
          if (this.style === STYLE.NONE || !this.bbox) return;
 
@@ -242,9 +239,8 @@ sap.ui.define([], function() {
          // Record what this geometry was built for, so the camera check does
          // not immediately rebuild the very thing it just triggered.
          if (this.viewer.camera) {
-            this._octant = (this.style === STYLE.BOX)
-                         ? this._octantKey(this.viewer.camera) : "";
-            this._camSig = this._degenKey(this.viewer.camera) + "/" + this._octant;
+            const ok = (this.style === STYLE.BOX) ? this._octantKey(this.viewer.camera) : "";
+            this._camSig = this._degenKey(this.viewer.camera) + "/" + ok;
          }
 
          // ---- lines and ticks ------------------------------------------------
@@ -457,7 +453,6 @@ sap.ui.define([], function() {
          a = (a >= 0 && a <= 2) ? a : -1;
          if (a === this.up_axis) return;
          this.up_axis = a;
-         this._octant = null;   // the panel set changes; force a rebuild
          this.rebuild();
       }
 
@@ -674,7 +669,6 @@ sap.ui.define([], function() {
          const sig = dk + "/" + ok;
          if (sig !== this._camSig) {
             this._camSig = sig;
-            this._octant = ok;
             this._build();
             return true;
          }
