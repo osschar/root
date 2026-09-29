@@ -215,12 +215,12 @@ sap.ui.define([], function() {
          v.request_render();
       }
 
-      /** A click on an overlay element. A local `_ovl_click` handler wins, which
+      /** A click on an overlay element. A local `onOverlayClick` handler wins, which
        * is how annotation buttons act on the client alone. Otherwise, if the
        * streamed element carries a click action, send its MIR: a button exists
        * to change server state, so the result reaches every client. */
       click(obj) {
-         if (obj && typeof obj._ovl_click === "function") { obj._ovl_click(); return; }
+         if (obj && typeof obj.onOverlayClick === "function") { obj.onOverlayClick(); return; }
 
          const el = obj ? obj.eve_el : null;
          if (!el || !el.fClickMir) return;

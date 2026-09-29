@@ -401,7 +401,7 @@ sap.ui.define([], function() {
    /** One kept annotation: a text box, its X (close) and E (edit) buttons,
     * and, when it has a 3D anchor, a connector line. The three ZTexts are
     * ordinary overlay objects, dragged and highlighted by Overlay. The buttons
-    * act on the client through `_ovl_click`, which Overlay.click() calls in
+    * act on the client through `onOverlayClick`, which Overlay.click() calls in
     * place of sending a MIR.
     */
    class Annotation {
@@ -426,7 +426,6 @@ sap.ui.define([], function() {
          this.text_obj.pickable  = true;
          this.text_obj.resizable = true;
          owner._plate(this.text_obj);
-         this.text_obj._ovl_click = () => {};   // a click on the body does nothing
 
          this.btn_close = this._makeButton("X", () => this.remove());
          this.btn_edit  = this._makeButton("E", () => this.edit());
@@ -466,7 +465,7 @@ sap.ui.define([], function() {
          // own hit area to the grip, and there is nothing to resize.
          b.resizable = false;
          this.owner._plate(b, this._frameFrac());
-         b._ovl_click = onclick;
+         b.onOverlayClick = onclick;
          return b;
       }
 
