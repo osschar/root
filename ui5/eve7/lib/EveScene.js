@@ -287,10 +287,7 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
 
          let mot_viewer = this.glctrl ? this.glctrl.viewer : null;
 
-         if (typeof obj3d.updateTrans === "function") {
-            obj3d.updateTrans(el, msg);
-         }
-         else if (msg.matrix) {
+         if (msg.matrix) {
             if (this.mgr.is_rcore) {
                obj3d.setMatrixFromArray(msg.matrix);
             } else {

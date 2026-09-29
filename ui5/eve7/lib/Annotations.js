@@ -59,29 +59,15 @@ sap.ui.define([], function() {
          this._tip = null;       // the hover tooltip ZText
          this._pending = null;   // text asked for before the font arrived
          this._kept = [];        // Annotation instances
+         this._keep_pending = null;   // keepAt() request waiting for the font
+         this._font_requested = false;
+         this._watched = {};     // ids of the scenes registered with, see _watchScene()
+         this._last = null;      // last tooltip text and position, see updateText()
       }
 
       //-----------------------------------------------------------------------
       // Kept annotations
       //-----------------------------------------------------------------------
-
-      /** Is there something to keep? The context menu asks before offering. */
-      canKeep() { return !!(this._tip && this._tip.visible && this._tip.text); }
-
-      /** Turn the current hover tooltip into a kept annotation: a copy of it
-       * that stays put, can be moved and resized, and carries its own buttons.
-       *
-       * A copy rather than a handover -- the tooltip goes on being the tooltip.
-       * Keeping twice in a row should give two annotations, not move one. */
-      keepCurrent() {
-         if (!this.canKeep()) return null;
-         const a = new Annotation(this, this._tip.text, this._tip.ovlGetPos(),
-                                  this._tip.fontSize);
-         this._kept.push(a);
-         this.hideTooltip();
-         this.viewer.request_render();
-         return a;
-      }
 
       /** Keep an annotation with `text` at (x, y), CSS pixels from the canvas
        * top-left. `anchor3d` is a world point for a connector, or null.
@@ -92,9 +78,10 @@ sap.ui.define([], function() {
       keepAt(text, x, y, anchor3d, target) {
          if (!text) return null;
          if (!this._font) {
-            // Only the latest request is remembered.
-            this._ensureFont();
+            // Only the latest request is remembered. Recorded before asking for
+            // the font, because a cached font is delivered synchronously.
             this._keep_pending = { text: text, x: x, y: y, a3: anchor3d, tgt: target };
+            this._ensureFont();
             return null;
          }
          return this._keepAtNow(text, x, y, anchor3d, target);
@@ -119,7 +106,6 @@ sap.ui.define([], function() {
       _watchScene(a) {
          const sid = a.target && a.target.sceneId;
          if (!sid) return;
-         this._watched = this._watched || {};
          if (this._watched[sid]) return;
          const mgr = this.viewer.controller ? this.viewer.controller.mgr : null;
          if (!mgr || typeof mgr.RegisterSceneReceiver !== "function") return;
@@ -226,8 +212,6 @@ sap.ui.define([], function() {
             this.viewer.request_render();
          }
       }
-
-      getFontSize() { return this.font_size; }
 
       hideTooltip() {
          this._pending = null;
@@ -343,8 +327,6 @@ sap.ui.define([], function() {
          }
          this.viewer.request_render();
       }
-
-      getPlateAlpha() { return this.plate_alpha; }
 
       _build() {
          const RC = this.RC;
@@ -483,7 +465,7 @@ sap.ui.define([], function() {
          // Not resizable: a button with a resize grip would hand over half its
          // own hit area to the grip, and there is nothing to resize.
          b.resizable = false;
-         this.owner._plate(b, this.owner.frame_line / this.owner.btn_scale);
+         this.owner._plate(b, this._frameFrac());
          b._ovl_click = onclick;
          return b;
       }
