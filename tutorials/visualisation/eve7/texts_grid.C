@@ -97,7 +97,7 @@ static void PanelA(REveElement *h)
    float y = 0.97;
    for (int i = 0; i < kNSizes; ++i) {
       float s = kSizes[i];
-      auto t = MakeText(h, Form("A_%02d_size_%.3f", i, s), Form("%.3f %s", s, kRuler), "LiberationSans-Regular", 1, s,
+      auto t = MakeText(h, Form("A_%02d_size_%.3f", i, s), Form("%.3f %s", s, kRuler), "LiberationSerif-Regular", 1, s,
                         kBlack);
       t->SetPosition(REveVector(0.01, y, 0.0));
       y -= 2.2 * s + 0.012;
@@ -123,7 +123,7 @@ static void PanelC(REveElement *h)
    float y = -kWorldLim + 10.0;
    for (int i = 0; i < kNSizes; ++i) {
       float s = 200.0 * kSizes[i]; // world units: 1.0 .. 12.0
-      auto t = MakeText(h, Form("C_%02d_size_%.1f", i, s), Form("%.1f %s", s, kRuler), "LiberationSans-Regular", 0, s,
+      auto t = MakeText(h, Form("C_%02d_size_%.1f", i, s), Form("%.1f %s", s, kRuler), "LiberationSerif-Regular", 0, s,
                         kRed + 2);
       t->RefMainTrans().SetPos(-kWorldLim, y, 0.0);
       y += 2.4 * s + 3.0;
@@ -138,14 +138,14 @@ static void PanelD(REveElement *h)
    const int angles[] = {0, 20, 40, 60, 75};
    for (int i = 0; i < 5; ++i) {
       auto t = MakeText(h, Form("D_rotY_%02d", angles[i]), Form("Y%02d %s", angles[i], kRuler),
-                        "LiberationSans-Regular", 0, 8.0f, kGreen + 3);
+                        "LiberationSerif-Regular", 0, 8.0f, kGreen + 3);
       auto &tr = t->RefMainTrans();
       tr.SetPos(-kWorldLim, 20.0 * i + 10.0, 0.0);
       tr.SetRotByAngles(0.0, angles[i] * d2r, 0.0);
    }
    for (int i = 0; i < 5; ++i) {
       auto t = MakeText(h, Form("D_rotX_%02d", angles[i]), Form("X%02d %s", angles[i], kRuler),
-                        "LiberationSans-Regular", 0, 8.0f, kMagenta + 2);
+                        "LiberationSerif-Regular", 0, 8.0f, kMagenta + 2);
       auto &tr = t->RefMainTrans();
       tr.SetPos(-kWorldLim, -20.0 * i - 10.0, 0.0);
       tr.SetRotByAngles(angles[i] * d2r, 0.0, 0.0);
@@ -160,7 +160,7 @@ static void PanelE(REveElement *h)
    AddBBoxAnchor(h, kWorldLim);
    for (int i = 0; i < 5; ++i) {
       double z = -kWorldLim + i * (2.0 * kWorldLim / 4.0);
-      auto t = MakeText(h, Form("E_%02d_z_%+.0f", i, z), Form("z%+.0f %s", z, kRuler), "LiberationSans-Regular", 2,
+      auto t = MakeText(h, Form("E_%02d_z_%+.0f", i, z), Form("z%+.0f %s", z, kRuler), "LiberationSerif-Regular", 2,
                         0.022f, kOrange + 7);
       t->RefMainTrans().SetPos(-kWorldLim, -kWorldLim + i * 45.0, z);
    }

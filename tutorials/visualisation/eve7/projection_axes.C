@@ -117,8 +117,6 @@ static void makeProjectedView(REveManager *eveMng, REveElement *content, REvePro
 
    axis = new REveProjectionAxis(mng, Form("%s Axis", name));
    axis->SetFontSize(0.022);
-   axis->SetTextColor(TColor::GetColor("#1f2d36"));
-   axis->SetLineColor(TColor::GetColor("#6b8290"));
    axis->SetFont(kAxisFont);
    ovl->AddElement(axis);
 
