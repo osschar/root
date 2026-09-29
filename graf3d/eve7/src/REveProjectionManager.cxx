@@ -81,7 +81,7 @@ void REveProjectionManager::RemoveDependent(REveElement *el)
 /// Updates name to have consistent information with projection.
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Add \p steps * 1e-4 to the distortion of the current projection, clamped at
+/// Add `steps` * 1e-4 to the distortion of the current projection, clamped at
 /// zero, reproject, and refresh the REveProjectionAxis nieces. Called by MIR.
 
 void REveProjectionManager::BumpDistortion(Int_t steps)

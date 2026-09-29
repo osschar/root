@@ -48,7 +48,7 @@ fMode, fResizable, the alignment and the frame are not used.
 
 namespace {
 
-/// Format a tick value with enough decimals to separate ticks \p step apart;
+/// Format a tick value with enough decimals to separate ticks `step` apart;
 /// exponent form outside [1e-4, 1e5).
 std::string FormatTickLabel(Double_t v, Double_t step)
 {
@@ -69,7 +69,7 @@ std::string FormatTickLabel(Double_t v, Double_t step)
 } // namespace
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Constructor. Registers as a niece of \p m. ProjectChildren() visits the
+/// Constructor. Registers as a niece of `m`. ProjectChildren() visits the
 /// nieces but reprojects only REveProjected ones, so the axis is skipped.
 
 REveProjectionAxis::REveProjectionAxis(REveProjectionManager *m, const Text_t *n, const Text_t *t)

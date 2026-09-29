@@ -37,7 +37,7 @@ images.
 std::string REveLogo::sImageDir;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Constructor. A \p file that IsRemote() accepts selects kRemote.
+/// Constructor. A `file` that IsRemote() accepts selects kRemote.
 
 REveLogo::REveLogo(std::string_view file, const Text_t *n, const Text_t *t) : REveElement(n, t), fFile(file)
 {

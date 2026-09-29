@@ -372,7 +372,7 @@ void REveManager::BrowseElement(ElementId_t id)
 ////////////////////////////////////////////////////////////////////////////////
 /// Ask every connected client to grab its GL viewers and POST each image to an
 /// image collector. Each client posts the views it shows, all tagged with the
-/// same \p event_id.
+/// same `event_id`.
 ///
 /// The body is `application/octet-stream`, width*height*4 bytes of RGBA8 with
 /// straight alpha and no background, so it composites onto any backdrop.

@@ -32,8 +32,8 @@ REveText::REveText(const Text_t* n, const Text_t* t) :
 /// Fill core part of JSON representation.
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Make this text a button: a click that does not become a drag sends \p mir
-/// to \p target, or to this element if null. The effect reaches every client.
+/// Make this text a button: a click that does not become a drag sends `mir`
+/// to `target`, or to this element if null. The effect reaches every client.
 /// A target that is an REveAunt is tracked, and its destruction clears the
 /// action. Any other target is stored by id only.
 

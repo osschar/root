@@ -235,7 +235,7 @@ void REveScene::StreamJsonRecurse(REveElement *el, nlohmann::json &jarr)
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Move every element whose only pending change is kCBTransBBox from the change
-/// list into \p arr, for REveManager::SendMotionChanges(). The remaining
+/// list into `arr`, for REveManager::SendMotionChanges(). The remaining
 /// elements go through the ordinary acknowledged round.
 
 void REveScene::StreamMotionChanges(nlohmann::json &arr)
