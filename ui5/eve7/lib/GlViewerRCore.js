@@ -3,8 +3,9 @@ sap.ui.define([
    'rootui5/eve7/lib/EveElementsRCore',
    'rootui5/eve7/lib/Axis3D',
    'rootui5/eve7/lib/Annotations',
-   'rootui5/eve7/lib/Motion'
-], function(GlViewer, EveElements, Axis3D, Annotations, Motion) {
+   'rootui5/eve7/lib/Motion',
+   'rootui5/eve7/lib/Overlay'
+], function(GlViewer, EveElements, Axis3D, Annotations, Motion, Overlay) {
 
    "use strict";
 
@@ -60,15 +61,6 @@ sap.ui.define([
 
          this._selection_map = {};
          this._selection_list = [];
-
-         this.initialMouseX = 0;
-         this.initialMouseY = 0;
-         this.lastOffsetX = 0;
-         this.lastOffsetY = 0;
-         this.firstMouseDown = true;
-         this.scale = false;
-         this.pickedOverlayObj;
-         this.initialSize = 0;
       }
 
       init(controller)
@@ -260,6 +252,19 @@ sap.ui.define([
          this.lights.name = "Light container";
          this.scene.add(this.lights);
 
+         // Created once, here rather than in createCameraAndLights(), which runs
+         // again on every switch between perspective and orthographic cameras.
+         // The axis goes in the scene, not the overlay: the overlay always draws
+         // in front, which would put an axis line through the detector.
+         this.axis3d = new Axis3D(this, RC);
+         this.scene.add(this.axis3d.group);
+         // Evaluates streamed trajectories on its own frame clock.
+         this.motion = new Motion(this);
+         // Hover tooltip and kept annotations, as ZTexts in the overlay scene.
+         this.annotations = new Annotations(this, RC);
+         // Hover, drag and click on overlay elements.
+         this.overlay = new Overlay(this, RC);
+
          this.createCameraAndLights();
 
          // The overlay is a fixed (0,0)-(1,1) screen box, so it needs its own
@@ -312,20 +317,6 @@ sap.ui.define([
          let light_3d_ctor = function(col, int, dist, decay, args) { return new RC.PointLight(col, int, dist, decay, args); };
          // let light_3d_ctor = function(col, int, dist, decay, args) { return new RC.DirectionalLight(col, int); };
          let light_2d_ctor = function(col, int) { return new RC.DirectionalLight(col, int); };
-
-         // guides. The axis goes in the scene, not the overlay: it is 3D, and
-         // the overlay has its own depth buffer and always draws in front,
-         // which would put an axis line through the detector rather than
-         // behind it.
-         this.axis3d = new Axis3D(this, RC);
-         // Evaluates streamed trajectories on its own frame clock; see Motion.js.
-         this.motion = new Motion(this);
-         this.scene.add(this.axis3d.group);
-
-         // The hover tooltip and, later, annotations kept from it. Lives in the
-         // overlay scene, so it is in the framebuffer and therefore in every
-         // screen capture -- which the DOM tooltip it replaces never was.
-         this.annotations = new Annotations(this, RC);
 
          let w = this.canvas.width;
          let h = this.canvas.height;
@@ -418,7 +409,7 @@ sap.ui.define([
          });
 
          dome.addEventListener('pointerleave', function() {
-            glc.clearOverlayHover();
+            glc.overlay.clearHover();
 
             glc.removeMouseMoveTimeout();
             glc.clearHighlight();
@@ -479,19 +470,19 @@ sap.ui.define([
          });
 
          dome.addEventListener("mouseup", function() {
-            glc.handleOverlayMouseUp();
+            glc.overlay.onMouseUp();
          });
 
          dome.addEventListener("mousedown", function(event) {
             if (event.button == 0 || event.button == 2)
             {
-               glc.handleOverlayMouseDown(event);
+               glc.overlay.onMouseDown(event);
 
             }
          });
 
          dome.addEventListener("mousemove", function(event) {
-            glc.handleOverlayMouseMove(event);
+            glc.overlay.onMouseMove(event);
          });
 
          // Key-handlers go on window ...
@@ -864,8 +855,8 @@ sap.ui.define([
          // console.log("RENDER", this.scene, this.camera, this.canvas, this.renderer);
 
          this.render_requested = false;
-         this.updateOverlayPixelScale();
-         this.updateProjectionAxes();
+         this.overlay.updatePixelScale();
+         this.overlay.updateProjectionAxes();
          // Annotation buttons hang off their box's laid-out rect, and a drag
          // moves that box through ovlSetPos without announcing it, so there is
          // nothing to hook -- re-place them per frame instead.
@@ -1113,7 +1104,7 @@ sap.ui.define([
          // off the top of the hierarchy and threw on null.parent for anything
          // else. Client-local overlay elements -- kept annotations and their
          // buttons -- have no eve_el at all and are exactly that case, so the
-         // pick threw before handleOverlayMouseDown could set up a drag. That
+         // pick threw before Overlay.onMouseDown() could set up a drag. That
          // is why they could not be moved or resized.
          let top_obj = state_overlay.object;
          while (top_obj && top_obj.eve_el === undefined)
@@ -1205,7 +1196,7 @@ sap.ui.define([
          //console.log("GlViewerRCore onResizeTimeout", w, h, "canvas=", this.canvas, this.canvas.width, this.canvas.height);
 
          this.camera.aspect = w / h;
-         this.updateOverlayPixelScale();
+         this.overlay.updatePixelScale();
          this.rqt.updateViewport(w, h);
          this.controls.update();
 
@@ -1455,9 +1446,9 @@ sap.ui.define([
       {
          // A press that landed on an overlay element belongs to the overlay.
          // pointerup runs before the compatibility mouseup that ends the overlay
-         // drag, so ovl_drag is still set here -- without this, clicking an
+         // drag, so overlay.drag is still set here -- without this, clicking an
          // overlay button would also clear the scene selection behind it.
-         if (this.ovl_drag) return;
+         if (this.overlay.drag) return;
 
          let x = event.offsetX * this.canvas.pixelRatio;
          let y = event.offsetY * this.canvas.pixelRatio;
@@ -1474,236 +1465,6 @@ sap.ui.define([
          }
 
 
-      }
-
-      //==============================================================================
-      // Overlay interaction: move and resize
-      //
-      // Client-local by design -- nothing here sends a MIR, so dragging an overlay
-      // element moves it on this screen only and other clients are untouched.
-      // Making it shared later means turning the two mutations below (setOffset and
-      // fontSize) into MIRs on the owning element.
-      //==============================================================================
-
-      /** Overlay coordinates: (0,0) bottom-left to (1,1) top-right, matching the
-       * space ZText's `offset` uniform lives in. Canvas y grows downward. */
-      overlayNormCoords(event)
-      {
-         let x = event.offsetX * this.canvas.pixelRatio;
-         let y = event.offsetY * this.canvas.pixelRatio;
-         return { px: x, py: y,
-                  nx: x / this.canvas.width,
-                  ny: 1.0 - y / this.canvas.height };
-      }
-
-      /** Which part of the element the cursor grabbed: the bottom-right corner
-       * resizes, anywhere else moves. Right-drag resizes from anywhere. */
-      overlayGrabZone(obj, nx, ny, button)
-      {
-         // NB: the right button is already the context menu, so resize is the
-         // corner grip only.
-         if (!obj.resizable) return "move";
-         if (typeof obj.getScreenRect !== "function") return "move";
-
-         let r = obj.getScreenRect(this.canvas.width / this.canvas.height);
-         if (!r) return "move";
-
-         // The element computed and drew its own grip square, so use that rather
-         // than recomputing it here -- the sensitive area is then exactly what the
-         // user can see, and the two cannot drift apart.
-         let gx = r.grip_x, gy = r.grip_y;
-         if (!(gx > 0) || !(gy > 0)) return "move";
-
-         let xmax = Math.max(r.x0, r.x1), ymin = Math.min(r.y0, r.y1);
-         if (nx > xmax - gx && ny < ymin + gy) return "resize";
-         return "move";
-      }
-
-      /** Re-lay any projection axes for the current scene camera.
-       *
-       * The axis holds its ticks in projected coordinates; the scene camera is
-       * orthographic in a 2D projected view, so the visible extent -- unprojected
-       * NDC corners -- is all that is needed to place them. Cheap, local, and it
-       * means zooming never round-trips to the server. Returns true if anything
-       * was rebuilt. */
-      updateProjectionAxes()
-      {
-         if (!this.overlay_scene || !this.camera) return false;
-
-         let p0 = new RC.Vector3(-1, -1, 0).unproject(this.camera);
-         let p1 = new RC.Vector3( 1,  1, 0).unproject(this.camera);
-         let l = Math.min(p0.x, p1.x), r = Math.max(p0.x, p1.x);
-         let b = Math.min(p0.y, p1.y), t = Math.max(p0.y, p1.y);
-         let aspect = this.canvas.width / this.canvas.height;
-
-         let rebuilt = false;
-         this.overlay_scene.traverse(function (o) {
-            if (o.type === "ZTextAxis" && o.updateForCamera(l, r, b, t, aspect))
-               rebuilt = true;
-         });
-         return rebuilt;
-      }
-
-      /** ZText bakes its resize grip into the vertex buffer but wants a pixel
-       * floor, so it needs to know how big a CSS pixel is in screen space.
-       * Rebuild overlay text when the factor actually changes -- a window resize
-       * or a display-scale change in system settings -- since the grip size is
-       * already in the buffer. Only a handful of elements, on the (already
-       * throttled) resize path. */
-      updateOverlayPixelScale()
-      {
-         if (!this.canvas || !this.canvas.height) return;
-         let f = (this.canvas.pixelRatio || 1) / this.canvas.height;
-         if (f === this._px_to_screen) return;
-         this._px_to_screen = f;
-
-         // Per object, not on the class: several viewers of different sizes can
-         // show the same kind of element, and a shared static would have them
-         // overwriting each other.
-         if (this.overlay_scene) {
-            let W = this.canvas.width, H = this.canvas.height;
-            this.overlay_scene.traverse(function (o) {
-               if (typeof o.setPixelScale === "function") o.setPixelScale(f, W, H);
-            });
-         }
-      }
-
-      /** Which overlay element is under the cursor.
-       *
-       * Deliberately a rectangle test rather than the GPU picking path: overlay
-       * elements are few and each knows its own screen rect, so hover costs
-       * nothing and can run on every mouse move. Mouse-down still uses real
-       * picking. Later in the traversal means drawn later, i.e. on top. */
-      overlayHoverTest(nx, ny)
-      {
-         let aspect = this.canvas.width / this.canvas.height;
-         let hit = null;
-         this.overlay_scene.traverse(function (o) {
-            if (!o.pickable || !o.visible || typeof o.getScreenRect !== "function") return;
-            let r = o.getScreenRect(aspect);
-            if (!r) return;
-            if (nx >= Math.min(r.x0, r.x1) && nx <= Math.max(r.x0, r.x1) &&
-                ny >= Math.min(r.y0, r.y1) && ny <= Math.max(r.y0, r.y1))
-               hit = o;
-         });
-         return hit;
-      }
-
-      /** Enter/leave bookkeeping, in the spirit of TGLOverlayElement's
-       * MouseEnter/MouseLeave: exactly one element is highlighted at a time. */
-      updateOverlayHover(event)
-      {
-         if (this.ovl_drag) return; // a drag owns the element until mouse-up
-
-         let c = this.overlayNormCoords(event);
-         // Remembered so an overlay element can run its own hit test against a
-         // region wider than itself -- an annotation has to treat its buttons,
-         // and the gap between them and the plate, as part of the same target.
-         this.ovl_nx = c.nx;
-         this.ovl_ny = c.ny;
-
-         let hit = this.overlayHoverTest(c.nx, c.ny);
-         if (hit === this.ovl_hover) return;
-
-         if (this.ovl_hover && typeof this.ovl_hover.setHighlight === "function")
-            this.ovl_hover.setHighlight(false);
-         this.ovl_hover = hit;
-         if (hit && typeof hit.setHighlight === "function")
-            hit.setHighlight(true);
-
-         this.request_render();
-      }
-
-      clearOverlayHover()
-      {
-         if (!this.ovl_hover) return;
-         if (typeof this.ovl_hover.setHighlight === "function") this.ovl_hover.setHighlight(false);
-         this.ovl_hover = null;
-         this.request_render();
-      }
-
-      handleOverlayMouseDown(event)
-      {
-         if (this.ovl_drag) return false;
-
-         let c = this.overlayNormCoords(event);
-
-         // RCore-side pick diagnostics are gated on window.__RC_PICKDBG; see
-         // MeshRenderer._renderPickableObjects.
-         if (this._logLevel >= 3) window.__RC_PICKDBG = true;
-         let pstate = this.render_for_Overlay_picking(c.px, c.py, false);
-         window.__RC_PICKDBG = false;
-         if (this._logLevel >= 3)
-            console.log("overlay pick at " + c.px + "," + c.py +
-                        " hit=" + (!!(pstate && pstate.object)));
-         if (!pstate || !pstate.object) return false;
-
-         let obj = pstate.object;
-         if (typeof obj.ovlGetPos !== "function") return false;   // not a movable overlay element
-         let rect = (typeof obj.getScreenRect === "function")
-                  ? obj.getScreenRect(this.canvas.width / this.canvas.height) : null;
-
-         this.ovl_drag = {
-            obj:       obj,
-            zone:      this.overlayGrabZone(obj, c.nx, c.ny, event.button),
-            grab_nx:   c.nx,
-            grab_ny:   c.ny,
-            orig_x:    obj.ovlGetPos()[0],
-            orig_y:    obj.ovlGetPos()[1],
-            orig_size: obj.ovlGetSize(),
-            // Resize anchors on the top-left corner. The reference width is
-            // measured to the *click point*, not to the box edge, so the scale
-            // is exactly 1 at the moment of grabbing and grows smoothly from
-            // there -- clicking a few pixels inside the grip must not make the
-            // box jump before it starts following the mouse.
-            anchor_x:  rect ? Math.min(rect.x0, rect.x1) : 0,
-            grab_w:    rect ? (c.nx - Math.min(rect.x0, rect.x1)) : 0,
-            // A press that never travels far enough is a click, not a drag.
-            // Overlay elements are movable, so a button cannot be recognised on
-            // press -- only on release, once we know it stayed put.
-            moved:     false
-         };
-
-         // Stop the orbit controls from also acting on this drag.
-         this.controls.enablePan = false;
-         this.controls.enableRotate = false;
-         return true;
-      }
-
-      handleOverlayMouseMove(event)
-      {
-         let d = this.ovl_drag;
-         if (!d) { this.updateOverlayHover(event); return; }
-
-         let c = this.overlayNormCoords(event);
-
-         if (Math.abs(c.nx - d.grab_nx) > GlViewerRCore.OVL_CLICK_SLOP ||
-             Math.abs(c.ny - d.grab_ny) > GlViewerRCore.OVL_CLICK_SLOP)
-            d.moved = true;
-
-         if (d.zone === "move") {
-            d.obj.ovlSetPos(d.orig_x + (c.nx - d.grab_nx),
-                            d.orig_y + (c.ny - d.grab_ny));
-         } else if (d.grab_w > 1e-4) {
-            // Cursor distance from the anchor, relative to what it was when the
-            // grip was grabbed: 1.0 at grab, then tracks the mouse smoothly.
-            let f = (c.nx - d.anchor_x) / d.grab_w;
-            d.obj.ovlSetSize(Math.max(d.orig_size * f, 1e-4));
-         }
-
-         this.request_render();
-      }
-
-      handleOverlayMouseUp()
-      {
-         if (!this.ovl_drag) return;
-
-         if (!this.ovl_drag.moved) this.overlayClick(this.ovl_drag.obj);
-
-         this.ovl_drag = null;
-         this.controls.enablePan = true;
-         this.controls.enableRotate = true;
-         this.request_render();
       }
 
       /** Re-colour elements that follow the viewer's foreground colour.
@@ -1778,49 +1539,6 @@ sap.ui.define([
                                      "ROOT::Experimental::REveViewer");
       }
 
-      /** A click on an overlay element that carries a click action sends that MIR.
-       *
-       * Everything else the overlay does -- moving, resizing, hover -- is
-       * client-local by design. A button is the deliberate exception: it exists
-       * to change server state, so it goes through the normal MIR path and the
-       * result comes back to every subscribed client, not just this viewer.
-       *
-       * The action is read off the streamed element rather than the RCore
-       * object, so nothing in RenderCore needs to know that buttons exist. */
-      overlayClick(obj)
-      {
-         // A local handler wins: annotation buttons act entirely on the client
-         // and have no server element behind them, so there is no MIR to send.
-         if (obj && typeof obj._ovl_click === "function") { obj._ovl_click(); return; }
-
-         let el = obj ? obj.eve_el : null;
-         if (!el || !el.fClickMir) return;
-
-         let mgr = this.controller ? this.controller.mgr : null;
-         if (!mgr) return;
-
-         // fClickTargetId 0 means "this element"; anything else lets a button
-         // drive an object it is not part of, which is the usual case.
-         let tid = el.fClickTargetId || el.fElementId;
-         let tgt = mgr.GetElement(tid);
-         if (!tgt) {
-            console.error("overlayClick: no element", tid, "for MIR", el.fClickMir);
-            return;
-         }
-         mgr.SendMIR(el.fClickMir, tid, tgt._typename);
-      }
-
-      /** Hide/show overlay elements flagged exclude_from_capture. Used around the
-       * grab so screen-only decoration stays out of exported images. */
-      setOverlayCaptureHidden(hide)
-      {
-         let touched = [];
-         this.overlay_scene.traverse(function (o) {
-            if (o.exclude_from_capture) { o.visible = !hide; touched.push(o); }
-         });
-         return touched;
-      }
-
       /** GL resource recycling, called by EveManager around a scene rebuild --
        * see the block comment at the top of this file. A GL buffer or texture
        * is only a cache of the BufferAttribute or Texture holding the data, so
@@ -1850,12 +1568,6 @@ sap.ui.define([
             console.error("Exception caught in clearAttributesAndTextures.", e);
          }
       }
-
-      /** Click/drag threshold for overlay elements, as a fraction of the canvas
-       * (nx/ny are 0..1), so roughly 3 px on a typical view. Small enough that
-       * a deliberate drag is never mistaken for a click, large enough to absorb
-       * the pointer jitter of an ordinary press. */
-      static OVL_CLICK_SLOP = 0.004;
 
       static showShaderCount = 0;
       showShaderJson(arg)

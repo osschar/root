@@ -232,8 +232,9 @@ sap.ui.define([], function() {
          // the tile is entered". The test is over the whole GROUP, not the box
          // alone: moving onto a button leaves the box, and if that hid the
          // buttons they could never be clicked.
-         const dragged = this.viewer.ovl_drag ? this.viewer.ovl_drag.obj : null;
-         const nx = this.viewer.ovl_nx, ny = this.viewer.ovl_ny;
+         const ovl = this.viewer.overlay;
+         const dragged = ovl.drag ? ovl.drag.obj : null;
+         const nx = ovl.nx, ny = ovl.ny;
          for (const a of this._kept) {
             // Geometry first: the test below is against the laid-out rects.
             a.syncWeight();
@@ -329,8 +330,8 @@ sap.ui.define([], function() {
       _fixPixelScale(obj) {
          const v = this.viewer;
          if (typeof obj.setPixelScale !== "function") return;
-         if (!(v._px_to_screen > 0)) return;
-         obj.setPixelScale(v._px_to_screen, v.canvas.width, v.canvas.height);
+         if (!(v.overlay.px_to_screen > 0)) return;
+         obj.setPixelScale(v.overlay.px_to_screen, v.canvas.width, v.canvas.height);
       }
 
       /** Synthetic bold for a given font size, in ZText's `weight` units.
@@ -340,7 +341,7 @@ sap.ui.define([], function() {
        * in -- the same 0.012 is fine on a tall canvas and far too thin on a
        * short one. */
       weightFor(font_size) {
-         const px_scale = this.viewer._px_to_screen ||
+         const px_scale = this.viewer.overlay.px_to_screen ||
                           this.RC.ZText.PX_TO_SCREEN_SPACE;
          const px = font_size / px_scale;
          const t = Math.min(1, Math.max(0,
@@ -492,7 +493,7 @@ sap.ui.define([], function() {
     * All three are ordinary overlay ZTexts, so they get picking, dragging,
     * resizing and hover highlight from the machinery that already exists. The
     * only thing added is a local click handler -- `_ovl_click` -- because
-    * GlViewerRCore.overlayClick() otherwise only knows how to send a server MIR,
+    * Overlay.click() otherwise only knows how to send a server MIR,
     * and these buttons act entirely on the client.
     */
    class Annotation {
@@ -763,7 +764,7 @@ sap.ui.define([], function() {
 
       /** Is the pointer on this annotation, counting its buttons and the gap
        * between them as part of it? Union of the three rects plus a margin --
-       * a plain "is ovl_hover one of mine" test fails in the gap, which is
+       * a plain "is overlay.hover one of mine" test fails in the gap, which is
        * exactly where the pointer is while travelling towards a button. */
       containsPointer(nx, ny) {
          if (!(nx >= -1) || !(ny >= -1)) return false;   // no pointer seen yet
