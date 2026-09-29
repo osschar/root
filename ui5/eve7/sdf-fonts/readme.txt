@@ -7,53 +7,49 @@ Each font is a pair of files:
     <name>.png     the distance field itself
     <name>.js.gz   the glyph metrics (advances, kerning, rectangles)
 
-Both are *generated artefacts* and are not kept in git -- only this file is. A
-fresh checkout therefore starts with no atlases, and the first thing that wants
-text has to build them.
+Both are generated files and are not kept in git. A fresh checkout has no
+atlases until something calls REveText::AssertSdfFont().
 
 Generating
 ----------
 
-REveText::AssertSdfFont(font_name, ttf_path) is the entry point. It is a no-op
-when both files for font_name are already present, and otherwise builds them
-from the TTF -- via TGLSdfFontMaker in the RGL module, called through the
-interpreter so that REve does not have to link against RGL.
+REveText::AssertSdfFont(font_name, ttf_path) is the entry point. It does
+nothing when both files for font_name are present. Otherwise it builds them
+from the TTF with TGLSdfFontMaker from the RGL module, which it calls through
+the interpreter so that REve does not link against RGL.
 
-Three conditions have to hold, and none of them announces itself clearly:
+Generation needs three things:
 
- 1. REveManager must already exist. AssertSdfFont() needs the font directory,
-    which is set up as part of manager construction. Called earlier,
-    SetDefaultSdfFontDir() fails and AssertSdfFont() then returns without
-    generating anything and without an obvious error -- it looks like it worked.
+ 1. REveManager must already exist, because the font directory is registered
+    with it. Called earlier, AssertSdfFont() prints an error from
+    SetSdfFontDir() and returns false. Later calls in the same session return
+    false without a message, because the failed default setup is not retried.
+    Call REveText::SetSdfFontDir() to recover.
 
  2. A real GL context, so generation cannot happen in batch mode. `root.exe -b`
     fails with "TGLWidget::CreateWindow: Display is not set!". Run once with a
     display to populate the directory; after that batch sessions are fine,
     because AssertSdfFont() sees the files and does nothing.
 
- 3. A writable target directory. Two defaults are tried in order --
-    $ROOTSYS/ui5/eve7/sdf-fonts/ and ./sdf-fonts/ -- and the first writable one
-    wins. REveText::SetSdfFontDir(dir, require_write_access) overrides that; pass
-    false for require_write_access when pointing at a directory that is already
-    populated.
-
-Note that a development setup serving ui5 from the source tree
-(WebGui.RootUi5Path) reads atlases from the *source* ui5/eve7/sdf-fonts, while
-AssertSdfFont() writes to $ROOTSYS/..., i.e. into the *build* tree. If text
-renders as nothing after a successful-looking generation, check which of the two
-directories the files landed in.
+ 3. A writable target directory. Two defaults are tried in order, and the
+    first writable one is used. A missing directory is created. The first
+    default is eve7/sdf-fonts/ under WebGui.RootUi5Path, or under
+    $ROOTSYS/ui5 when that is not set. The second is ./sdf-fonts/.
+    REveText::SetSdfFontDir(dir, require_write_access) overrides them. Pass
+    false for require_write_access when pointing at a directory that is
+    already populated.
 
 Which fonts to ask for
 ----------------------
 
-Only faces that ship in $ROOTSYS/fonts can be relied on. That includes
-LiberationMono-Regular and LiberationSerif-Regular, arial and arialbd, verdana,
-georgia, comic, comicbd and BlackChancery -- but *not* Liberation Sans, in any
-weight. Naming a system path such as /usr/share/fonts/liberation-sans ties the
-code to one distribution's layout.
+Only faces that ship in TROOT::GetDataDir()/fonts can be relied on. They
+include LiberationMono-Regular and LiberationSerif-Regular, arial and arialbd,
+verdana, georgia, comic, comicbd and BlackChancery. ROOT ships no Liberation
+Sans in any weight. A system path such as /usr/share/fonts/liberation-sans
+ties the code to one distribution's layout.
 
-LiberationSerif-Regular is REveText's default and is what REveViewer and
-GlViewerRCore use for the viewer axes.
+LiberationSerif-Regular is REveText's default. REveViewer::SetAxesType()
+generates it, and the client's Axis3D.js uses it for the viewer axes.
 
 For bold, prefer REveText::SetFontWeight() over a second atlas: weight is applied
 by moving the SDF threshold, so it is continuous and needs no extra font. Several

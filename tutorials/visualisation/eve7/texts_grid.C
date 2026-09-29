@@ -1,30 +1,19 @@
 /// \file
 /// \ingroup tutorial_eve_7
-/// Deterministic SDF-text test grid for REveText.
+/// SDF text on a fixed grid, for judging REveText rendering quality.
 ///
-/// Unlike texts.C, which scatters random words at random sizes and fonts, this
-/// macro lays text out on a fixed grid, so two runs can be compared
-/// pixel-by-pixel. It is meant for judging *text quality*: every axis known to
-/// affect SDF rendering is varied on its own, one panel per scene.
+/// Unlike texts.C, which places random words at random sizes, this macro is
+/// deterministic, so two runs can be compared pixel by pixel. Each panel varies
+/// one parameter:
 ///
-///   A  SCREEN mode, font-size ladder   The SDF antialiasing width is derived
-///                                      from the font size; this sweeps it over
-///                                      the full useful range.
-///   B  SCREEN mode, font comparison    One line per generated SDF font, same size.
-///   C  WORLD mode, size ladder         The same sweep, in world units.
-///   D  WORLD mode, rotation fan        Anisotropy: is the AA width still right
-///                                      when the quad is seen at an angle?
-///   E  MIXED mode, depth ladder        World position, screen size, front facing:
-///                                      all five must render at *identical* size.
+///   A  screen mode, font-size ladder
+///   B  screen mode, one line per font at the same size
+///   C  world mode, size ladder in world units
+///   D  world mode, text rotated about y and about x
+///   E  mixed mode, text at increasing depth; all lines should be the same size
 ///
-/// Two viewers watch the same scenes, one perspective and one orthographic. That
-/// is the multi-view demo -- several clients may watch one scene through
-/// different views -- and also a test, since the AA width is computed from a
-/// clip-space probe and so need not agree between the two projections.
-///
-/// The screen-mode ladder straddles cap_height, ~0.033 of viewport height for the
-/// Liberation atlases; that is the one size at which the current AA-width
-/// expression comes out exact.
+/// REveText::SetMode() takes 0 for world, 1 for screen and 2 for mixed. Two
+/// viewers, one perspective and one orthographic, show the same scenes.
 ///
 /// Panels can be isolated from the ROOT prompt while the macro runs:
 ///     tg_only("C")     // show panel C alone
@@ -57,16 +46,14 @@ using namespace ROOT::Experimental;
 //                                                 smoothstep is too wide
 const char *kRuler = "Ill1 OQ08 //\\\\ ..";
 
-// Every one of these ships in ROOT's data dir. ROOT carries Liberation Mono and Serif
-// but no Liberation Sans, so a Sans entry would only work where the distribution
-// happens to provide it. Bold is demonstrated with REveText::SetFontWeight() rather
-// than a second atlas -- see panel B.
+// Every one of these ships in TROOT::GetDataDir()/fonts. ROOT has Liberation Mono
+// and Serif but no Liberation Sans.
 const char *kFonts[] = {"LiberationSerif-Regular", "LiberationMono-Regular", "verdana",
                         "georgia",                 "comic",                  "comicbd",
                         "BlackChancery"};
 const int kNFonts = sizeof(kFonts) / sizeof(char *);
 
-// Geometric ladder straddling cap_height (0.033 in viewport-height units).
+// Screen-mode font sizes, as fractions of viewport height.
 const float kSizes[] = {0.005f, 0.008f, 0.012f, 0.018f, 0.024f, 0.033f, 0.045f, 0.060f};
 const int kNSizes = sizeof(kSizes) / sizeof(float);
 
@@ -90,10 +77,8 @@ static REveText *MakeText(REveElement *holder, const char *name, const std::stri
    return t;
 }
 
-// REveText::ComputeBBox() is empty, so text alone contributes nothing to the
-// scene extent and the client -- which fits the camera with Box3.setFromObject()
-// over the RenderCore scene graph -- has nothing to frame on. Give the
-// world-mode scenes a piece of real geometry with a known extent.
+// REveText contributes nothing to the scene bounding box, so a scene of world text
+// gives the camera nothing to frame. Add a faint box of known extent.
 static void AddBBoxAnchor(REveElement *holder, double lim)
 {
    auto b = new REveBox("bbox_anchor");
@@ -198,21 +183,17 @@ void tg_only(const char *panel = "")
 
 //------------------------------------------------------------------------------
 
-/// \param panels which panels to build, e.g. "ABCDE" (all) or "CDE" (world+mixed only).
-///        Building a subset matters: screen-mode text geometry lives in [0,1]
-///        screen coordinates but still sits in the same RenderCore scene graph,
-///        and the client frames the camera with Box3.setFromObject() over that
-///        graph -- so a scene that contains screen text gets its camera fitted to
-///        the [0,1] quad instead of to the real geometry.
+/// \param panels which panels to build, e.g. "ABCDE" (all) or "CDE" (world and
+///        mixed only). Leave out A and B to fit the camera to the world-mode
+///        panels, since screen-mode text in [0,1] is counted in the camera fit.
 void texts_grid(const char *panels = "ABCDE")
 {
    std::string want(panels);
    auto eveMng = REveManager::Create();
    eveMng->AllowMultipleRemoteConnections(false, false);
 
-   // Fonts are expected to be pre-generated in ui5/eve7/sdf-fonts/. AssertSdfFont
-   // is a no-op when both the .png and the .js.gz are there; it only needs a GL
-   // context (and hence a display) when it actually has to build one.
+   // Generate the SDF atlases on first use. This needs a display. Once the
+   // .png and .js.gz files exist it does nothing.
    std::string rf = std::string(TROOT::GetDataDir().Data()) + "/fonts/";
    for (int i = 0; i < kNFonts; ++i)
       REveText::AssertSdfFont(kFonts[i], rf + kFonts[i] + ".ttf");
@@ -239,10 +220,8 @@ void texts_grid(const char *panels = "ABCDE")
       gPanels[d.key] = h;
    }
 
-   // Multi-view: the same scenes through two viewers. Besides being the canonical
-   // REve demo, it puts a perspective and an orthographic camera on identical
-   // geometry -- the cheapest way to see whether SDF antialiasing is
-   // camera-dependent.
+   // The same scenes in a perspective and an orthographic viewer, to check that
+   // text renders the same under both cameras.
    auto *v0 = (REveViewer *)eveMng->GetViewers()->FirstChild();
    v0->SetName("Perspective");
    v0->SetCameraType(REveViewer::kCameraPerspXOY); // XY plane face-on: panels C/D live there

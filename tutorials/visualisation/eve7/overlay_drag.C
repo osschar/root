@@ -3,39 +3,31 @@
 /// Interactive overlay annotations: framed REveText boxes floating in front of
 /// the 3D scene, which can be dragged and resized in the browser.
 ///
-/// An *overlay* scene is a normal REveScene flagged with SetIsOverlay(true). Its
-/// contents are rendered by a dedicated orthographic camera into a fixed screen
-/// box, after and in front of the 3D scene, so annotations never disappear behind
-/// geometry no matter how the camera is moved.
+/// An overlay scene is a normal REveScene flagged with SetIsOverlay(true). Its
+/// contents are drawn by a dedicated orthographic camera into a fixed screen
+/// box, after and in front of the 3D scene.
 ///
 /// Coordinates in the overlay box are fractions of the viewport:
 ///
 ///     (0,0) = bottom-left corner,  (1,1) = top-right corner
 ///
-/// Font size is given in the same units, i.e. as a fraction of viewport *height*;
-/// the x direction is divided by the window aspect ratio so glyphs keep their
-/// shape. That means a client with a differently shaped window sees the boxes at
-/// the same relative position but covering a different fraction of its width --
-/// worth remembering in a multi-client setup such as a control room.
+/// Font size is a fraction of viewport height. A client with a differently
+/// shaped window sees the boxes at the same relative position but covering a
+/// different fraction of its width.
 ///
-/// Interaction, once REveText::SetPickable(true) is set:
-///
-/// The logo is the same kind of overlay element -- a screen-space image rather
-/// than text -- and moves and resizes on exactly the same handling.
+/// Interaction, once SetPickable(true) is set:
 ///
 ///     hover over a box             -> it lightens, and if it is resizable a small
-///                                     square grip appears in its bottom corner
+///                                     square grip appears in its bottom-right corner
 ///     drag the box                 -> move it
 ///     drag the corner grip         -> resize it (font size and frame together)
 ///
 /// SetPickable() governs moving, SetResizable() governs resizing, so a header can
-/// be repositioned while keeping its size.
+/// be repositioned while keeping its size. The logo, an REveLogo, moves and
+/// resizes the same way.
 ///
-/// Both are **client-local**: they are handled entirely in the browser and
-/// nothing is sent back to the server, so two people looking at the same scene
-/// can arrange their annotations independently. Moving that state to the server,
-/// so a layout can be shared or saved, would mean turning the two mutations into
-/// MIRs on the element.
+/// Moving and resizing are client-local. Nothing is sent to the server, so two
+/// browsers on the same session arrange their annotations independently.
 ///
 /// \macro_code
 ///
@@ -58,7 +50,7 @@
 
 using namespace ROOT::Experimental;
 
-/// Ships with ROOT in the data dir's fonts/ -- see texts.C.
+/// Ships with ROOT in TROOT::GetDataDir()/fonts.
 static const char *kOvlFont = "LiberationSerif-Regular";
 
 const Double_t kR_min = 240;
@@ -81,9 +73,8 @@ REveText *makeAnnotation(REveElement *holder, const char *name, const char *text
    t->SetPosition(REveVector(x, y, 0.0));
    t->SetTextColor(text_color);
 
-   // Frame: a filled, outlined plate behind the glyphs. Without it the text
-   // floats on the scene and is hard to grab, since the whole plate -- not just
-   // the glyph coverage -- is the pick target.
+   // Frame: a filled, outlined plate behind the glyphs. The whole plate is the
+   // pick target, so framed text is easier to grab.
    t->SetDrawFrame(true);
    t->SetFillColor(fill_color);
    t->SetFillAlpha(170); // 0..255; translucent so the scene stays visible
@@ -95,9 +86,8 @@ REveText *makeAnnotation(REveElement *holder, const char *name, const char *text
    // Required for drag and resize: without it the element is not in the picking
    // pass at all and mouse events pass straight through to the camera controls.
    t->SetPickable(true);
-   // Movable either way; a non-resizable element keeps its size, which is what
-   // you want for a fixed-format header. The corner grip is only drawn on
-   // elements that can actually be resized, and only while hovered.
+   // A non-resizable element can still be moved. The corner grip is drawn only
+   // on resizable elements, and only while hovered.
    t->SetResizable(resizable);
 
    holder->AddElement(t);
@@ -134,21 +124,15 @@ void overlay_drag()
 {
    auto eveMng = REveManager::Create();
 
-   // Allow several browsers to attach to the same session, so you can open the
-   // printed URL in two windows and see that dragging an annotation in one does
-   // not move it in the other -- the interaction is entirely client-side.
-   //
-   // NOTE: the second argument also switches off the single-use authentication
-   // key, which is convenient while developing but should be reconsidered before
-   // this is committed; see the security note in REveManager.
+   // Make the printed URL reusable, so it can be opened in two browser windows.
+   // Dragging an annotation in one does not move it in the other. This also
+   // accepts non-local clients without a connection key, so use it only for
+   // local development.
    eveMng->AllowMultipleRemoteConnections(false, false);
 
-   // SDF fonts are generated on demand into ui5/eve7/sdf-fonts/ and reused after
-   // that; this is a no-op once the .png and .js.gz for the font are present.
-   // TROOT::GetDataDir()/fonts. ROOT ships no Liberation Sans and no bold
-   // Liberation at all, so the weight comes from REveText::SetFontWeight() instead --
-   // the SDF threshold gives synthetic bold from the one atlas, which is exactly the
-   // case it exists for.
+   // Generate the SDF atlas from the font in TROOT::GetDataDir()/fonts. This does
+   // nothing once the .png and .js.gz exist. ROOT ships no bold Liberation face,
+   // so makeAnnotation() uses SetFontWeight() instead.
    std::string rf = std::string(TROOT::GetDataDir().Data()) + "/fonts/";
    REveText::AssertSdfFont(kOvlFont, rf + kOvlFont + ".ttf");
 
@@ -160,19 +144,10 @@ void overlay_drag()
    ((REveViewer *)(eveMng->GetViewers()->FirstChild()))->AddScene(os);
    os->SetIsOverlay(true);
 
-   // Images have to be reachable by the browser, so the directory holding them
-   // is registered as an HTTP location. Any readable directory works: an
-   // experiment would point this at its own icons -- for CMS, at
-   //   .../src/Fireworks/Core/icons
-   // Here we use the icons that ship with ROOT, so the tutorial runs anywhere:
-   // icons/ is both copied into the build tree and installed, and
-   // TROOT::GetIconPath() resolves it in either case -- unlike ${ROOTSYS}/icons,
-   // which does not survive a gnuinstall-style layout.
-   //
-   // Two other sources exist: REveLogo::kTextures for the ZSprite template
-   // textures in ui5/eve7/textures, and an absolute URL, which the browser
-   // fetches directly -- convenient, but subject to CORS, mixed content and
-   // certificate checks, so not something to rely on. See REveLogo::SetFile.
+   // The browser fetches images over HTTP, so the directory holding them is
+   // registered with SetImageDir(). Any readable directory works. The icons that
+   // ship with ROOT are found through TROOT::GetIconPath(), in a build tree and in
+   // an installation. See REveLogo::SetFile() for the other image sources.
    REveLogo::SetImageDir(TROOT::GetIconPath().Data());
 
    auto logo = new REveLogo("Root6Icon.png", "Logo");
@@ -183,9 +158,7 @@ void overlay_drag()
 
    auto holder = new REveElement("annotations");
 
-   // Arctic ambient: cool, low-saturation, with the one saturated blue reserved
-   // to mean "this element is interactive". Annotations sit on top of the event,
-   // so they should stay legible without competing with it for attention.
+   // Muted colours, with a saturated blue frame marking the interactive boxes.
    const Color_t kInk   = TColor::GetColor("#1f2d36"); // deep slate text
    const Color_t kIce   = TColor::GetColor("#f2f7f9"); // plate, a cool white
    const Color_t kQuiet = TColor::GetColor("#8fa6b2"); // frame, static label
@@ -195,10 +168,8 @@ void overlay_drag()
    makeAnnotation(holder, "DragMe", "drag me anywhere", 0.03, 0.85, 0.030, kInk, kLive, kIce);
    makeAnnotation(holder, "ResizeMe", "hover me, then grab the corner", 0.03, 0.76, 0.030, kInk, kLive, kIce);
 
-   // Multi-line: embed newlines in the text. The box grows downwards, one
-   // line_height per line. Note the resize grip does NOT grow with it -- it is
-   // scaled on a single line, because a taller note has no bigger text and so
-   // needs no bigger handle.
+   // Multi-line: embed newlines in the text. The box grows downwards, one line
+   // height per line. The resize grip keeps its single-line size.
    makeAnnotation(holder, "Legend", "legend\n  cyan  barrel\n  pink  jet cones", 0.03, 0.67, 0.030, kInk, kLive,
                   kIce);
 

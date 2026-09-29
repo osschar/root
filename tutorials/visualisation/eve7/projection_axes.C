@@ -1,27 +1,18 @@
 /// \file
 /// \ingroup tutorial_eve_7
-/// Scales and tick labels for a projected view, using REveProjectionAxis.
+/// Scales and tick labels for projected views, using REveProjectionAxis.
 ///
-/// This is the REve counterpart of the old TEve projection.C. A barrel and a few
-/// jets are projected in RhoPhi and RhoZ, and each projected view gets an axis.
-///
-/// Ticks sit at round numbers in the *original* space and are drawn where the
-/// projection puts them, so with a non-zero distortion their spacing on screen
-/// becomes uneven -- that unevenness is the information the axis carries. Try it:
+/// A barrel and a few jets are projected in RhoPhi and RhoZ, and each projected
+/// view gets an axis. Ticks sit at round numbers in the original space and are
+/// drawn where the projection puts them, so with a non-zero distortion their
+/// spacing on screen is uneven. Change the distortion with the <<< and >>>
+/// buttons in each view, or from the ROOT prompt:
 ///
 ///     pa_distortion(0.001)   // then 0.005, and back to 0
 ///
-/// The division of labour is worth knowing. The projection can be arbitrarily
-/// non-linear and exists only on the server, so the mapping original -> projected
-/// happens there, once, and the tick set is streamed deliberately over-provided:
-/// a wider range and finer subdivision than any one view needs. The client is
-/// left with projected -> screen, which for the orthographic camera of a 2D
-/// projected view is affine, so it filters and re-lays the labels itself on every
-/// zoom and pan without ever asking the server. Only a change to the projection
-/// needs a round trip.
-///
-/// The axes live in overlay scenes: drawn by their own orthographic camera into
-/// their own depth buffer, so they stay in front of the geometry.
+/// The browser relayouts the labels on zoom and pan. Only a change of the
+/// projection goes back to the server. The axes and buttons are in overlay
+/// scenes, which are drawn in front of the geometry.
 ///
 /// \macro_code
 ///
@@ -47,8 +38,7 @@ using namespace ROOT::Experimental;
 
 REveProjectionManager *gPaRPhi = nullptr;
 REveProjectionManager *gPaRhoZ = nullptr;
-/// Ships with ROOT in the data dir's fonts/ -- see texts.C, which uses the same two
-/// Liberation faces. Stroke weight rather than a bold face does the emphasising.
+/// Ships with ROOT in TROOT::GetDataDir()/fonts.
 static const char *kAxisFont = "LiberationSerif-Regular";
 
 REveProjectionAxis *gPaAxisRPhi = nullptr;
@@ -60,8 +50,7 @@ const Double_t kZ_d = 300;
 
 //------------------------------------------------------------------------------
 /// Change the distortion of both projections and rebuild the tick sets.
-/// Callable from the ROOT prompt while the macro runs. This is the one operation
-/// that genuinely needs the server: the projection changed, so the ticks move.
+/// Callable from the ROOT prompt while the macro runs.
 
 void pa_distortion(float d)
 {
@@ -72,9 +61,8 @@ void pa_distortion(float d)
       mng->UpdateName();
       mng->ProjectChildren();
    }
-   // Ticks and the read-out both follow the projection, so keep them together --
-   // BumpDistortion() from the overlay buttons does the same, and it would be
-   // confusing for the two routes to leave the display in different states.
+   // Update the ticks and the read-out, as REveProjectionManager::BumpDistortion()
+   // does for the overlay buttons.
    for (auto ax : {gPaAxisRPhi, gPaAxisRhoZ}) {
       if (!ax) continue;
       ax->UpdateTicks();
@@ -119,11 +107,9 @@ static void makeProjectedView(REveManager *eveMng, REveElement *content, REvePro
    mng = new REveProjectionManager(type);
    mng->ImportElements(content, scene);
 
-   // Put the manager in the element tree. Without this it has no element id, so
-   // the client has never heard of it: it cannot be a MIR target, and the
-   // distortion the manager formats into its own name -- "RhoPhi (5.0)" -- never
-   // reaches a browser to be seen. Both matter here, since the overlay buttons
-   // address it and hold it as an aunt.
+   // Add the manager to the element tree. This gives it an element id, which the
+   // overlay buttons need as their MIR target, and streams its name, which shows
+   // the distortion, e.g. "RhoPhi (5.0)".
    eveMng->GetWorld()->AddElement(mng);
 
    auto ovl = eveMng->SpawnNewScene(Form("%s Axis", name), name);
@@ -136,20 +122,9 @@ static void makeProjectedView(REveManager *eveMng, REveElement *content, REvePro
    axis->SetFont(kAxisFont);
    ovl->AddElement(axis);
 
-   // Distortion controls: three overlay texts in the same overlay scene, laid
-   // out as [ <<< | value | >>> ]. Buttons rather than one compound widget --
-   // a single element would have to hit-test which third of itself was clicked,
-   // and REveText has no notion of sub-areas.
-   //
-   // All three address the projection manager: it owns the current projection, so
-   // distortion belongs to it, and it refreshes the axes hanging off it as
-   // nieces. One MIR therefore does the whole job -- reproject, refresh the name,
-   // recompute the ticks, rewrite the read-out -- and the client never has to
-   // sequence anything.
-   //
-   // The manager is also an REveAuntAsList, so SetClickAction() holds it as an
-   // aunt: destroy it and the buttons' actions clear themselves rather than
-   // pointing at a dead element.
+   // Distortion controls: three overlay texts laid out as [ <<< | value | >>> ].
+   // SetClickAction() makes a text a button that sends a MIR to the projection
+   // manager. BumpDistortion() reprojects and updates the axes and the read-out.
    {
       auto mkbtn = [&](const char *label, Float_t x, const char *mir) {
          auto b = new REveText(Form("%s %s", name, label), label);
@@ -176,9 +151,8 @@ static void makeProjectedView(REveManager *eveMng, REveElement *content, REvePro
          return b;
       };
 
-      // Spacing is tuned rather than computed: only the client knows the glyph
-      // metrics, so the server cannot lay these out without a round trip. Wide
-      // enough here that the three do not collide in a narrow projected pane.
+      // The x positions are set by hand, since only the client knows the glyph
+      // metrics.
       mkbtn("<<<", 0.26f, "BumpDistortion(-1)");
       auto val = mkbtn("0.0", 0.50f, nullptr);   // read-out, not a button
       mkbtn(">>>", 0.74f, "BumpDistortion(1)");
@@ -197,10 +171,7 @@ void projection_axes()
    auto eveMng = REveManager::Create();
    eveMng->AllowMultipleRemoteConnections(false, false);
 
-   // From TROOT::GetDataDir()/fonts, which is the only
-   // portable choice: LiberationSerif-Regular ships with ROOT. A
-   // /usr/share/fonts/liberation-sans path would tie the tutorial to one distribution's
-   // layout, and ROOT ships no Liberation Sans to fall back on.
+   // Generate the SDF atlas from the font file that ships with ROOT.
    std::string rf = std::string(TROOT::GetDataDir().Data()) + "/fonts/";
    REveText::AssertSdfFont(kAxisFont, rf + kAxisFont + ".ttf");
 

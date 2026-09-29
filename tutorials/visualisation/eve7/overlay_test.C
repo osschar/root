@@ -98,10 +98,7 @@ void makeTexts(REveElement *textHolder)
       REveVector pos(0.5, 0.5, 0.2);
       text->SetPosition(pos);
       text->SetFontSize(0.1);
-      // SetFont takes a face name; the integer here dated from when fonts were
-      // numeric ids and had stopped compiling. LiberationSerif-Regular ships with
-      // ROOT and is what the viewer axes use, so it is also REveText's default --
-      // named explicitly for clarity.
+      // LiberationSerif-Regular ships with ROOT. It is also REveText's default.
       text->SetFont("LiberationSerif-Regular");
       text->SetText(text->GetCName());
       textHolder->AddElement(text);
@@ -112,9 +109,8 @@ void overlay_test()
 {
    auto gEve = REveManager::Create();
 
-   // Must follow REveManager::Create(): without it the font directory is not set
-   // up and AssertSdfFont() quietly does nothing. Generating an atlas also needs a
-   // GL context, so a first run cannot be done in batch mode.
+   // Call after REveManager::Create(), which the font directory needs. Generating
+   // the atlas needs a display, so the first run cannot be in batch mode.
    {
       std::string rf = std::string(TROOT::GetDataDir().Data()) + "/fonts/";
       REveText::AssertSdfFont("LiberationSerif-Regular", rf + "LiberationSerif-Regular.ttf");

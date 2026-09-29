@@ -1,42 +1,14 @@
 /// \file
 /// \ingroup tutorial_eve_7
-/// The Amiga Boing demo, server-side.
+/// The Amiga Boing ball, bouncing inside the 3D axis box, driven from the server.
 ///
-/// A checkered ball bounces inside the 3D axis box, which rules its floor.
-/// Everything about it is driven from the server -- position, spin, the shadow
-/// -- and nothing is re-tessellated, nothing is rebuilt on the client, and no
-/// geometry crosses the wire after the first frame.
-///
-/// The two halves of that are worth separating, because the demo uses one
-/// without the other on purpose:
-///
-///   - A transformation-only change (kCBTransBBox and nothing else) leaves the
-///     acknowledged round entirely and goes out on the motion channel: no
-///     BeginChanges/EndChanges, no acknowledgement, nothing gated on it, and
-///     the element tree and editor never hear of it. THE SHADOW USES ONLY THIS.
-///     It is placed by a matrix per update and steps at whatever rate those
-///     arrive.
-///
-///   - REveTrans::SetMotion() additionally says how a thing is MOVING --
-///     velocity, acceleration, a spin axis and rate, and how long the
-///     trajectory may be trusted. The client then evaluates it on its own frame clock and draws
-///     smoothly between updates. ONLY THE BALL DOES THIS.
-///
-/// So the ball is smooth at the display rate however rarely the server runs,
-/// and the shadow steps. That is deliberate: a shadow's exact position between
-/// updates is not worth a trajectory, and having one element of each makes the
-/// point that the cheap channel and the trajectory are independent -- an
-/// element may use the first without the second.
-///
-/// The ball is a `REveSMorph`, ported from Gled's SMorph, with the original
-/// `checker_8.png` from gled's Geom1 demos. Select it in the browser to get its
-/// full parameter set in the editor: twist it, pinch it, shear it, cut it open
-/// in theta and phi, or retile the texture, all while it is bouncing.
-///
-/// The viewer's Ged has a Motion panel, folded away at the bottom, with the
-/// three knobs that govern all of the above: how often the stream is acted on,
-/// how often the result is drawn, and whether anything is drawn between
-/// updates.
+/// Each timer tick sends only the transformations of the ball and its shadow.
+/// The ball also carries a trajectory, set with REveTrans::SetMotion(), which
+/// the client extrapolates between updates. The shadow carries none and steps
+/// to each new position. Run with a long period, e.g. boing(500), to see the
+/// difference. Select the ball to edit its REveSMorph parameters while it
+/// bounces. The Motion panel of the viewer's editor sets the update and redraw
+/// rates and switches the extrapolation off.
 ///
 /// \macro_code
 ///
@@ -55,21 +27,17 @@
 
 using namespace ROOT::Experimental;
 
-// Room half-extents and ball radius. **Y is up**: that is the up axis of the
-// default REve camera, so a scene built this way needs no camera setup to read
-// correctly. (Verified rather than assumed -- with the default camera, world +Y
-// projects straight up the screen, +Z to the right and +X down-left.)
+// Room half-extents and ball radius. Y is up, which is the up axis of the
+// default REve camera, so the scene needs no camera setup.
 const Float_t kBX = 40, kBY = 30, kBZ = 40;
 const Float_t kR  = 8;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// The whole demo: integrate, then write two matrices.
+/// Moves the ball and its shadow on every timer tick.
 ///
-/// Note what is NOT here -- no call that touches geometry, colour or any other
-/// element property. SetTransMatrix() stamps kCBTransBBox, so each tick streams
-/// sixteen numbers per element and the client displaces the objects it already
-/// has. Run it at any rate you like; the cost per frame does not depend on how
-/// finely the ball is tessellated.
+/// Each tick integrates the motion and sets two transformation matrices with
+/// SetTransMatrix(). No geometry is rebuilt, so the cost per tick does not
+/// depend on how finely the ball is tessellated.
 
 class Boinger : public TTimer {
    REveSMorph *fBall{nullptr};
@@ -87,12 +55,9 @@ class Boinger : public TTimer {
    static constexpr Double_t kTilt = 0.30;    // polar axis tipped out of vertical
    static constexpr Double_t kSpinRate = 2.4; // rad / s
 
-   /// How long until the ball next hits something, in seconds.
-   ///
-   /// This is what makes the extrapolation window meaningful: up to the bounce
-   /// the trajectory is exact, and the bounce is the one discontinuity the
-   /// client has no way of predicting. Walls are linear, the floor and ceiling
-   /// parabolic.
+   /// Time until the ball next hits a wall, the floor or the ceiling, in seconds.
+   /// SetMotion() gets it as the time the trajectory may be trusted, because a
+   /// bounce is the one change the client cannot predict.
    Double_t TimeToNextBounce() const
    {
       Double_t t = 1e9;
@@ -116,14 +81,12 @@ class Boinger : public TTimer {
             if (r > 1e-6) t = TMath::Min(t, r);
       }
 
-      // Never promise more than a short while regardless: the demo could be
-      // stopped, or the ball's motion changed from the prompt.
+      // Cap the window at 2 s, so that the ball stops soon after the timer does.
       return TMath::Min(t, 2.0);
    }
 
-   /// Reflect off a wall, elastically. Perfectly elastic on purpose: with no
-   /// loss the ball returns to the same height for ever, which is what the
-   /// original did and what makes it a demo rather than a simulation.
+   /// Reflects p and v off the wall at +-lim. The bounce is perfectly elastic,
+   /// so the ball returns to the same height every time.
    static void Bounce(Double_t &p, Double_t &v, Double_t lim)
    {
       if (p > lim)       { p = 2 * lim - p;  v = -TMath::Abs(v); }
@@ -139,45 +102,30 @@ public:
 
    Bool_t Notify() override
    {
-      // No congestion check here, deliberately. The manager holds changes back
-      // when the clients have not finished with the previous round and flushes
-      // them on the last acknowledgement -- and because a change carries current
-      // state rather than a delta, and stamps coalesce per element, what finally
-      // goes out is simply the newest position. So this may fire as fast as it
-      // likes; the link decides how much of it is sent.
+      // The timer needs no throttling of its own. A transformation-only change
+      // goes out on the motion channel, which skips a client that has not yet
+      // taken the previous message. Each message carries the absolute position,
+      // so the next one replaces a skipped one.
       ++fSent;
 
-      // Integrate on the wall clock, not on the timer period: frames are
-      // dropped, so the two are not the same, and using the period would slow
-      // the ball down exactly when the link is congested.
+      // Integrate on the wall clock rather than the timer period, because
+      // timer ticks can arrive late.
       auto now = std::chrono::steady_clock::now();
       Double_t dt = std::chrono::duration<double>(now - fLast).count();
       fLast = now;
-      // A long stall -- a tab in the background, a client reconnecting -- must
-      // not teleport the ball through a wall.
+      // Clamp dt, so that a stall of the event loop does not make the ball jump.
       if (dt > 0.1) dt = 0.1;
 
-      // Ticks, not rounds on the wire -- the manager decides how many of these
-      // are actually streamed. Compare with the timer period to see whether the
-      // event loop is keeping up with the timer.
+      // Report the tick rate every 100 ticks. Compare it with the timer period
+      // to see whether the event loop keeps up.
       if (fSent % 100 == 0) {
          Double_t el = std::chrono::duration<double>(now - fT0).count();
          ::Info("boing", "%d ticks, %.1f/s over %.1f s", fSent, fSent / el, el);
       }
 
-      // Integrate in small fixed sub-steps, NOT in one step of the whole
-      // interval. The simulation must not depend on how often this is called.
-      //
-      // Found the hard way: run at 200 ms and a single step moves the ball
-      // further than the room is high, so it passes clean through the floor and
-      // the reflection `p = 2*lim - p` puts it back somewhere with more energy
-      // than it had. Repeat, and the speed runs away -- the ball reached 336
-      // units/s against a physical maximum near 118, and the symptom was a ball
-      // stuck at the floor with a near-zero extrapolation window, which looks
-      // nothing like an integration bug.
-      //
-      // This is exactly what streaming trajectories is supposed to separate:
-      // simulate finely, send rarely.
+      // Integrate in fixed 5 ms sub-steps, so that the simulation does not
+      // depend on the timer period. One step over a long period can carry the
+      // ball past a wall, and the reflection then adds energy.
       for (Double_t rem = dt; rem > 0; ) {
          const Double_t h = TMath::Min(rem, 0.005);
          rem -= h;
@@ -193,11 +141,10 @@ public:
       }
 
 
-      // The ball spins about its own polar axis -- which for an SMorph is the
-      // local x, not z -- and that axis is stood up near vertical and tipped
-      // off it. It does not roll: the spin is constant and unrelated to the
-      // motion, exactly as on the Amiga, and that is what makes it read as a
-      // spinning ball rather than a rolling one.
+      // The ball spins at a constant rate about its polar axis, which for an
+      // REveSMorph is the local x. The axis is stood up and tilted by kTilt
+      // from vertical. The spin is independent of the flight, so the ball does
+      // not roll.
       Double_t cs = TMath::Cos(fSpin), sn = TMath::Sin(fSpin);
       // Rotate the polar axis by a quarter turn to stand it up (x -> y), then
       // lean it over by kTilt.
@@ -218,64 +165,41 @@ public:
       t.SetPos(fX, fY, fZ);
       fBall->SetTransMatrix(t.Array());
 
-      // Say how it is moving, not just where it is. The client evaluates the
-      // trajectory on its own frame clock, so the ball is smooth at 60 fps
-      // however rarely this runs -- and under constant gravity the second-order
-      // form is the exact path, not a smoothing of it.
-      //
-      // The window is the time to the next bounce, which is the only thing the
-      // client cannot see coming. Up to it the extrapolation is exact; past it
-      // the ball simply stops, which is visible and honest, rather than
-      // continuing through the floor.
+      // Declare the trajectory as well as the position. The client evaluates it
+      // on its own frame clock, so the ball moves smoothly between updates.
+      // Under constant gravity the second-order form is the exact path. The
+      // trajectory is trusted until the next bounce, after which the client
+      // stops extrapolating until the next update.
       REveVectorD vel(fVx, fVy, fVz);
       REveVectorD acc(0., kGrav, 0.);
 
-      // Spin about the ball's own polar axis, which for an SMorph is the local
-      // x. Being a local-frame axis it is the same (1,0,0) on every update,
-      // however the ball is standing -- the orientation is already in the
-      // matrix. Without the spin the flight is smooth and the turn jumps once
-      // per update, and the two disagreeing is more distracting than neither
-      // being smooth.
+      // The spin axis is in the ball's local frame, so it is the same (1,0,0)
+      // on every update. The orientation is already in the matrix.
       REveVectorD spin_axis(1., 0., 0.);
 
       fBall->RefMainTrans().SetMotion(vel, acc, spin_axis, kSpinRate,
                                       TimeToNextBounce());
 
-      // The shadow, tightening as the ball comes down. One more matrix -- no
-      // second element type, no shadow pass, no light.
+      // The shadow: a shallow dome under the ball that shrinks as the ball
+      // rises. It gets no SetMotion(), so the client moves it to each new
+      // matrix as it arrives, while the ball moves smoothly in between.
       //
-      // Note what it does NOT get: SetMotion(). It rides the same motion
-      // channel as the ball, but declares no trajectory, so the client never
-      // extrapolates it -- it steps to each new matrix as it arrives while the
-      // ball flies smoothly between them. A shadow's position between updates
-      // is not worth a trajectory, and it leaves one element of each kind in
-      // the demo, which is the clearest way to show the two are separable.
-      //
-      // It is a hemisphere (SetThetaMax(0.5)) squashed along its own polar axis
-      // into a very shallow dome, NOT a flattened whole sphere. A whole one
-      // squashed this far leaves its two halves a fraction of a unit apart in a
-      // scene eighty units across, and they z-fight. A hemisphere has one
-      // surface and cannot.
-      //
-      // That is also why the basis is set by hand rather than with SetScale:
-      // the flattening has to be along the *polar* axis, which for an SMorph is
-      // the local x, and that axis has to end up pointing at the ceiling.
+      // It is a hemisphere (SetThetaMax(0.5)) flattened along its polar axis.
+      // A flattened whole sphere would z-fight with itself. The basis is set by
+      // hand because the polar axis, the local x, has to point up.
       Double_t h = (fY + kBY) / (2 * kBY);        // 0 at the floor, 1 at the ceiling
 
-      // Never wider than the ball. The ball's centre reaches kBX - kR, so a
-      // shadow any larger than kR sticks out through the wall -- and because
-      // the scene box is the union of what is in it, that is enough to drag the
-      // axis box out with it every time the ball nears a corner.
+      // Never wider than the ball, so the shadow stays inside the room when the
+      // ball is at a wall.
       Double_t s = kR * (1.0 - 0.3 * h);
 
       REveTrans sh;
       sh.SetBaseVec(1, 0, 0.02 * kR, 0);          // polar axis up, and squashed
       sh.SetBaseVec(2, s, 0, 0);
       sh.SetBaseVec(3, 0, 0, s);
-      // Sit so the *bounding box* bottom lands exactly on the floor, not 0.08
-      // below it: REveSMorph's box is conservative and spans the whole sphere,
-      // so half the squashed thickness hangs beneath the dome that is drawn.
-      // Reaching below the floor would put it outside the declared room.
+      // Raise the shadow by half its flattened thickness, 0.02 * kR, so the
+      // bottom of its bounding box is on the floor. REveSMorph's box spans the
+      // whole sphere, so its lower half is below the drawn dome.
       sh.SetPos(fX, -kBY + 0.02 * kR, fZ);
       fShadow->SetTransMatrix(sh.Array());
 
@@ -289,22 +213,13 @@ void boing(Long_t period_ms = 40)
    auto eveMng = REveManager::Create();
    eveMng->AllowMultipleRemoteConnections(false, false);
 
-   // The box axes frame the scene and carry the scale, which is what the room
-   // grid used to do and did too loudly.
+   // The edge axes frame the room and carry the scale.
    auto viewer = eveMng->GetDefaultViewer();
    viewer->SetAxesType(REveViewer::kAxesEdge);
-   // Y is up here, so the box axes rule the FLOOR rather than whichever face
-   // happens to point away -- from eye height inside the room that would be the
-   // ceiling, leaving the surface the ball bounces off unmarked.
+   // Y is up, so the axes rule the floor, the surface the ball bounces off.
    viewer->SetAxesUpAxis(1);
-   // The axis spans the ROOM, not whatever the scene happens to hold. Without
-   // this it would measure the ball and its shadow -- the room is nowhere
-   // drawn, so there is nothing else to take it from.
-   //
-   // This is what retires the trick of putting something invisible at the
-   // extremities to inflate the bounding box from inside: an eight-corner box
-   // that existed only to be counted, which had to be kept in step with a
-   // volume nobody had written down. Now it is written down.
+   // Make the axes span the room. Otherwise they span the scene content, which
+   // here is only the ball and its shadow.
    viewer->SetAxesBBox(-kBX, -kBY, -kBZ, kBX, kBY, kBZ);
 
    auto scene = eveMng->GetEventScene();
@@ -324,11 +239,10 @@ void boing(Long_t period_ms = 40)
    auto shadow = new REveSMorph("Shadow");
    shadow->SetTLevel(6);
    shadow->SetPLevel(32);
-   shadow->SetThetaMax(0.5);      // a hemisphere -- see the comment in Notify()
+   shadow->SetThetaMax(0.5);      // a hemisphere; see the comment in Notify()
    shadow->SetMainColor(kBlack);
-   // Opaque enough to read. At 55 it was a faint smudge: the surface is lit
-   // like any other, so the specular lifts even a pure black off black, and
-   // what is left after that has to carry the whole shadow.
+   // Fairly opaque, because the lit surface's specular highlight lightens even
+   // a black shadow.
    shadow->SetMainTransparency(20);
    shadow->SetPickable(kFALSE);
    scene->AddElement(shadow);

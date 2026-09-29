@@ -1,11 +1,10 @@
 /// \file
 /// \ingroup tutorial_eve_7
-/// Exercise the kCBTransBBox cheap-update path.
+/// Move an element from the server by changing only its transformation.
 ///
-/// One box stands still, the other is moved from the server every 1.5 s by
-/// streaming nothing but its transformation matrix. The client must displace
-/// the renderer object it already has -- watch for the absence of a rebuild,
-/// not for the motion itself.
+/// One box stands still. Every 1.5 s the other is moved by SetTransMatrix(),
+/// which streams only the new matrix. The client moves the object it already
+/// has and rebuilds no geometry.
 ///
 /// \macro_code
 ///
@@ -34,7 +33,7 @@ public:
 
       REveTrans t;
       t.SetPos(30.0 * TMath::Sin(0.4 * fStep), 0.0, 0.0);
-      fEl->SetTransMatrix(t.Array());   // stamps kCBTransBBox
+      fEl->SetTransMatrix(t.Array());   // a transformation-only change
 
       ++fStep;
       Reset();
@@ -65,8 +64,8 @@ void trans_update()
    eveMng->GetEventScene()->AddElement(still);
 
    auto mover = make_box("Mover", kMagenta, 10, 20);
-   // Give it a transformation up front, so the initial stream is representative
-   // of an element that has one -- render_data.matrix present from the start.
+   // Give the box a transformation from the start, so the first stream already
+   // carries its matrix.
    mover->InitMainTrans();
    eveMng->GetEventScene()->AddElement(mover);
 
