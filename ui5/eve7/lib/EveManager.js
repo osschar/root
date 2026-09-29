@@ -455,10 +455,9 @@ sap.ui.define([], function() {
                Object.assign(obj, em);
             }
             else if (em.changeBit & this.EChangeBits.kCBTransBBox) {
-               // Transformation-only update; no render data is streamed for it.
-               // render_data.matrix has to be kept in step by hand, or a later
-               // rebuild -- a colour change, today -- reads the stale matrix
-               // and teleports the object back to where it used to be.
+               // Transformation-only update: no render data is streamed.
+               // render_data.matrix is updated here because a later rebuild,
+               // e.g. on a colour change, reads it.
                Object.assign(obj, em);
                if (em.matrix && obj.render_data)
                   obj.render_data.matrix = em.matrix;
@@ -774,12 +773,8 @@ sap.ui.define([], function() {
          }
 
          for (let item of recs) {
-            // Same rule as the update triggers and callSceneReceivers: a
-            // receiver implements the callbacks it cares about, and the caller
-            // checks. Without this a receiver registered for one thing throws
-            // here on every redraw -- caught and logged, so merely noisy rather
-            // than fatal, but noise that hides real exceptions from the same
-            // handler.
+            // A receiver implements only the callbacks it needs;
+            // Annotations, for one, has no endChanges().
             if (typeof item.endChanges !== "function") continue;
             try {
                item.endChanges();
@@ -802,20 +797,10 @@ sap.ui.define([], function() {
          this.busyProcessingChanges = false;
       }
 
-      /** The motion channel: transformation-only updates, outside the round.
-        *
-        * No BeginChanges/EndChanges, no acknowledgement, no pass over every
-        * receiver of every scene, no texture clear per viewer -- and the
-        * element tree and editor never see it, because only EveScene implements
-        * `sceneElementMotion`. That is the point of a separate channel rather
-        * than a filter on the ordinary one: the tree cannot be told about
-        * something it is not sent.
-        *
-        * Pacing is the server's, from RWebWindow::CanSend: a client whose queue
-        * is not drained is skipped rather than queued behind. Nothing is lost by
-        * that -- these carry absolute state, so the next message says everything
-        * the skipped one would have.
-        */
+      /** Apply a "Motion" message: transformation-only updates sent outside the
+        * change round, with no BeginChanges/EndChanges and no acknowledgement.
+        * Only EveScene implements sceneElementMotion, so the element tree and
+        * the editor never see these. */
       ImportMotion(resp)
       {
          let els = resp.els;
@@ -824,7 +809,7 @@ sap.ui.define([], function() {
          for (let i = 0; i < els.length; ++i) {
             let em = els[i];
             let obj = this.map[em.fElementId];
-            if (!obj) continue;   // gone, or not here yet -- a delete may race one of these
+            if (!obj) continue;   // removed, or not yet created
 
             // The message's own timestamp, so a viewer's rate cap can decide
             // once for the whole message rather than once per element.

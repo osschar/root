@@ -202,19 +202,10 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
                this.need_visibility_update = false;
             }
 
-            // Recompute the scene bounding box only when something structural
-            // happened -- elements added, removed, or rebuilt. NOT for a round
-            // that only moved things.
-            //
-            // Recomputing it every round is what makes the 3D axis breathe: the
-            // box is the union of what is in the scene, so it follows whatever
-            // is furthest out, and anything that moves drags the axis and its
-            // tick labels around with it. Nobody wants an axis whose extent
-            // depends on where a track happens to be this frame -- the axis is
-            // supposed to be the fixed thing you read positions against.
-            //
-            // A viewer that wants a fixed extent says so, with
-            // REveViewer::SetAxesBBox().
+            // Recompute the scene bounding box only after elements were added,
+            // removed or rebuilt, not after a round that only moved them. The
+            // 3D axis is sized from this box and would otherwise follow moving
+            // objects. REveViewer::SetAxesBBox() fixes the axis extent instead.
             this.glctrl.viewer.request_render(this.need_bbox_update);
             this.need_bbox_update = false;
          }
@@ -241,12 +232,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
       replaceElement(el) {
          if (!this.glctrl) return;
 
-         // Any trajectory being evaluated refers to the object about to be
-         // thrown away. Left in place it would go on moving the discarded one
-         // while the replacement sat still -- until the next motion message
-         // re-registered it, so a glitch rather than a freeze, but a real one.
-         // Dropping it is enough: the next message brings it back, attached to
-         // whatever object exists then.
+         // Drop the trajectory: it refers to the object about to be replaced.
+         // The next transformation update registers it on the new object.
          let mo = this.glctrl.viewer.motion;
          if (mo) mo.remove(el.fElementId);
 
@@ -269,60 +256,35 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
          this.need_visibility_update = true;
       }
 
-      /** One element off the motion channel. Same work as a kCBTransBBox change,
-        * without any of the round around it. Only this class implements it, so
-        * the tree and the editor cannot hear it. */
+      /** Apply one element of a "Motion" message: the same update as a
+        * kCBTransBBox change, outside the change round. */
       sceneElementMotion(msg)
       {
          let el = this.mgr.GetElement(msg.fElementId);
          if (!el) return;
 
-         // The viewer's own rate cap. Dropping one of these costs nothing --
-         // they carry absolute state, so the next says everything this one
-         // would have -- which is what lets a viewer be throttled or frozen
-         // without the server knowing or caring.
+         // The viewer's rate cap. Dropping an update is safe because each
+         // carries absolute state.
          let mo = this.glctrl ? this.glctrl.viewer.motion : null;
          if (mo && !mo.acceptUpdate(msg.msg_t)) return;
 
          this.updateElementTrans(el, msg);
 
-         // No endChanges to ask for one, and an element whose trajectory has
-         // just been cleared will not be redrawn by the motion loop either.
-         //
-         // Through Motion, so this obeys the viewer's render cap like the
-         // animation loop does -- otherwise the stream would redraw at its own
-         // rate and the cap would only govern half of what it names.
+         // No endChanges() follows, so request the render here. Going through
+         // Motion applies the viewer's render cap.
          if (mo)
             mo.requestRender();
          else if (this.glctrl && this.glctrl.viewer)
             this.glctrl.viewer.request_render();
       }
 
-      /** Apply a transformation-only change to the existing renderer object.
-        *
-        * A type whose positional state is not expressible as a matrix, or that
-        * built something composite and has to reach into its pieces, injects an
-        * `updateTrans` method in its maker function. That closure already holds
-        * everything the maker built, so nothing here has to know the shape of
-        * the representation -- which is the whole reason this is not a switch.
-        *
-        * Everything else takes the fallback. REve objects are matrix-only
-        * (GlViewerRCore sets Object3D.sDefaultQuaternionsAndAutoUpdate = false,
-        * so nothing regenerates the matrix from position/rotation behind our
-        * back), and Object3D.updateMatrixWorld cascades the dirty flag to every
-        * child, so a single assignment covers a composite as well -- including
-        * its bounding boxes, which RCore recomputes in the same pass.
-        *
-        * No render request: endChanges() asks for one unconditionally.
-        */
+      /** Apply a transformation-only change to the existing renderer object by
+        * setting msg.matrix on it. Requests no render; the callers do. */
       updateElementTrans(el, msg)
       {
          let obj3d = this.getObj3D(msg.fElementId);
          if (!obj3d) return;
 
-         // Streamed motion, if any. Handed over BEFORE the matrix is applied
-         // below would be wrong -- Motion reads the position out of the matrix
-         // the server just sent, so it has to see the new one.
          let mot_viewer = this.glctrl ? this.glctrl.viewer : null;
 
          if (typeof obj3d.updateTrans === "function") {
@@ -337,9 +299,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
             }
          }
 
-         // "mot" is present on every transformation update -- an object that
-         // has stopped moving sends null, which clears the trajectory the
-         // client would otherwise keep evaluating.
+         // After the matrix is applied: Motion takes the start position from it.
+         // Every transformation update carries "mot"; null clears the trajectory.
          if (mot_viewer && mot_viewer.motion && msg.mot !== undefined)
             mot_viewer.motion.update(msg.fElementId, obj3d, msg.mot);
       }
@@ -354,11 +315,8 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
          {
             let elId  = ids[i];
 
-            // Nothing will re-register this one -- it is gone. Left behind, its
-            // trajectory would be evaluated every frame for ever, and because
-            // the position keeps changing it would report movement and hold the
-            // render loop open at full rate. An event's worth of moving
-            // elements would do that once per event, and never give it back.
+            // Drop the trajectory. Nothing else removes it, and a live
+            // trajectory keeps Motion's render loop running.
             if (mo) mo.remove(elId);
             let obj3d = this.getObj3D(elId);
             if (!obj3d) {
@@ -392,10 +350,9 @@ sap.ui.define(['rootui5/eve7/lib/EveManager'], function(EveManager) {
             this.need_visibility_update = true;
          }
 
-         // Transformation only -- update in place, never rebuild. If kCBObjProps
-         // is set as well the server streams full render data instead of a
-         // matrix, so this finds nothing to do and the rebuild below carries the
-         // new position.
+         // Update the transformation in place. When kCBObjProps is also set the
+         // server sends render data instead of a matrix, and the rebuild below
+         // carries the new position.
          if (msg.changeBit & this.mgr.EChangeBits.kCBTransBBox) {
             this.updateElementTrans(el, msg);
          }

@@ -1,24 +1,11 @@
-/** Annotations -- the hover tooltip, and (later) annotations kept from it.
+/** Annotations -- the hover tooltip, and annotations kept from it.
  *
- * A separate module for the same reason Axis3D is one: GlViewerRCore is already
- * the biggest file in the client, and this is self-contained. The viewer's whole
- * share is to own one Annotations, tell it what is hovered, and let it draw.
+ * GlViewerRCore owns one Annotations, tells it what is hovered and calls
+ * layout() once per frame. The tooltip and every kept annotation are ZTexts in
+ * the viewer's overlay scene. They are therefore in the framebuffer and appear
+ * in screen captures, and the Overlay class moves and resizes them.
  *
- * Why the tooltip stops being a DOM div
- * -------------------------------------
- * It was a `div.eve_tooltip` appended next to the canvas and positioned in CSS
- * pixels. That works, but it is a second, parallel way of putting marks on the
- * viewer -- it cannot be moved or resized by the overlay machinery that every
- * other floating element already uses, it does not follow the viewer's
- * foreground colour, and, decisively, **it is not in the framebuffer**, so it is
- * absent from every screen capture. A ZText in the overlay scene is in the
- * capture automatically: RendeQuTor blends the overlay into tex_final before
- * render_tone_map_to_capture() reads it.
- *
- * Plain text only, which is what the tooltips already are -- all three
- * getTooltipText() implementations return fTitle/fName or composed numbers, no
- * markup, so nothing is lost in the move. Newlines and spaces are preserved by
- * ZText. Rich text would be a different job and does not belong in GL.
+ * Text is plain: ZText preserves newlines and spaces but renders no markup.
  */
 
 sap.ui.define([], function() {
@@ -27,8 +14,8 @@ sap.ui.define([], function() {
 
    class Annotations {
 
-      /** @param viewer a GlViewerRCore; used for the overlay scene, the texture
-       * cache, the foreground colour and request_render. */
+      /** @param viewer the owning GlViewerRCore.
+       *  @param RC the RenderCore module. */
       constructor(viewer, RC) {
          this.viewer = viewer;
          this.RC = RC;
@@ -41,36 +28,26 @@ sap.ui.define([], function() {
 
          this.font_name = "LiberationSerif-Regular";
 
-         /** Button size, as a fraction of the annotation's own font size, and
-          * the gap between the box and its buttons in screen fractions. */
+         /** Button font size, as a fraction of the annotation's font size. */
          this.btn_scale = 0.8;
 
-         /** How far outside the annotation the pointer still counts as "on"
-          * it. The buttons now share frames with the plate, so there is no gap
-          * to cross -- this is only slack against the pointer sitting exactly
-          * on an outer edge. */
+         /** Slack, in overlay coordinates, around an annotation's outer edges
+          * within which the pointer still counts as on it. */
          this.hover_margin = 0.008;
 
-         /** Frame line width, as a fraction of the line height. ZText's own
-          * default of 0.06 is sub-pixel at these font sizes and rasterises away
-          * edge by edge, so a box loses its top rule first and reads as broken
-          * rather than as small. */
+         /** Frame line width, as a fraction of the line height. REveText's
+          * 0.05 is sub-pixel at tooltip font sizes, and a sub-pixel frame
+          * loses its edges one at a time. */
          this.frame_line = 0.14;
 
          /** Plate opacity, streamed from REveViewer::fTooltipAlpha. */
          this.plate_alpha = 0.85;
 
-         /** Synthetic bold for small text, and the size below which it starts.
-          *
-          * An SDF glyph a few pixels tall has strokes about one pixel wide, so
-          * its coverage never reaches 1 and the letter DARKENS what is behind
-          * it instead of replacing it -- over a magenta jet the text comes out
-          * magenta, over green it comes out green. Lowering the SDF threshold
-          * dilates the glyph until the coverage saturates, which is exactly
-          * what `weight` is for.
-          *
-          * Ramped by size rather than applied flat: a large label does not need
-          * it and would merely look overweight. */
+         /** Synthetic bold for small text, ramped by cap height in CSS pixels.
+          * An SDF glyph a few pixels tall never reaches full coverage, so it
+          * tints what is behind it instead of covering it. A positive ZText
+          * `weight` dilates the glyph until coverage saturates. Large text
+          * gets none, since it would look overweight. */
          this.weight_max    = 0.07;
          this.weight_px_lo  = 6;    ///< full weight at or below this cap height
          this.weight_px_hi  = 14;   ///< no weight at or above it
@@ -106,15 +83,16 @@ sap.ui.define([], function() {
          return a;
       }
 
-      /** Keep an annotation with given text at a canvas position, independent of
-       * whether a tooltip is showing. This is the context-menu path: by the time
-       * the menu is up the tooltip has been hidden by pointerleave, so the menu
-       * supplies its own text from its own pick. */
+      /** Keep an annotation with `text` at (x, y), CSS pixels from the canvas
+       * top-left. `anchor3d` is a world point for a connector, or null.
+       * `target` is {elementId, sceneId} of the annotated element, or null.
+       * Used by the context menu, which supplies text from its own pick. If
+       * the font is not loaded yet, the annotation is created when it arrives
+       * and null is returned. */
       keepAt(text, x, y, anchor3d, target) {
          if (!text) return null;
          if (!this._font) {
-            // Font not in yet -- ask for it and place the annotation when it
-            // lands, rather than dropping the request on the floor.
+            // Only the latest request is remembered.
             this._ensureFont();
             this._keep_pending = { text: text, x: x, y: y, a3: anchor3d, tgt: target };
             return null;
@@ -134,17 +112,10 @@ sap.ui.define([], function() {
          return a;
       }
 
-      /** Listen to the scene the annotated element lives in.
-       *
-       * An annotation describes ONE object, and in an event display that object
-       * is transient: the next event replaces it. Nothing about a screen
-       * position expires on its own, so without this an annotation survives its
-       * subject and goes on pointing confidently at whatever now occupies that
-       * part of space -- which is worse than showing nothing.
-       *
-       * REveManager already announces this: ImportSceneChange calls
-       * elementsRemoved on every receiver registered for the scene, before the
-       * elements are actually dropped. */
+      /** Register as a receiver of the annotated element's scene, once per
+       * scene, so that elementsRemoved() can drop annotations whose subject is
+       * deleted. EveManager.ImportSceneChangeJson calls elementsRemoved before
+       * it removes the elements from its map. */
       _watchScene(a) {
          const sid = a.target && a.target.sceneId;
          if (!sid) return;
@@ -156,20 +127,9 @@ sap.ui.define([], function() {
          this._watched[sid] = true;
       }
 
-      /** Scene-receiver callback: drop annotations whose subject is gone.
-       *
-       * Matching the annotated id against the removed list is NOT enough.
-       * REveElement::RemoveElementsInternal reports only the DIRECT children of
-       * the scene, so clearing an event scene announces the container -- the
-       * jet list, say -- and never the individual jet an annotation was made
-       * about. The subject therefore has to be considered dead if it or any of
-       * its ancestors is in the list, which is what the walk below does.
-       *
-       * This is the client-side stand-in for what the server does properly with
-       * aunts: an annotation there holds the annotated element as a NIECE, and
-       * ~REveElement calls RemoveNieceInternal on every aunt of every element
-       * as it dies, however deeply nested. There is no such back-link on the
-       * client, so the ancestry is walked instead. */
+      /** Scene-receiver callback: drop annotations whose subject, or any
+       * ancestor of it, is in `ids`. A removal can be reported for a container
+       * only, so matching the subject's own id is not sufficient. */
       elementsRemoved(ids) {
          if (!ids || !ids.length || !this._kept.length) return;
          const mgr = this.viewer.controller ? this.viewer.controller.mgr : null;
@@ -177,7 +137,7 @@ sap.ui.define([], function() {
          const dead = new Set(ids);
 
          const subjectIsGone = (id) => {
-            // The callback runs BEFORE removeElements, so the chain is intact.
+            // The callback runs before removeElements, so the mother chain is intact.
             let guard = 0;
             while (id !== undefined && id !== null && ++guard < 64) {
                if (dead.has(id)) return true;
@@ -192,18 +152,9 @@ sap.ui.define([], function() {
             if (a.target && subjectIsGone(a.target.elementId)) a.remove();
       }
 
-      /** World-space point under a pick, from its depth.
-       *
-       * Camera-agnostic on purpose. setCameraCenter() does this with the fov
-       * tangent and camera.testMtx, which is perspective-only -- and an
-       * orthographic 3D view is an ordinary thing to be looking at. Here the
-       * pixel's near- and far-plane points are unprojected and the depth picks
-       * a point between them: eye-space z runs linearly along that world-space
-       * segment under BOTH projections, so one formula covers both.
-       *
-       * state.depth is already linearised to an eye-space distance by
-       * RendeQuTor.pick_low_level -- that is what the near*far reconstruction
-       * there is for. */
+      /** World-space point under a pick, or null. Unprojects the pixel's near-
+       * and far-plane points and interpolates between them by
+       * `pstate.depth`, the eye-space distance from RendeQuTor.pick_low_level. */
       worldFromPick(pstate) {
          const RC = this.RC, cam = this.viewer.camera;
          if (!pstate || !cam || !(pstate.depth > 0)) return null;
@@ -228,10 +179,9 @@ sap.ui.define([], function() {
        * or resizes. Called from the viewer's render loop: a drag moves the box
        * through ovlSetPos without telling anyone, so there is nothing to hook. */
       layout() {
-         // Buttons show only while the pointer is on the annotation -- "when
-         // the tile is entered". The test is over the whole GROUP, not the box
-         // alone: moving onto a button leaves the box, and if that hid the
-         // buttons they could never be clicked.
+         // Buttons show while the pointer is on the annotation or its buttons,
+         // or while one of its parts is being dragged. Testing the box alone
+         // would hide the buttons as soon as the pointer moved onto one.
          const ovl = this.viewer.overlay;
          const dragged = ovl.drag ? ovl.drag.obj : null;
          const nx = ovl.nx, ny = ovl.ny;
@@ -264,11 +214,9 @@ sap.ui.define([], function() {
          this._apply(text, x, y);
       }
 
-      /** Tooltip label size, as a fraction of viewport height. Streamed from
-       * REveViewer::fTooltipFontSize, so every client of the viewer agrees and
-       * it survives a reload -- the same arrangement as the axis font size.
-       * Kept annotations keep the size they were made at: a size change should
-       * not reach back and rewrite annotations already placed. */
+      /** Tooltip cap height, as a fraction of viewport height, streamed from
+       * REveViewer::fTooltipFontSize. Kept annotations keep the size they
+       * were made at. */
       setFontSize(sz) {
          if (!(sz > 0) || sz === this.font_size) return;
          this.font_size = sz;
@@ -289,9 +237,8 @@ sap.ui.define([], function() {
          }
       }
 
-      // No recolour() here: the tooltip carries use_fg_color, and the viewer's
-      // recolourFgElements() already traverses overlay_scene looking for exactly
-      // that flag. One mechanism, not two.
+      // Recolouring is done by GlViewerRCore.recolourFgElements(), which calls
+      // setColors() on every overlay object flagged use_fg_color.
 
       //-----------------------------------------------------------------------
 
@@ -322,11 +269,10 @@ sap.ui.define([], function() {
          );
       }
 
-      /** ZText floors its frame line and resize grip at a number of CSS pixels,
-       * which it can only do if it knows how big a CSS pixel is. The viewer
-       * sets that by traversing the overlay scene -- but only when the factor
-       * CHANGES, so an object added afterwards keeps the 1/900 class default
-       * for ever. Everything created here is created afterwards. */
+      /** Give a new overlay object the viewer's CSS-pixel scale. ZText floors
+       * its frame line, grip and font size at that many pixels.
+       * Overlay.updatePixelScale() only pushes the scale when it changes, so an
+       * object added later keeps ZText.PX_TO_SCREEN_SPACE until told. */
       _fixPixelScale(obj) {
          const v = this.viewer;
          if (typeof obj.setPixelScale !== "function") return;
@@ -334,12 +280,9 @@ sap.ui.define([], function() {
          obj.setPixelScale(v.overlay.px_to_screen, v.canvas.width, v.canvas.height);
       }
 
-      /** Synthetic bold for a given font size, in ZText's `weight` units.
-       *
-       * The size is a fraction of viewport height; dividing by the CSS-pixel
-       * scale turns it into pixels, which is the unit the problem is actually
-       * in -- the same 0.012 is fine on a tall canvas and far too thin on a
-       * short one. */
+      /** Synthetic bold for `font_size` (a fraction of viewport height), in
+       * ZText `weight` units. The ramp is evaluated in CSS pixels, since
+       * stroke thinness depends on pixel size, not on the viewport fraction. */
       weightFor(font_size) {
          const px_scale = this.viewer.overlay.px_to_screen ||
                           this.RC.ZText.PX_TO_SCREEN_SPACE;
@@ -350,19 +293,14 @@ sap.ui.define([], function() {
          return this.weight_max * t;
       }
 
-      /** @param line_frac frame width as a fraction of the object's OWN line
-       * height. Defaults to the plate's value; a button passes a bigger
-       * fraction so that its absolute frame comes out the same -- see
-       * Annotation._frameFrac(). */
+      /** Give `obj` the annotation plate: background-colour fill, foreground
+       * frame, pixel scale and weight.
+       * @param line_frac frame width as a fraction of obj's line height;
+       * defaults to frame_line. Buttons pass Annotation._frameFrac(). */
       _plate(obj, line_frac) {
-         // The plate is the BACKGROUND colour, not white.
-         //
-         // A white plate is invisible on a white background and blinding on a
-         // black one -- and setHighlight() pulls fill_alpha towards opaque, so
-         // on a dark background entering an annotation lit a white slab over
-         // the scene. Painting the plate in the background colour makes the
-         // highlight read as "this one is active" under either background,
-         // which is what it is for.
+         // The plate takes the background colour, so it and its hover
+         // highlight (fill_alpha raised towards opaque) read correctly on both
+         // light and dark backgrounds.
          obj.setupFrameStuff(1.0, true,
                              this.viewer.bgCol, this.plate_alpha,
                              this.viewer.fgCol, 1.0, 0.25,
@@ -387,13 +325,9 @@ sap.ui.define([], function() {
          obj.fontWeight = this.weightFor(obj.fontSize);
       }
 
-      /** Plate opacity, applied live to the tooltip and to every kept
-       * annotation.
-       *
-       * Both fill_alpha AND _norm_fill_alpha have to be set. ZText's highlight
-       * bumps fill_alpha by 0.30 and restores it from _norm_fill_alpha when the
-       * highlight goes -- so writing only fill_alpha survives exactly until the
-       * next time the pointer crosses the element, and then silently reverts. */
+      /** Set the plate opacity of the tooltip and every kept annotation. Sets
+       * _norm_fill_alpha too, because ZText.setHighlight(false) restores
+       * fill_alpha from it. */
       setPlateAlpha(a) {
          if (!(a >= 0) || a === this.plate_alpha) return;
          this.plate_alpha = a;
@@ -427,15 +361,13 @@ sap.ui.define([], function() {
             alignV: RC.ZText.ALIGN_V.TOP
          });
 
-         // A hover tooltip is passive: it must not be draggable, resizable or
-         // hoverable itself, or it would fight the very hover that produced it.
-         // Those become true when an annotation is KEPT, which is what
-         // ZText's ovlGetPos/ovlSetPos/ovlGetSize interface is already for.
+         // The tooltip is passive: not pickable, so the overlay neither hovers
+         // nor drags it, and not resizable. Kept annotations are separate
+         // ZTexts with both enabled.
          this._tip.pickable  = false;
          this._tip.resizable = false;
 
-         // A plate behind the text, so it stays readable over busy geometry --
-         // the one thing the DOM tooltip got for free from CSS.
+         // A plate behind the text keeps it readable over busy geometry.
          this._plate(this._tip);
          this._tip.visible = false;
 
@@ -456,20 +388,17 @@ sap.ui.define([], function() {
          const gap = this.cursor_gap_px * px;
          const sx  = x * px, sy = y * px;
 
-         // Flip the box to the other side of the cursor near an edge, so it
-         // cannot run off the canvas. The DOM tooltip did this by switching
-         // between left/right and top/bottom CSS anchors; here the same choice
-         // is the text's own alignment, which is cheaper and exact -- ZText
-         // aligns against its real laid-out box, where the CSS version was
-         // guessing before the box existed.
+         // Put the box on the side of the cursor facing the canvas centre, so
+         // it stays on the canvas. ZText aligns against its laid-out box, so
+         // the choice is made through setAlign().
          const right_half = sx > 0.5 * W;
          const lower_half = sy > 0.5 * H;
 
          t.setAlign(right_half ? RC.ZText.ALIGN_H.RIGHT : RC.ZText.ALIGN_H.LEFT,
                     lower_half ? RC.ZText.ALIGN_V.BOTTOM : RC.ZText.ALIGN_V.TOP);
 
-         // ZText's screen mode measures from the BOTTOM-left in (0,1); the
-         // pointer arrives top-left in CSS pixels.
+         // ZText screen mode is (0,1) from the bottom-left; the pointer is in
+         // CSS pixels from the top-left.
          const ox = (sx + (right_half ? -gap : gap)) / W;
          const oy = 1.0 - (sy + (lower_half ? -gap : gap)) / H;
          t.setOffset([ox, oy]);
@@ -478,23 +407,20 @@ sap.ui.define([], function() {
          this.viewer.request_render();
       }
 
-      /** Re-show the last tooltip with new text, at the position it already
-       * had. This is the server-driven path (REveManager can push a tooltip
-       * string for the highlighted element after the fact), which has no
-       * pointer position of its own. */
+      /** Re-show the last tooltip with new text at its last position. Called
+       * by GlViewerRCore.remoteToolTip() with the tooltip that REveSelection
+       * streams in the highlight record, which carries no position. */
       updateText(text) {
          if (!this._last) return;
          this.showTooltip(text, this._last.x, this._last.y);
       }
    }
 
-   /** One kept annotation: the text box plus its X and E buttons.
-    *
-    * All three are ordinary overlay ZTexts, so they get picking, dragging,
-    * resizing and hover highlight from the machinery that already exists. The
-    * only thing added is a local click handler -- `_ovl_click` -- because
-    * Overlay.click() otherwise only knows how to send a server MIR,
-    * and these buttons act entirely on the client.
+   /** One kept annotation: a text box, its X (close) and E (edit) buttons,
+    * and, when it has a 3D anchor, a connector line. The three ZTexts are
+    * ordinary overlay objects, dragged and highlighted by Overlay. The buttons
+    * act on the client through `_ovl_click`, which Overlay.click() calls in
+    * place of sending a MIR.
     */
    class Annotation {
 
@@ -515,7 +441,6 @@ sap.ui.define([], function() {
             alignV: RC.ZText.ALIGN_V.TOP
          });
          this.text_obj.setOffset(pos.slice());
-         // Movable AND resizable: this is the point of keeping it.
          this.text_obj.pickable  = true;
          this.text_obj.resizable = true;
          owner._plate(this.text_obj);
@@ -563,12 +488,9 @@ sap.ui.define([], function() {
          return b;
       }
 
-      /** Place the buttons above the box's top-right corner.
-       *
-       * Above rather than inside: inside would cover text, and the bottom-right
-       * corner is already the resize grip's. Recomputed from the box's actual
-       * laid-out rect, so it follows both a move and a resize without either
-       * having to report itself. */
+      /** Place the buttons on top of the box, X at its left edge and E to the
+       * right of X, sharing frame lines with the box. Recomputed each frame
+       * from the laid-out rect, so the buttons follow moves and resizes. */
       layout() {
          const v = this.owner.viewer;
          if (!v.canvas || !v.canvas.width) return;
@@ -576,10 +498,8 @@ sap.ui.define([], function() {
          const r = this.text_obj.getScreenRect(aspect);
          if (!r) return;
 
-         // Buttons track the plate's size. Resizing the annotation has to carry
-         // its furniture with it -- text, frame and buttons are one object as
-         // far as anyone using it is concerned. Guarded, because assigning
-         // fontSize rebuilds glyph geometry and this runs every frame.
+         // Buttons follow the plate's font size. Guarded, because assigning
+         // fontSize rebuilds the glyph geometry and this runs every frame.
          const want = this.text_obj.fontSize * this.owner.btn_scale;
          if (Math.abs(this.btn_close.fontSize - want) > 1e-9) {
             this.btn_close.fontSize = want;
@@ -588,27 +508,16 @@ sap.ui.define([], function() {
             // thin-stroke threshold sooner and need their own weight.
             this.btn_close.fontWeight = this.owner.weightFor(want);
             this.btn_edit.fontWeight  = this.owner.weightFor(want);
-            // The frame fraction is relative to each object's OWN line height,
-            // so a smaller button needs a bigger fraction to draw the same
-            // absolute width. Without this the three frames differ and nothing
-            // below can make them line up.
+            // Rescale the frame fraction so the button frames keep the plate's
+            // absolute width; see _frameFrac().
             this.owner._plate(this.btn_close, this._frameFrac());
             this.owner._plate(this.btn_edit,  this._frameFrac());
          }
 
-         // Frames SHARE pixels rather than stacking:
-         //   - X's left frame continues the plate's left frame;
-         //   - the buttons' bottom frames land exactly on the plate's top
-         //     frame;
-         //   - E's left frame IS X's right frame, so there is no double rule
-         //     between them.
-         //
-         // All of this is in OUTER edges, and getScreenRect does NOT give those.
-         // It reads the first quad of the geometry, and setText2D writes the
-         // inner fill first -- fill_rect(verts, 0, l+frame, r-frame, ...) -- so
-         // the rect it returns is inset by one frame width on every side.
-         // Working in it directly put every edge out by a frame, which showed up
-         // as four vertical rules between X and E instead of three.
+         // Frames share lines rather than stacking: X's left frame continues
+         // the plate's left frame, both buttons' bottom frames lie on the
+         // plate's top frame, and E's left frame is X's right frame. All
+         // positions are outer edges, from _outer().
          const P = this._outer(this.text_obj, aspect);
          if (!P) return;
          const wf  = this._frameWidthOf(this.text_obj);   // == screen y units
@@ -652,19 +561,15 @@ sap.ui.define([], function() {
          m.diffuse = this.owner.viewer.fgCol;
          m.lights = false;
          m.depthTest = false;
-         // Both faces. The quad is built from a perpendicular whose sign
-         // follows the line's direction, so its winding flips as the annotation
-         // moves around its anchor -- with culling on, the connector would
-         // vanish for half of the possible directions.
+         // Both faces: the quad's winding follows the line direction, so it
+         // flips as the annotation moves around its anchor.
          m.side = RC.FRONT_AND_BACK_SIDE;
          const mesh = new RC.Mesh(g, m);
          mesh.frustumCulled = false;
          mesh.pickable = false;
 
-         // Give the mesh a setColors, so the viewer's existing recolour
-         // traversal reaches it. That traversal calls setColors on anything
-         // flagged use_fg_color, and a plain Mesh has no such method -- so the
-         // connector stayed black when the background went black.
+         // A plain Mesh has no setColors(). This one lets
+         // GlViewerRCore.recolourFgElements() recolour the connector.
          mesh.use_fg_color = true;
          mesh.setColors = function(text_col, line_col) {
             m.color = line_col;
@@ -673,15 +578,10 @@ sap.ui.define([], function() {
          return mesh;
       }
 
-      /** Point the connector at its 3D anchor.
-       *
-       * Where it meets the box is recomputed every frame from the projected
-       * point, as TGLAnnotation did it: one of nine attachment positions,
-       * chosen by which side of the box the point falls on. The two ternaries
-       * below are that rule. If the point is INSIDE the box -- both fractions
-       * land on 0.5 -- no line is drawn at all, which is right: a line from a
-       * box to a point under it says nothing.
-       */
+      /** Draw the connector from the box to the projected 3D anchor. The line
+       * starts at a corner or edge midpoint of the box, chosen by which side
+       * of the box the anchor falls on. No line is drawn when the anchor is
+       * inside the box or outside the depth range. */
       updateConnector() {
          if (!this.conn) return;
          const v = this.owner.viewer, RC = this.owner.RC;
@@ -707,10 +607,8 @@ sap.ui.define([], function() {
          const ax = o.l + fx * (o.r - o.l);
          const ay = o.b + fy * (o.t - o.b);
 
-         // Constant pixel width. Overlay x and y are both 0..1 but span
-         // different pixel counts, so the perpendicular has to be taken in
-         // PIXELS and converted back, or the line thins and thickens as it
-         // turns.
+         // Constant pixel width: overlay x and y span different pixel counts,
+         // so the perpendicular is computed in pixels and converted back.
          const dx = (tx - ax) * W, dy = (ty - ay) * H;
          const len = Math.hypot(dx, dy);
          if (!(len > 1e-6)) { this.conn.visible = false; return; }
@@ -723,26 +621,22 @@ sap.ui.define([], function() {
          const put = (x, y) => { V[i++] = x; V[i++] = y; V[i++] = 0; };
          put(ax - nx, ay - ny); put(ax + nx, ay + ny); put(tx + nx, ty + ny);
          put(ax - nx, ay - ny); put(tx + nx, ty + ny); put(tx - nx, ty - ny);
-         // Assigning the array is what marks the buffer for re-upload: a
-         // same-length assignment sets _update, which is the path the renderer
-         // checks. BufferAttribute has both an `update` accessor and an
-         // update() method, so writing the property is not reliable.
+         // A same-length assignment bumps the attribute's version, so every
+         // context re-uploads it.
          a.array = V;
 
          this.conn.visible = true;
       }
 
-      /** Frame width as a fraction of a BUTTON's line height, chosen so the
-       * absolute width matches the plate's. The frame is line_width *
-       * line_height and line_height scales with the font, so a button at
-       * btn_scale of the plate's size needs the fraction divided by it. */
+      /** Frame fraction for a button that gives the plate's absolute frame
+       * width: frame_line / btn_scale, because line height scales with font
+       * size. */
       _frameFrac() { return this.owner.frame_line / this.owner.btn_scale; }
 
-      /** An object's frame width, in ZText geometry units -- screen fractions
-       * in y, aspect-divided in x. Mirrors setText2D: line_width * line_height,
-       * floored at MIN_FRAME_LINE_PX. Per object, not per annotation: the floor
-       * can bite on a small button while leaving the plate alone, and then the
-       * two frames genuinely differ. */
+      /** An object's frame width in ZText geometry units: a fraction of
+       * viewport height, to be divided by aspect for x. Mirrors setText2D:
+       * line_width * line_height, floored at MIN_FRAME_LINE_PX. Per object,
+       * because the floor can apply to a button and not to the plate. */
       _frameWidthOf(obj) {
          const RC = this.owner.RC;
          const f = this.owner._font;
@@ -762,10 +656,8 @@ sap.ui.define([], function() {
                   b: Math.min(r.y0, r.y1) - wf,  t: Math.max(r.y0, r.y1) + wf };
       }
 
-      /** Is the pointer on this annotation, counting its buttons and the gap
-       * between them as part of it? Union of the three rects plus a margin --
-       * a plain "is overlay.hover one of mine" test fails in the gap, which is
-       * exactly where the pointer is while travelling towards a button. */
+      /** True if (nx, ny), in overlay coordinates, is inside the bounding box
+       * of the plate and both buttons, grown by hover_margin. */
       containsPointer(nx, ny) {
          if (!(nx >= -1) || !(ny >= -1)) return false;   // no pointer seen yet
          const v = this.owner.viewer;
@@ -815,13 +707,9 @@ sap.ui.define([], function() {
          this.owner._forget(this);
       }
 
-      /** Edit the text in an HTML textarea floating over the canvas.
-       *
-       * HTML because text entry is a DOM problem -- caret, selection, IME,
-       * clipboard -- and none of that belongs in GL. The textarea only produces
-       * a string; what renders it is still ZText, still plain text. When these
-       * become real REveElements the editor should move to the side panel,
-       * which is the same split, better placed.
+      /** Edit the text in an HTML textarea over the annotation. Text entry is
+       * left to the DOM for caret, selection, IME and clipboard; the result is
+       * still rendered by ZText as plain text.
        */
       edit() {
          if (this._editor) return;
@@ -829,9 +717,8 @@ sap.ui.define([], function() {
          const dom = v.canvas.parentDOM;
          if (!dom) return;
 
-         // Editor and buttons are one box, so the keyboard shortcuts are not the
-         // only way out. Ctrl-Enter and Esc still work and are named in the
-         // button tooltips, but nothing about a bare textarea says they exist.
+         // Save and Discard buttons sit under the textarea, so the editor can
+         // be left without knowing the keys. Their tooltips name the keys.
          const box = document.createElement('div');
          box.style.position = "absolute";
          box.style.zIndex = 1000;
@@ -869,11 +756,8 @@ sap.ui.define([], function() {
             box.style.top  = ((1 - Math.max(r.y0, r.y1)) * v.canvas.height / px) + "px";
          }
 
-         // Guarded, because every route out of the editor is reachable twice:
-         // removing a focused element fires blur, which used to call close() a
-         // second time and throw NotFoundError out of remove(). Escape was worse
-         // than noisy -- the blur that followed it applied the edit that Escape
-         // had just abandoned.
+         // Runs once. Removing the box fires focusout, which would otherwise
+         // call close(true) again, after Escape as well.
          let closed = false;
          const close = (apply) => {
             if (closed) return;
@@ -904,17 +788,15 @@ sap.ui.define([], function() {
             // handler in which bare t, e and r rescale line widths, so typing any
             // of the three into the editor would also rescale the scene.
             e.stopPropagation();
-            // Esc abandons; Ctrl/Cmd-Enter applies. Plain Enter must stay a
-            // newline -- these strings are multi-line by nature.
+            // Esc discards and Ctrl/Cmd-Enter saves. Plain Enter is a newline.
             if (e.key === "Escape") { e.preventDefault(); close(false); }
             else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                e.preventDefault(); close(true);
             }
          });
 
-         // Clicking outside still saves, as it did before the buttons existed.
-         // focusout rather than blur, so moving focus within the box is not an
-         // exit; the buttons decline focus anyway, this covers the tab key.
+         // Focus leaving the box saves. focusout with a relatedTarget check,
+         // so tabbing between the textarea and the buttons is not an exit.
          box.addEventListener('focusout', (e) => {
             if (box.contains(e.relatedTarget)) return;
             close(true);

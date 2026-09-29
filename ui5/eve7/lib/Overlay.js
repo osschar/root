@@ -1,9 +1,10 @@
-/** Overlay -- pointer interaction with elements in the viewer's overlay scene:
- * hover highlight, move and resize by drag, and click.
+/** Overlay -- the viewer's overlay scene: pointer interaction with its
+ * elements (hover highlight, move and resize by drag, click), and per-frame
+ * upkeep (the CSS-pixel scale, and projection-axis layout for the camera).
  *
- * Moving and resizing are client-local; nothing here sends a MIR, so other
- * clients do not see them. A click on an element with a click action is the
- * exception, see click().
+ * Moving and resizing are client-local and send no MIR, so other clients do
+ * not see them. A click on an element with a click action sends one, see
+ * click().
  */
 
 sap.ui.define([], function() {
@@ -68,9 +69,10 @@ sap.ui.define([], function() {
          return rebuilt;
       }
 
-      /** Pass the size of a CSS pixel in screen space to every overlay element,
-       * for the minimum grip size. Only when it changes, i.e. on a resize or a
-       * display-scale change, because the elements rebuild their vertices. */
+      /** Pass the size of a CSS pixel in screen space to every overlay element
+       * with setPixelScale(), for its pixel floors: grip, frame line and font
+       * size. Only when it changes, i.e. on a resize or a display-scale
+       * change, because the elements rebuild their vertices. */
       updatePixelScale() {
          const v = this.viewer;
          if (!v.canvas || !v.canvas.height) return;
