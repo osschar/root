@@ -379,7 +379,7 @@ sap.ui.define([
          this.makeSliderSetter(el.AxesFontSize, "AxesFontSize", "SetAxesFontSize",
                                { min: 0.004, max: 0.05, step: 0.001,
                                  tip: "Label height as a fraction of the viewport. "
-                                    + "0.018 is the default and about the smallest "
+                                    + "0.015 is the default and about the smallest "
                                     + "that stays crisp; by 0.05 the labels of a "
                                     + "box axis start to meet." });
          this.makeSliderSetter(el.TooltipFontSize, "TooltipFontSize",

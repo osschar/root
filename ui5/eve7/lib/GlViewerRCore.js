@@ -750,8 +750,6 @@ sap.ui.define([
             this.annotations.setFontSize(eveView.TooltipFontSize);
          if (eveView.TooltipAlpha !== undefined && this.annotations)
             this.annotations.setPlateAlpha(eveView.TooltipAlpha);
-         this.updateRenderBBox();
-
 
          // compare cam base matrices
          let a = this.controls.getCamBase().elements;
@@ -887,10 +885,11 @@ sap.ui.define([
             if (this._capture_request)
                this.rqt.render_tone_map_to_capture();
 
-            // AMT: All render passes are drawn with the black bg
-            //      except of the tone map render pass
             if (this.RQ_HdrStats) { this.RQ_HdrStats = false; this.rqt.hdr_stats(); }
             if (this._autotune_pending) { this._autotune_pending = false; this.autoTuneLights(); }
+
+            // AMT: All render passes are drawn with the black bg
+            //      except of the tone map render pass
 
             this.renderer.clearColor = '#' +  this.bgCol.getHexString() + '00';
             this.rqt.render_tone_map_to_screen();
@@ -1232,34 +1231,6 @@ sap.ui.define([
          this._ttip_text = msg;
          if (this.highlighted_top_object && this.annotations)
             this.annotations.updateText(msg);
-      }
-
-      /** Only the three.js viewer still needs this: its tooltip is a DOM div
-       * positioned against the view, which is what these offsets are for. The
-       * RCore tooltip is a ZText in the overlay scene and positions itself in
-       * screen fractions, so it needs none of it. Kept because the method is
-       * still reachable, not because this file uses it. */
-      getRelativeOffsets(elem)
-      {
-         // Based on:
-         // https://stackoverflow.com/questions/3000887/need-to-calculate-offsetright-in-javascript
-
-         let r = { left: 0, right: 0, top:0, bottom: 0 };
-
-         let parent = elem.offsetParent;
-
-         while (parent && getComputedStyle(parent).position === 'relative')
-         {
-            r.top    += elem.offsetTop;
-            r.left   += elem.offsetLeft;
-            r.right  += parent.offsetWidth  - (elem.offsetLeft + elem.offsetWidth);
-            r.bottom += parent.offsetHeight - (elem.offsetTop  + elem.offsetHeight);
-
-            elem   = parent;
-            parent = parent.offsetParent;
-         }
-
-         return r;
       }
 
       //------------------------------------------------------------------------------
