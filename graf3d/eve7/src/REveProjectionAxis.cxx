@@ -266,6 +266,17 @@ void REveProjectionAxis::SetDistortionLabel(REveText *t)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// Forget the projection manager when it is destroyed, then clear any click
+/// target as REveText does.
+
+void REveProjectionAxis::RemoveAunt(REveAunt *au)
+{
+   if (fManager && au == fManager)
+      fManager = nullptr;
+   REveText::RemoveAunt(au);
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// Rewrite the read-out. Shown as distortion * 1000, the same scaling
 /// REveProjectionManager uses in its own name.
 

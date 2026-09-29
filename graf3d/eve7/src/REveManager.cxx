@@ -11,8 +11,6 @@
 
 #include <ROOT/REveManager.hxx>
 
-#include <chrono>
-
 #include <ROOT/REveCamera.hxx>
 #include <ROOT/REveUtil.hxx>
 #include <ROOT/REveSelection.hxx>
@@ -868,7 +866,18 @@ void REveManager::WindowDisconnect(unsigned connid)
    // note if scene changes are in progess the new serverstate will be changes after finish those
    if (fServerState.fVal == ServerState::UpdatingClients && ClientConnectionsFree())
    {
-      fServerState.fVal = ServerState::Waiting;
+      if (fPendingSceneChanges && !fConnList.empty()) {
+         // The closed connection was the last one busy: send the changes held
+         // back for it, as its acknowledgement would have.
+         fPendingSceneChanges = false;
+         StreamSceneChangesToJson();
+         SendSceneChanges();
+      } else {
+         // No one left to send to; the stamps stay for the next round.
+         fPendingSceneChanges = false;
+         fServerState.fVal = ServerState::Waiting;
+      }
+      fServerState.fCV.notify_all();
    }
 
    fServerStatus.fTLastDisconnect = std::time(nullptr);
