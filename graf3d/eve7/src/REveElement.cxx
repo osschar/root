@@ -1490,22 +1490,10 @@ void REveElement::BuildRenderData()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Write the state needed for a transformation-only update, as streamed for
-/// kCBTransBBox. No render data is written and no display list is dropped: the
-/// client applies this to the renderer object it already has.
-///
-/// The base writes the main transformation, which is all most elements have.
-/// A subclass carrying further positional state -- a screen-space position, a
-/// width and height -- overrides this, calls the base, and adds its own fields.
-/// Its client-side counterpart is the `updateTrans` method that the matching
-/// maker function injects in EveElementsRCore.js.
-///
-/// This goes out as JSON rather than in the binary blob on purpose. The binary
-/// path exists to keep vertex arrays out of JSON; sixteen numbers do not need
-/// it, and staying out of the blob means no offset has to be reserved for a
+/// Write the main transformation and its motion for a kCBTransBBox update.
+/// No render data is written; the client applies it to the object it already
+/// has. It goes out as JSON, so no offset is reserved in the binary blob for a
 /// message that carries no geometry.
-
-////////////////////////////////////////////////////////////////////////////////
 
 void REveElement::WriteTransJson(nlohmann::json &cj)
 {
@@ -1528,9 +1516,8 @@ void REveElement::WriteTransJson(nlohmann::json &cj)
    }
    else
    {
-      // Say so explicitly: an element that stops moving has to cancel the
-      // trajectory the client is still evaluating, and absence of a field in a
-      // partial update means "unchanged", not "cleared".
+      // Sent explicitly so that a stopped element cancels the client's
+      // trajectory: a missing field in a partial update means unchanged.
       cj["mot"] = nullptr;
    }
 }

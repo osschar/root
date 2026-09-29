@@ -234,17 +234,9 @@ void REveScene::StreamJsonRecurse(REveElement *el, nlohmann::json &jarr)
 ////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Take the transformation-only changes off the ordinary round.
-///
-/// An element whose sole pending change is kCBTransBBox has nothing to say that
-/// needs the round machinery: no geometry, no structure, nothing another client
-/// has to agree about. Sending it that way costs a BeginChanges and an
-/// EndChanges to every connection, a pass over every receiver of every scene on
-/// the client, a texture and attribute clear per viewer, and an acknowledgement
-/// that gates the next round on the slowest client -- to move sixteen floats.
-///
-/// So it goes out on its own channel instead. See
-/// REveManager::SendMotionChanges().
+/// Move every element whose only pending change is kCBTransBBox from the change
+/// list into \p arr, for REveManager::SendMotionChanges(). The remaining
+/// elements go through the ordinary acknowledged round.
 
 void REveScene::StreamMotionChanges(nlohmann::json &arr)
 {

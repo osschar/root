@@ -33,7 +33,7 @@ struct REveDeltaTrans
 {
    REveVectorD fVel;            ///< velocity, units/s
    REveVectorD fAcc;            ///< acceleration, units/s^2
-   REveVectorD fSpinAxis;       ///< spin axis, unit, LOCAL frame
+   REveVectorD fSpinAxis;       ///< spin axis, unit length, local frame
    Double_t    fSpinRate{0.};   ///< rad/s about fSpinAxis
    Double_t    fMaxDt{0.};      ///< seconds the trajectory may be trusted
    Double_t    fMotionT0{0.};   ///< REveUtil::ServerTimeMs() when set
@@ -73,9 +73,10 @@ public:
    REveTrans(const Float_t arr[16]);
    ~REveTrans() override {}
 
-   // Streamed motion: how this transformation is changing, so the client can
-   // extrapolate between updates. Spin is an axis and rate in the LOCAL frame.
-   // @{
+   /// \name Streamed motion
+   /// How this transformation is changing, so the client can extrapolate between
+   /// updates. Spin is an axis and a rate in the local frame.
+   /// @{
    void SetMotion(const REveVectorD &vel, const REveVectorD &acc, Double_t max_dt);
    void SetMotion(const REveVectorD &vel, const REveVectorD &acc,
                   const REveVectorD &spin_axis, Double_t spin_rate, Double_t max_dt);

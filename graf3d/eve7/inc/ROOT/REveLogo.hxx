@@ -24,8 +24,8 @@ class REveLogo : public REveElement
 {
 public:
    /// Where the image comes from: a directory registered with SetImageDir()
-   /// (the default), ui5/eve7/textures/, or an absolute URL the browser fetches
-   /// itself, which is detected from the file string.
+   /// (the default), ui5/eve7/textures/, or an absolute URL fetched by the
+   /// browser. The constructor selects kRemote for a URL; SetFile() does not.
    enum EImageSource_e { kImageDir = 0, kTextures, kRemote };
 
 private:
@@ -33,7 +33,7 @@ private:
    REveLogo &operator=(const REveLogo &) = delete;
 
 protected:
-   std::string fFile;         ///< file name inside the registered image directory
+   std::string fFile;         ///< file name or URL, interpreted according to fSource
 
    Float_t fPosX{0.06};       ///< position in the (0,1) overlay box; the image is centred on it
    Float_t fPosY{0.92};
@@ -49,11 +49,8 @@ public:
    REveLogo(std::string_view file, const Text_t *n = "REveLogo", const Text_t *t = "");
    ~REveLogo() override {}
 
-   /// True if the file is an absolute URL rather than a name in a served dir.
    static bool IsRemote(const std::string &f);
 
-   /// Register the directory the images are served from. Must be called after
-   /// REveManager::Create(), since it installs an HTTP location.
    static bool SetImageDir(std::string_view dir);
    static const std::string &GetImageDir() { return sImageDir; }
 

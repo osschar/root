@@ -372,34 +372,20 @@ void REveManager::BrowseElement(ElementId_t id)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Ask every connected client to grab the image of its GL viewers and post it
-/// to an image-collector service.
+/// Ask every connected client to grab its GL viewers and POST each image to an
+/// image collector. Each client posts the views it shows, all tagged with the
+/// same \p event_id.
 ///
-/// The grab happens in the client, after tone mapping but *before* the viewer
-/// background colour is composited in, so the posted PNG keeps straight alpha
-/// and can be placed over any backdrop downstream.
-///
-/// This is deliberately per client rather than per viewer: in a control room the
-/// same event is on several screens showing different views, and each machine
-/// posts what it is actually displaying, all tagged with the same `event_id`.
-///
-/// The wire contract, so a site can implement its own collector: the client
-/// POSTs `application/octet-stream` to \p url, the body being the raw
-/// framebuffer of width*height*4 bytes, RGBA8 with straight (un-premultiplied)
-/// alpha and no background composited in. Dimensions and tags travel as headers
-/// X-Width, X-Height, X-Event-ID, X-View-Type, and X-Flip-Y which is 1 when the
-/// rows are still in WebGL bottom-left order. A reference receiver lives in
-/// RenderCore under util/image-gator.js.
-///
-/// The default endpoint is loopback on purpose: the collector is expected to run
-/// on the same machine as the client -- a console at P5, or a controlled CERN IT
-/// virtual machine -- so the image never crosses a network and needs no transport
-/// security. Pointing this at a remote host is a different proposition and wants
-/// TLS and authentication.
+/// The body is `application/octet-stream`, width*height*4 bytes of RGBA8 with
+/// straight alpha and no background, so it composites onto any backdrop.
+/// Headers X-Width, X-Height, X-Event-ID and X-View-Type describe it; X-Flip-Y
+/// is 1 when the rows are in WebGL bottom-up order. RenderCore's
+/// util/image-gator.js is a reference receiver. The default collector is on
+/// loopback; a remote one needs TLS and authentication.
 ///
 /// \param event_id  tag recorded with the image, e.g. run/lumi/event
 /// \param url       collector endpoint; empty takes rootrc `WebEve.ImageGatorUrl`,
-///                  which itself defaults to http://localhost:3000/capture
+///                  which defaults to http://localhost:3000/capture
 /// \param scale     multiplier on the viewer viewport; 1 is what the operator sees
 /// \param viewers   restrict to these viewer names; empty means all of them
 
@@ -928,8 +914,8 @@ void REveManager::WindowData(unsigned connid, const std::string &arg)
 
       if (fServerState.fVal == ServerState::UpdatingClients && ClientConnectionsFree()) {
          if (fPendingSceneChanges) {
-            // Changes accumulated while this round was in flight -- send them
-            // now, which leaves a fresh round outstanding rather than idle.
+            // Changes stamped while this round was in flight. Sending them
+            // leaves a new round outstanding.
             fPendingSceneChanges = false;
             StreamSceneChangesToJson();
             SendSceneChanges();
@@ -1077,15 +1063,11 @@ void REveManager::StreamSceneChangesToJson()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// The motion channel: transformation-only changes, on the same websocket but
-/// outside the round protocol -- no BeginChanges/EndChanges envelope and no
-/// acknowledgement, so nothing gates the next update on the slowest client.
-///
-/// RWebWindow::CanSend(id, true) is the whole of the flow control. It is false
-/// while that connection's queue is non-empty, its credits are spent, or a send
-/// is in flight, so a client that is behind is skipped this time. Nothing is
-/// lost: these messages are absolute state rather than deltas, and the next one
-/// says everything the missed one would have.
+/// Send transformation-only changes on the motion channel: the same websocket,
+/// outside the round protocol, with no BeginChanges/EndChanges and no
+/// acknowledgement. A connection for which RWebWindow::CanSend(id, true) is
+/// false skips the message. Each message is absolute state, but a client that
+/// skips the last one keeps the old state until the element changes again.
 
 void REveManager::SendMotionChanges()
 {
@@ -1339,10 +1321,10 @@ void REveManager::BeginChange()
 }
 
 //____________________________________________________________________
-/// Close a round of changes and stream it, unless the clients have not yet
-/// acknowledged the previous one; then keep the stamps and let the last
-/// acknowledgement flush them. Nothing is lost: a change carries the element's
-/// current state and stamps coalesce per element. MIR rounds are not held back.
+/// Close a round of changes and stream it. If the clients have not yet
+/// acknowledged the previous round, keep the stamps and let the last
+/// acknowledgement in WindowData() flush them. Stamps coalesce per element.
+/// Motion changes are sent in either case. MIR rounds are not held back.
 
 void REveManager::EndChange()
 {
@@ -1352,9 +1334,7 @@ void REveManager::EndChange()
 
    std::unique_lock<std::mutex> lock(fServerState.fMutex);
 
-   // Motion first, and unconditionally. It is not part of the round, so it must
-   // not be held back with one -- that would put the animation back behind the
-   // acknowledgement it was taken out of the round to escape.
+   // Motion is outside the round, so it is sent even when the round is held.
    SendMotionChanges();
 
    if ( ! fConnList.empty() && ! ClientConnectionsFree())

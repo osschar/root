@@ -325,9 +325,9 @@ public:
 
    // Change-stamping and change bits
    //---------------------------------
-   // kCBTransBBox streams the transformation as JSON only; the client applies
-   // it to the object it already has. Anything that invalidates geometry must
-   // still stamp kCBObjProps. The bounding-box half of the name is historical.
+   // kCBTransBBox streams the transformation as JSON only, and the client
+   // applies it to the object it already has. A change that invalidates
+   // geometry must stamp kCBObjProps. No bounding box is sent despite the name.
 
    enum EChangeBits
    {

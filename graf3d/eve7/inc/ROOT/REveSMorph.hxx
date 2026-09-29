@@ -35,9 +35,8 @@ protected:
    Int_t   fTLevel{24};     ///< divisions in theta
    Int_t   fPLevel{32};     ///< divisions in phi
 
-   // Morph. All zero is a plain sphere. GUI range [-2, 2], step 0.01 -- the
-   // shape stops being informative long before the ends of that, and a wider
-   // range only makes the useful part of the slider harder to hit.
+   // Morph. All zero is a plain sphere. GUI range [-2, 2], step 0.01; the
+   // shape stops being informative well before the ends.
    Float_t fTx{0.f};        ///< twist of phi, proportional to cos(theta)
    Float_t fCx{0.f};        ///< radial convergence, proportional to cos(theta)
    Float_t fRz{0.f};        ///< shear about z, proportional to x
@@ -70,8 +69,8 @@ public:
    REveSMorph(const std::string &n = "REveSMorph", const std::string &t = "");
    ~REveSMorph() override = default;
 
-   /// Shape and texture parameters; each stamps kCBObjProps. The clamps double
-   /// as the Ged slider ranges. Size is the transformation, see SetRadius().
+   /// Shape and texture parameters; each setter clamps and stamps kCBObjProps.
+   /// Size is in the transformation, see SetRadius().
    /// @{
    Int_t GetTLevel() const { return fTLevel; }
    Int_t GetPLevel() const { return fPLevel; }
@@ -112,9 +111,6 @@ public:
    void    SetTexYOff(Float_t v) { fTexYOff = std::clamp(v, -1e3f, 1e3f); StampObjProps(); }
    /// @}
 
-   /// Uniform scale on the main transformation. A convenience, and a reminder
-   /// that size here is transformation and not geometry: this stamps
-   /// kCBTransBBox, so it streams as a matrix and rebuilds nothing.
    void SetRadius(Float_t r);
 
    void ComputeBBox() override;

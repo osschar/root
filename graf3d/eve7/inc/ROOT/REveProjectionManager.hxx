@@ -58,9 +58,6 @@ public:
 
    virtual void UpdateName();
 
-   /// Step the current projection's distortion and reproject. A MIR target --
-   /// the overlay's distortion buttons call it. Additive in units of 1e-4 and
-   /// clamped at zero.
    void BumpDistortion(Int_t steps);
 
    void SetCenter(Float_t x, Float_t y, Float_t z);

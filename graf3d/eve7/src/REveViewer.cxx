@@ -118,17 +118,9 @@ void REveViewer::SetAxesType(int at)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Distance attenuation of the 3D axis labels. See the declaration.
-///
-/// The meaningful range is [0, 1] -- 0 a constant pixel size, 1 shrinking
-/// exactly like geometry -- but the clamp is deliberately much wider than that.
-/// Inside [0, 1] the effect is nearly invisible on a scene viewed from outside,
-/// because the spread of clip-space w across such a scene is small; it takes
-/// several times 1 before the eye can see what the knob does at all. Past 1 is
-/// exaggeration rather than physics, and below 0 is inverse perspective, where
-/// the FAR labels are the big ones. Neither is right, both are useful: one for
-/// seeing what the control does, the other for a picture that makes the depth
-/// ordering unmissable.
+/// Fix the volume the 3D axis spans, as {min, max} per coordinate, instead of
+/// following the scene contents. Only the axis and the clip box use it; camera
+/// framing uses the content.
 
 void REveViewer::SetAxesBBox(Float_t xmin, Float_t ymin, Float_t zmin,
                              Float_t xmax, Float_t ymax, Float_t zmax)
@@ -140,6 +132,7 @@ void REveViewer::SetAxesBBox(Float_t xmin, Float_t ymin, Float_t zmin,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// Let the 3D axis follow the scene bounding box again.
 
 void REveViewer::ClearAxesBBox()
 {
@@ -148,6 +141,7 @@ void REveViewer::ClearAxesBBox()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// Cap the redraw rate of this viewer, in frames per second; 0 is uncapped.
 
 void REveViewer::SetRenderMaxHz(Float_t hz)
 {
@@ -156,6 +150,7 @@ void REveViewer::SetRenderMaxHz(Float_t hz)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// Cap the rate at which this viewer applies streamed motion; 0 freezes it.
 
 void REveViewer::SetMotionMaxHz(Float_t hz)
 {
@@ -164,6 +159,7 @@ void REveViewer::SetMotionMaxHz(Float_t hz)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// Set the up axis, 0/1/2 for x/y/z; any other value means none.
 
 void REveViewer::SetAxesUpAxis(int a)
 {
@@ -172,6 +168,7 @@ void REveViewer::SetAxesUpAxis(int a)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// Enable or disable client-side extrapolation of streamed motion.
 
 void REveViewer::SetExtrapolateMotion(bool x)
 {
@@ -180,6 +177,10 @@ void REveViewer::SetExtrapolateMotion(bool x)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// Distance attenuation of the 3D axis labels. 0 keeps a constant pixel size
+/// and 1 scales them like geometry. The clamp is [-4, 8] because inside [0, 1]
+/// the effect is hard to see on a scene viewed from outside. Below 0 the far
+/// labels are the larger ones.
 
 void REveViewer::SetAxesAtten(Float_t a)
 {
@@ -188,10 +189,8 @@ void REveViewer::SetAxesAtten(Float_t a)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Label size for the 3D axis, as a fraction of viewport height. 0.018 is the
-/// default and about the smallest that stays crisp; 0.05 is already large
-/// enough that the labels of a box axis start to meet, which is the point where
-/// a bigger number stops telling you anything new.
+/// Label size for the 3D axis, as a fraction of viewport height, clamped to
+/// [0.004, 0.05]. Above 0.05 the labels of a box axis start to meet.
 
 void REveViewer::SetAxesFontSize(Float_t s)
 {
@@ -228,7 +227,7 @@ void REveViewer::SetBlackBackground(bool x)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Multiplier on the client's light intensities; 1.0 is the historical look.
+/// Multiplier on the client's light intensities, clamped at zero from below.
 
 void REveViewer::SetLightScale(Float_t s)
 {
@@ -256,7 +255,9 @@ void REveViewer::SetToneMapKnee(Float_t k)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Request a light-scale auto-tune from the clients. See the declaration.
+/// Ask the clients to pick a light scale that keeps the brightest channel just
+/// below white. Only a client can measure that, so it reports its choice back
+/// through SetLightScale().
 
 void REveViewer::AutoTuneLights()
 {

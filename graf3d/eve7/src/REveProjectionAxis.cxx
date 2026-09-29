@@ -27,33 +27,29 @@ using namespace ROOT::Experimental;
 Scales and tick labels for a projected view, the REve counterpart of
 TEveProjectionAxes.
 
-Ticks sit at round numbers in the *original* space and are placed at their
-projected positions, so under a non-linear projection their spacing on screen
-is deliberately uneven -- that unevenness is the information. The projection
-itself can be arbitrarily non-trivial and lives only on the server, so the
-mapping original -> projected is done here, once, and the result is streamed.
+In kValue mode the ticks sit at round numbers in the original space and are
+placed at their projected positions, so under a non-linear projection their
+screen spacing is uneven. The projection exists only on the server, so the
+mapping from original to projected coordinates is done here and the ticks are
+streamed in projected coordinates. The client maps them to the screen, which
+for the orthographic camera of a projected view is affine.
 
-The client is then left with projected -> screen, which for the orthographic
-camera of a 2D projected view is affine and which it already owns. That is
-what keeps zooming and panning free of server round-trips.
+The tick set covers fRangeFactor times the projection manager's extent. The
+client discards ticks outside the view and labels that overlap, so zooming and
+panning need no server round trip. Ticks are recomputed only when the
+projection or the scene extent changes.
 
-For the same reason the tick set is deliberately **over-provided**: rather
-than computing exactly what fits the current frustum, a generous range at a
-finer subdivision is sent, and the client filters it -- discarding what falls
-outside the view and what would overlap. Re-streaming is then only needed when
-the projection or the scene extent changes, not on every zoom.
+The projection manager is held as an aunt and is not owned.
 
-The projection manager is held as an aunt, so the link does not imply
-ownership and is cleaned up on either side.
-
-Inherits REveText for its style: font, size, colour and the frame settings
-apply to the tick labels. Of the inherited fields, fText is the axis title;
-fPosition, fMode and fResizable do not apply.
+Inherits REveText for its style: font, size, hinting, weight and text colour
+apply to the labels, and the line colour to the ticks. fText, fPosition,
+fMode, fResizable, the alignment and the frame are not used.
 */
 
 namespace {
 
-/// Decimals needed to tell neighbouring ticks apart, given the step between them.
+/// Format a tick value with enough decimals to separate ticks \p step apart;
+/// exponent form outside [1e-4, 1e5).
 std::string FormatTickLabel(Double_t v, Double_t step)
 {
    if (std::fabs(v) < 1e-12) return "0";
@@ -73,22 +69,16 @@ std::string FormatTickLabel(Double_t v, Double_t step)
 } // namespace
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Constructor. The manager is taken as an aunt: REveProjectionManager keeps its
-/// nieces as the elements it projects, and ProjectChildrenRecurse() only acts on
-/// REveProjected, so a plain element like this one is visited and skipped. The
-/// link therefore costs nothing and is cleaned up from either side.
+/// Constructor. Registers as a niece of \p m. ProjectChildren() visits the
+/// nieces but reprojects only REveProjected ones, so the axis is skipped.
 
 REveProjectionAxis::REveProjectionAxis(REveProjectionManager *m, const Text_t *n, const Text_t *t)
    : REveText(n, t), fManager(m)
 {
-   // Inherited style defaults that make sense for tick labels rather than for a
-   // free-standing text box.
-   SetMode(1);          // screen space; the client places the labels itself
-   // A projected view is often a small pane, where 0.022 of its height is under
-   // ten pixels of cap height and a stroke is about one pixel wide -- thin and
-   // ragged, since coverage then varies along the stroke. A little more size and
-   // a little synthetic weight cost nothing and fix both; neither needs a
-   // second, heavier atlas.
+   // Style defaults for tick labels rather than a free-standing text box.
+   SetMode(1);          // not read by makeProjectionAxis
+   // Larger and slightly bolder than the REveText default, for labels a few
+   // pixels tall in a small projected pane.
    SetFontSize(0.028f);
    SetFontWeight(0.06f);
    SetDrawFrame(kFALSE);
@@ -109,7 +99,8 @@ REveProjectionAxis::~REveProjectionAxis()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Recompute both axes. Call after the projection or the scene extent changes.
+/// Recompute both tick sets. Call after the projection or the scene extent
+/// changes; camera motion needs no update.
 
 void REveProjectionAxis::UpdateTicks()
 {
@@ -119,12 +110,8 @@ void REveProjectionAxis::UpdateTicks()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Build the tick set for one screen axis, 0 horizontal and 1 vertical.
-///
-/// The range comes from the projection manager's bounding box, widened by
-/// fRangeFactor. Widening is the over-provisioning: the client is expected to
-/// discard what its frustum does not show, and in return it can zoom and pan
-/// without asking the server for anything.
+/// Build the tick set for one screen axis, 0 horizontal and 1 vertical. The
+/// range is the projection manager's bounding box widened by fRangeFactor.
 
 void REveProjectionAxis::BuildTicks(Int_t ax)
 {
@@ -141,20 +128,15 @@ void REveProjectionAxis::BuildTicks(Int_t ax)
    Float_t pmin_t = bb[ax * 2], pmax_t = bb[ax * 2 + 1];
    if (pmax_t <= pmin_t) return;
 
-   // Two ranges, and the distinction matters. The TRUE range is what the view
-   // actually shows and is what the tick STEP must be derived from; the WIDENED
-   // range only says how far beyond the view to keep emitting ticks at that step.
-   // Deriving the step from the widened range instead lets THLimitsFinder jump to
-   // a coarser round number -- doubling the range can take the step from 200 to
-   // 1000 -- which leaves fewer labels inside the view than no over-provisioning
-   // at all. That is a real bug that was visible as "only 0 is labelled" once a
-   // projection distortion pushed the widened bounds over a round-number boundary.
+   // The tick step comes from the true range and only the extent from the
+   // widened one. A step derived from the widened range can jump to a coarser
+   // round number and leave fewer labels inside the view.
    Float_t center = 0.5f * (pmin_t + pmax_t);
    Float_t half = 0.5f * (pmax_t - pmin_t) * fRangeFactor;
    Float_t pmin = center - half;
    Float_t pmax = center + half;
 
-   // TAttAxis convention: n1 + 100 * n2, primary and secondary divisions.
+   // Decoded as in TEveProjectionAxes: primary = n / 100, secondary = n % 100.
    Int_t n1a = TMath::FloorNint(fNdivisions / 100);
    Int_t n2a = fNdivisions - n1a * 100;
    Int_t bn1, bn2;
@@ -162,8 +144,8 @@ void REveProjectionAxis::BuildTicks(Int_t ax)
    Double_t bl1 = 0, bh1 = 0, bl2 = 0, bh2 = 0;
 
    if (fLabMode == kValue) {
-      // Round numbers in the ORIGINAL space, placed where the projection puts
-      // them. Their screen spacing is uneven, which is the whole point.
+      // Round numbers in the original space, placed where the projection puts
+      // them. Their screen spacing is uneven under a non-linear projection.
       Float_t v1 = proj->GetValForScreenPos(ax, pmin_t);
       Float_t v2 = proj->GetValForScreenPos(ax, pmax_t);
       if (v2 <= v1) return;
@@ -273,6 +255,9 @@ void REveProjectionAxis::BuildRenderData()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// Attach a text element that shows the current distortion. Only its text is
+/// rewritten, so it can sit in any scene. The label is not owned and its
+/// lifetime is not tracked.
 
 void REveProjectionAxis::SetDistortionLabel(REveText *t)
 {

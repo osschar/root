@@ -66,13 +66,12 @@ private:
 
    EAxesType fAxesType{kAxesNone};
 
-   /// Instruct the client-side viewer to use the streamed velocity and
-   /// acceleration to animate the moving objects. Off holds each object where
-   /// the last update put it, which is how you see the raw update rate.
+   /// Let the client extrapolate streamed motion between updates. Off holds
+   /// each object where the last update put it, which shows the raw update rate.
    Bool_t fExtrapolateMotion{kTRUE};
 
-   /// Which axis points up -- 0/1/2 for x/y/z, -1 for no opinion, the default.
-   /// Named so the box axis rules the floor rather than the ceiling.
+   /// Which axis points up: 0/1/2 for x/y/z, -1 (default) for none. When set,
+   /// the box axis draws the floor panel along it instead of the far face.
    Int_t fAxesUpAxis{-1};
 
    Bool_t  fHasAxesBBox{kFALSE};  ///< see SetAxesBBox()
@@ -130,9 +129,8 @@ public:
    void SyncCamera(bool s) {fSyncCamera = s;}
    bool GetSyncCamera() const {return fSyncCamera;}
 
-   /// Note the getters return the stored value; every one of these properties
-   /// is applied on the client, so a getter says what the clients were told,
-   /// not what any of them is currently showing.
+   // The getters return the value last sent to the clients, not what a client
+   // is showing.
    EAxesType GetAxesType() const { return fAxesType; }
    void SetAxesType(int);
 
@@ -142,23 +140,19 @@ public:
    Int_t GetAxesUpAxis() const { return fAxesUpAxis; }
    void  SetAxesUpAxis(int);
 
-   /// The volume the 3D axis spans, instead of whatever the scene contains --
-   /// which otherwise rescales as content comes and goes. Only the axis and the
-   /// clip box follow it; camera framing still uses the real content.
    void SetAxesBBox(Float_t xmin, Float_t ymin, Float_t zmin,
                     Float_t xmax, Float_t ymax, Float_t zmax);
    void ClearAxesBBox();
    Bool_t HasAxesBBox() const { return fHasAxesBBox; }
 
    /// Cap on how often this viewer applies streamed motion, in updates per
-   /// second. Zero freezes it, which fExtrapolateMotion does not -- that only
-   /// decides whether the client draws between updates.
+   /// second, clamped to [0, 240]. Zero freezes motion; SetExtrapolateMotion()
+   /// only controls drawing between updates.
    Float_t GetMotionMaxHz() const { return fMotionMaxHz; }
    void    SetMotionMaxHz(Float_t);
 
    /// Cap on how often the animation loop redraws this viewer, in frames per
-   /// second. Zero means uncapped -- note fMotionMaxHz's zero means frozen.
-   /// A render is nearly all fixed cost, so halving the rate halves it.
+   /// second, clamped to [0, 240]. Zero means uncapped, unlike SetMotionMaxHz().
    Float_t GetRenderMaxHz() const { return fRenderMaxHz; }
    void    SetRenderMaxHz(Float_t);
 
@@ -186,9 +180,6 @@ public:
    Float_t GetToneMapKnee() const { return fToneMapKnee; }
    void SetToneMapKnee(Float_t k);
 
-   /// Ask the clients to pick a light scale that keeps the brightest channel
-   /// just below white. Only the client can measure that, so it reports its
-   /// choice back through SetLightScale().
    void AutoTuneLights();
 
    void DisconnectClient();

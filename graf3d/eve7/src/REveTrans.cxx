@@ -42,9 +42,9 @@
 using namespace ROOT::Experimental;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Declare how this transformation is changing. Position comes from the matrix
-/// as before; this adds only the rate of change, so a transformation with no
-/// motion set behaves exactly as it always did.
+/// Declare how this transformation is changing; position still comes from the
+/// matrix. Does not stamp the owning element, which must be stamped with
+/// kCBTransBBox for the motion to be streamed.
 
 void REveTrans::SetMotion(const REveVectorD &vel, const REveVectorD &acc, Double_t max_dt)
 {
@@ -52,27 +52,10 @@ void REveTrans::SetMotion(const REveVectorD &vel, const REveVectorD &acc, Double
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// As above, with a spin: an axis and a rate in rad/s about it. The client
-/// turns the basis by rate*dt about the axis, as a single Rodrigues rotation,
-/// so no axis ordering is involved.
-///
-/// The axis is in the LOCAL frame, in the sense of RotateLF(), and the rotation
-/// composes on the right of the matrix. A body turning about its own axis is
-/// therefore stated once: the axis is a property of the object, and only the
-/// rate varies. It is normalised here, so a caller may pass any length.
-///
-/// Right-composition mixes the basis columns, so it preserves the object only
-/// while the basis scale is uniform. A local-frame spin on a non-uniformly
-/// scaled transformation would shear it.
-///
-/// Rotation has to extrapolate too. Without it the position glides while the
-/// spin jumps once per update, and the two disagreeing is worse than neither
-/// being smooth.
-///
-/// t0 is stamped here rather than at stream time. The manager may hold a round
-/// back while clients catch up, so stamping later would shift every trajectory
-/// forward by however long the link was congested -- the very lag this exists
-/// to remove.
+/// As above, with a spin of \p spin_rate rad/s about \p spin_axis. The axis is
+/// in the local frame, as for RotateLF(), and is normalised here. A spin on a
+/// non-uniformly scaled transformation shears it. t0 is stamped now, not at
+/// stream time, so a round that is held back does not shift the trajectory.
 
 void REveTrans::SetMotion(const REveVectorD &vel, const REveVectorD &acc,
                           const REveVectorD &spin_axis, Double_t spin_rate,

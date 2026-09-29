@@ -21,24 +21,23 @@ using namespace ROOT::Experimental;
 
 /** \class REveLogo
 \ingroup REve
-A screen-space image for an overlay scene: an experiment logo, a watermark.
+A screen-space image for an overlay scene, such as an experiment logo or a
+watermark.
 
-Rendered client-side as a RenderCore ZSprite in screen space, so the size is
-in CSS pixels and stays constant as the camera moves, and the shape comes
-from the image's own alpha rather than from the quad. Like other overlay
-elements it can be moved, and resized from its corner grip, entirely in the
-client -- nothing is sent back, so two people watching the same scene place
-their logo independently.
+The client draws it as a RenderCore ZLogo, a screen-space ZSprite. The size is
+in CSS pixels and does not change with the camera, and the outline comes from
+the image alpha. The logo can be moved, and resized from its corner grip, in
+the client only. Nothing is sent back, so each client places its own copy.
 
-The image is served from a directory registered once with SetImageDir(),
-which maps it under "eve-images/" the same way REveText maps its SDF fonts.
-The images themselves are not shipped with ROOT; point this at wherever the
-experiment keeps them.
+Images are served from a directory registered with SetImageDir() and mapped
+under "eve-images/", as REveText maps its SDF fonts. ROOT does not ship any
+images.
 */
 
 std::string REveLogo::sImageDir;
 
 ////////////////////////////////////////////////////////////////////////////////
+/// Constructor. A \p file that IsRemote() accepts selects kRemote.
 
 REveLogo::REveLogo(std::string_view file, const Text_t *n, const Text_t *t) : REveElement(n, t), fFile(file)
 {
@@ -89,6 +88,7 @@ bool REveLogo::SetImageDir(std::string_view dir)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// Stream the file, source, position, size, opacity and resizability.
 
 Int_t REveLogo::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
 {
@@ -106,6 +106,7 @@ Int_t REveLogo::WriteCoreJson(nlohmann::json &j, Int_t rnr_offset)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// Name the client factory makeLogo. No geometry is sent.
 
 void REveLogo::BuildRenderData()
 {

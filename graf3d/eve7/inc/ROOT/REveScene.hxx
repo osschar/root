@@ -105,9 +105,6 @@ public:
 
    void StreamRepresentationChanges();
 
-   /// Move every element whose ONLY pending change is its transformation out of
-   /// the change list and into `arr`, ready for the motion channel. What is
-   /// left goes through the ordinary acknowledged round.
    void StreamMotionChanges(nlohmann::json &arr);
    void SendChangesToSubscribers();
 

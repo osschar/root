@@ -36,7 +36,8 @@
 using namespace ROOT::Experimental;
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Milliseconds from a monotonic clock, counted from first use.
+/// Milliseconds from a monotonic clock, counted from first use. Not a wall
+/// clock. Time base of the streamed motion stamps, see REveTrans::SetMotion().
 
 double REveUtil::ServerTimeMs()
 {

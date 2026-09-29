@@ -81,7 +81,8 @@ void REveProjectionManager::RemoveDependent(REveElement *el)
 /// Updates name to have consistent information with projection.
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Step the distortion of the current projection and reproject. MIR target.
+/// Add \p steps * 1e-4 to the distortion of the current projection, clamped at
+/// zero, reproject, and refresh the REveProjectionAxis nieces. Called by MIR.
 
 void REveProjectionManager::BumpDistortion(Int_t steps)
 {
@@ -94,10 +95,7 @@ void REveProjectionManager::BumpDistortion(Int_t steps)
    UpdateName();
    ProjectChildren();
 
-   // Refresh whatever axes are hanging off this manager. Nieces are held as
-   // pointers to base, so the type is established with dynamic_cast at use time --
-   // either it is enforced when the pointer is set or the collection joined, or it
-   // is checked on each use, and aunts do the latter by design.
+   // Refresh the axes among the nieces.
    for (auto &n : fNieces) {
       if (auto ax = dynamic_cast<REveProjectionAxis *>(n)) {
          ax->UpdateTicks();

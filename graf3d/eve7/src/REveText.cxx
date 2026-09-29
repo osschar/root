@@ -32,10 +32,10 @@ REveText::REveText(const Text_t* n, const Text_t* t) :
 /// Fill core part of JSON representation.
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Make this text act as a button. `target` is held as an aunt when it can be
-/// one, so that its destruction clears the action rather than leaving a
-/// dangling id behind; a target that is not an REveAunt still works, just
-/// without that tracking.
+/// Make this text a button: a click that does not become a drag sends \p mir
+/// to \p target, or to this element if null. The effect reaches every client.
+/// A target that is an REveAunt is tracked, and its destruction clears the
+/// action. Any other target is stored by id only.
 
 void REveText::SetClickAction(const std::string &mir, REveElement *target)
 {
@@ -57,6 +57,8 @@ void REveText::SetClickAction(const std::string &mir, REveElement *target)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// Clear the click action when the click target is destroyed, so the button
+/// does not keep an id that may be reused by an unrelated element.
 
 void REveText::RemoveAunt(REveAunt *au)
 {

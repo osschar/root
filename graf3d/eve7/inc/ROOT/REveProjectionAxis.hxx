@@ -52,14 +52,13 @@ protected:
    ELabMode_e  fLabMode{kValue};
    EAxesMode_e fAxesMode{kAll};
 
-   /// As TAttAxis: n1 + 100 * n2. Deliberately finer than the usual 510,
-   /// because the client drops every label that will not fit and too few
-   /// leaves it nothing to choose from.
+   /// Primary divisions * 100 + secondary divisions, decoded as
+   /// TEveProjectionAxes does, the reverse of TAttAxis. Finer than usual
+   /// because the client drops labels that do not fit.
    Int_t   fNdivisions{1010};
-   Float_t fRangeFactor{2.0};  ///< over-provision: extend past the scene extent by this factor
-   /// Take the viewer's foreground colour instead of fTextColor/fLineColor. On by
-   /// default: an axis is chrome, and chrome has to stay legible when the
-   /// background flips. Its own colours are ignored while this is set.
+   Float_t fRangeFactor{2.0};  ///< tick range as a multiple of the manager's bbox extent, about its centre
+   /// Take the viewer's foreground colour instead of fTextColor/fLineColor, so
+   /// the axis stays legible when the background changes. On by default.
    Bool_t  fUseFgColor{kTRUE};
    Bool_t  fDrawCenter{kFALSE};
    Bool_t  fDrawOrigin{kFALSE};
@@ -98,13 +97,8 @@ public:
    Bool_t GetDrawOrigin() const { return fDrawOrigin; }
    void SetDrawOrigin(Bool_t x) { fDrawOrigin = x; StampObjProps(); }
 
-   /// Recompute the tick set. Call after the projection or the scene extent
-   /// changes; the client needs no update on mere camera motion.
    void UpdateTicks();
 
-
-   /// Attach a text element to display the current distortion. Not owned; the
-   /// axis only rewrites its string, so the label can live anywhere.
    void SetDistortionLabel(REveText *t);
    void UpdateDistortionLabel();
 

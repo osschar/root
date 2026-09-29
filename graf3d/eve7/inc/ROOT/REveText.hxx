@@ -53,9 +53,9 @@ protected:
    static bool SetDefaultSdfFontDir();
 
 public:
-   /// Anchoring: SetPosition() says where the text goes, these say which point
-   /// of it lands there. kOrigin is the default and historical; the others are
-   /// relative to the box, which is what a tick label wants.
+   /// Anchoring: SetPosition() gives where the text goes, these give which point
+   /// of it lands there. kOriginH/kOriginV, the default, is the text origin; the
+   /// others are relative to the text box.
    enum EAlignH_e { kOriginH = 0, kLeft, kCenterH, kRight };
    enum EAlignV_e { kOriginV = 0, kTop, kCenterV, kBottom };
 
@@ -89,16 +89,10 @@ public:
    Int_t GetAlignV() const { return fAlignV; }
    void SetTextAlign(Int_t h, Int_t v) { fAlignH = h; fAlignV = v; StampObjProps(); }
 
-   /// Make this text a button: a click that does not become a drag sends `mir`
-   /// to `target` (this element if null). The one overlay action that is not
-   /// client-local, so every subscribed client sees the effect.
    void SetClickAction(const std::string &mir, REveElement *target = nullptr);
    const std::string &GetClickMir() const { return fClickMir; }
    ElementId_t GetClickTargetId() const { return fClickTargetId; }
 
-   /// Clears the click action when the target dies. The id alone carries no
-   /// lifetime relationship, so without this a button would keep pointing at a
-   /// destroyed element -- and at an id free to be reused by an unrelated one.
    void RemoveAunt(REveAunt *au) override;
 
    /// Stroke weight, applied by moving the SDF threshold rather than loading a

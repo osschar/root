@@ -61,9 +61,6 @@ public:
 
    // Math utilities
 
-   /// Milliseconds from a monotonic clock, counted from first use. The time
-   /// base for streamed motion, see REveTrans::SetMotion(). Not a wall clock:
-   /// only a steadily advancing origin both ends agree on is needed.
    static double ServerTimeMs();
 
    static Bool_t IsU1IntervalContainedByMinMax(Float_t minM, Float_t maxM, Float_t minQ, Float_t maxQ);
