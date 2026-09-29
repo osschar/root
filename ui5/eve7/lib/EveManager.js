@@ -232,36 +232,9 @@ sap.ui.define([], function() {
          return this.childs[0].childs[2].childs;
       }
 
-      /** Invoke function on all receiver of scene events - when such function exists */
-      /** Call `fname` on every receiver of `scene` that implements it.
-       *
-       * The ONE place that knows the receiver contract, which is why it is also
-       * the one place that checks. Nothing in RegisterSceneReceiver says a
-       * receiver must implement every callback -- a receiver interested only in
-       * element removal is a reasonable thing to be -- so a missing method has
-       * to be ordinary, not fatal. It was fatal while SelectElement and
-       * UnselectElement dispatched by hand: one partial receiver and every
-       * selection refresh threw, unwinding CompleteSceneChanges and taking
-       * highlight propagation, projected-view updates and removal processing
-       * with it.
-       *
-       * Variadic, so the selection callbacks can use it too rather than keeping
-       * their own copies of this loop. */
-      /** Dispatch one element change to the scene's receivers, skipping any that
-        * has said it does not care about these bits.
-        *
-        * A receiver may set `changeBitMask` to the EChangeBits it wants; the
-        * default is all of them, so a receiver that says nothing is unaffected.
-        *
-        * This exists for the position stream. A moving element streams
-        * kCBTransBBox at whatever rate the server is driven at, and the only
-        * thing with any use for it is the 3D representation. Before this, the
-        * Summary controller was taking ~20 calls a second from a single
-        * bouncing ball, refreshing its tree model on each and updating the Ged
-        * -- which made the element tree impossible to use while anything moved.
-        * No amount of coalescing fixes that: the updates are genuinely wanted,
-        * just not by the tree.
-        */
+      /** Dispatch an element change to the scene's receivers, skipping any whose
+        * `changeBitMask` excludes its bits. Summary masks out kCBTransBBox, which
+        * a moving element streams several times a second. */
       callSceneElementChange(scene, em) {
          if ( ! scene.$receivers) return;
 
@@ -276,6 +249,8 @@ sap.ui.define([], function() {
          }
       }
 
+      /** Invoke `fname` on every receiver of `scene` that implements it; a receiver
+        * may implement only some of the callbacks. */
       callSceneReceivers(scene, fname, ...args) {
          if (scene.$receivers) {
              for (let i=0; i < scene.$receivers.length; i++) {
@@ -867,17 +842,8 @@ sap.ui.define([], function() {
          }
       }
 
-      /** Method invoked from server message to browse to element elid */
-      /** Server-driven image capture.
-       *
-       * The server sends { content: "GrabImage", event_id, url, scale, viewers }
-       * and every GL viewer this client holds grabs its frame and posts it to the
-       * collector service. `viewers` is an optional array of viewer names to
-       * restrict the capture to; absent or empty means all of them.
-       *
-       * Note this is per client: in a control room each screen posts the view it
-       * is actually showing, which is the point -- one event, several views,
-       * several machines, all landing in the same collector. */
+      /** Server-driven image capture: every GL viewer on this client, or those named
+        * in `req.viewers`, grabs its frame and posts it to `req.url`. */
       GrabImages(req)
       {
          let want = (req.viewers && req.viewers.length) ? new Set(req.viewers) : null;
@@ -905,6 +871,7 @@ sap.ui.define([], function() {
             console.warn("EveManager.GrabImages: no capable GL viewer matched", req);
       }
 
+      /** Method invoked from server message to browse to element elid */
       BrowseElement(elid) {
          let scenes = this.getSceneElements();
 
