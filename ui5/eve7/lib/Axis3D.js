@@ -1,43 +1,25 @@
-/** Axis3D -- axes for a real 3D scene.
+/** Axis3D -- world-space axes for a 3D viewer, in origin or box style.
  *
- * Deliberately a separate module rather than more methods on GlViewerRCore:
- * the viewer is already the biggest file in the client and an axis is a
- * self-contained piece of chrome. The viewer's whole share of this is to own
- * one Axis3D, tell it the bounding box, and call updateForCamera() from
- * render().
+ * GlViewerRCore owns one Axis3D. It sets style, up axis, font size and
+ * attenuation from REveViewer, passes the scene box to setBBox(), widens its
+ * clip box by getRenderMargin(), and calls updateForCamera() from render().
  *
- * How this differs from the projected (2D) axis, and why it is simpler:
- *
- * REveProjectionAxis has to live on the server because the projection is
- * non-linear and exists only there -- ticks are round numbers in *original*
- * space placed at their *projected* positions, which nothing on the client can
- * compute. A 3D axis has no such mapping. Its ticks are round numbers in world
- * space and depend on the bounding box alone, not on the camera, so the whole
- * thing is client-local: no element, no streaming, no round trip.
- *
- * What *is* camera-dependent is presentation -- which box faces point away from
- * the viewer, which edges carry the numbers, how dense the labels can be. That
- * is recomputed per frame in updateForCamera(), the direct analogue of
- * ZTextAxis.updateForCamera().
- *
- * The tick values still come from behind TickSource, even though nothing needs
- * that today: it is the seam a streamed tick set would arrive through if the
- * axis ever grows a server side (explicit ranges, per-axis titles, user ticks).
+ * The axis is client-local. REveProjectionAxis lives on the server because
+ * only the server knows the projection. A 3D axis takes its ticks from the
+ * bounding box alone, and the camera decides only the presentation: which box
+ * faces are drawn, which edges carry numbers, and which axes are edge-on.
  */
 
 sap.ui.define([], function() {
 
    "use strict";
 
-   /** Round numbers for an axis range.
+   /** Round tick values for an axis range, from d3's scaleLinear().ticks().
     *
-    * d3's scale.ticks() is the 1/2/5 x 10^n picker, and it is what JSROOT's own
-    * axes use -- TAxisPainter.produceTicks() calls this.func.ticks(). Using it
-    * here means a REve 3D axis picks the same numbers a TAxis would, for free,
-    * and there is no second nice-number implementation to keep honest.
-    *
-    * d3 is already in the module graph (draw.mjs, base3d.mjs, colors.mjs and
-    * menu.mjs all pull it), so the import costs a resolved promise, not a fetch.
+    * This is the 1/2/5 x 10^n picker JSROOT's own axes use
+    * (TAxisPainter.produceTicks() calls this.func.ticks()), so a REve 3D axis
+    * picks the same numbers a TAxis would. JSROOT has already loaded d3, so the
+    * import resolves without a fetch.
     */
    class TickSource {
 
@@ -52,31 +34,31 @@ sap.ui.define([], function() {
          return this._ready;
       }
 
-      /** Round values in [min, max], aiming for about n of them, plus a
-       * formatter that prints them consistently -- d3 chooses the precision
-       * from the step, so 0.1 does not come back as 0.1 next to 0.30000000004. */
+      /** Round values in [min, max], about n of them, and a formatter for them.
+       * d3 picks the precision from the step, so all labels on an axis have
+       * the same number of decimals and no floating-point noise. */
       ticks(min, max, n) {
          if (!this._scale || !(max > min)) return { values: [], format: String };
          const s = this._scale().domain([min, max]);
          const v = s.ticks(n);
          const d3f = s.tickFormat(n);
 
-         // d3 formats negatives with U+2212 MINUS SIGN, which is typographically
-         // right and absent from every SDF atlas we generate -- the glyph lookup
-         // falls back to "?", so -10 came out as "?10". Fold it to ASCII.
+         // d3 formats negatives with U+2212 MINUS SIGN. The generated SDF atlases
+         // lack that glyph and ZText substitutes "?", so fold it to ASCII '-'.
          const f = x => d3f(x).replace(/\u2212/g, '-');
          return { values: v, format: f };
       }
    }
 
-   /** Axis style, matching REveViewer::EAxesType so the server enum can drive
-    * this directly once it stops being collapsed to a bool on the way over. */
+   /** Axis style. The values match REveViewer::EAxesType (kAxesNone,
+    * kAxesOrigin, kAxesEdge), which GlViewerRCore passes to setStyle() as is. */
    const STYLE = { NONE: 0, ORIGIN: 1, BOX: 2 };
 
    class Axis3D {
 
-      /** @param viewer a GlViewerRCore; used for RC, the texture cache, the
-       * foreground colour and request_render. */
+      /** @param viewer the owning GlViewerRCore; used for its camera, texture
+       * cache, stripe factory, foreground colour, top_path and request_render.
+       * @param RC the RenderCore module. */
       constructor(viewer, RC) {
          this.viewer = viewer;
          this.RC = RC;
@@ -95,49 +77,36 @@ sap.ui.define([], function() {
           * feed, because a 3D tick's position is known exactly here. */
          this.n_ticks = 5;
 
-         /** Tick length and label gap, as fractions of the bounding-box
-          * diagonal. World-space, so ticks scale with the scene rather than
-          * with the viewport -- see the note in Z3DAxis about what it would
-          * take to make them a fixed number of pixels instead. */
+         /** Tick length, as a fraction of the bounding-box diagonal. It is also
+          * the unit of num_out and name_out. World-space, so ticks scale with
+          * the scene; the Z3DAxis class doc says what fixed-pixel ticks need. */
          this.tick_frac = 0.02;
 
-         /** Where the axis NAME sits along its axis, as a fraction of the span,
-          * and how far out it stands compared with a tick.
+         /** Label placement, in world space.
           *
-          * Not at the end: that is precisely where the three axes converge on a
-          * corner, so the names land on each other and on the end numbers. At
-          * the middle of the axis it is as far from both ends -- and so from both
-          * corners -- as it can get.
+          * name_frac: where the box-style axis name sits along its edge, as a
+          * fraction of the axis extent. The middle keeps it away from the
+          * corners, where the three axes meet and names collide with the end
+          * numbers.
           *
-          * All three are WORLD-space multiples of the tick length (itself 1.8%
-          * of the bounding box diagonal); name_frac alone is a fraction of the
-          * axis EXTENT. None of them has anything to do with the font size.
-          *
-          * The numbers and the name are pushed out along BOTH axes
-          * perpendicular to their own, not just one: a single perpendicular
-          * leaves them lying in the plane of a panel, on top of its grid. Going
-          * diagonally takes them off the box entirely. The name then has to
-          * stand further out again than the numbers it shares an edge with. */
+          * num_out, name_out: how far numbers and names stand out, in tick
+          * lengths. Numbers, and box-style names, step out along both axes
+          * perpendicular to their own, which lifts them off the panel planes and
+          * their grids. Origin-style names sit on the axis, name_out past each
+          * end. */
          this.name_frac = 0.5;
          this.num_out   = 2.2;
          this.name_out  = 5.0;
 
-         /** Label size, as a fraction of viewport height -- the units ZText
-          * uses in every screen-space mode. */
+         /** Label size, as a fraction of viewport height. */
          this.font_size = 0.018;
          this.font_name = "LiberationSerif-Regular";
 
-         /** An axis whose whole extent projects to less than this fraction of
-          * the viewport is edge-on: it has no direction on screen to lay ticks
-          * or numbers along, so it is not drawn at all. Under an orthographic
-          * camera aimed down an axis that projection is exactly zero -- the
-          * classic case being z in an XOY view -- and the labels would stack on
-          * a single point.
-          *
-          * Kept small on purpose. This is about the DEGENERATE case only; a
-          * perspective axis pointing roughly at the viewer still has real
-          * screen extent (0.08 on boxset's x, measured) and its labels merely
-          * crowd, which is a thinning problem and not this one. */
+         /** An axis whose full extent projects shorter than this in NDC (the
+          * viewport spans 2) is edge-on and not drawn, since it has no screen
+          * direction to lay ticks along. The exact case is an orthographic
+          * camera looking down the axis, such as z in an XOY view. Kept small so
+          * that a foreshortened perspective axis is still drawn. */
          this.min_axis_ndc = 0.02;
 
          this.ticks = new TickSource();
@@ -148,10 +117,11 @@ sap.ui.define([], function() {
          this._degen = [false, false, false];
 
          /** Cached once delivered. The box style rebuilds whenever the camera
-          * crosses a face plane, which is far too often to re-request a font. */
+          * crosses one of the box's mid-planes, too often to re-request a font. */
          this._font = null;
-         /** Which back faces and which labelled edges the current geometry was
-          * built for; see _octantKey(). Null means "not built for any camera". */
+         /** Edge-on key plus octant key the current geometry was built for,
+          * from _degenKey() and _octantKey(). updateForCamera() rebuilds when
+          * it changes. Null means not built for any camera. */
          this._octant = null;
       }
 
@@ -162,8 +132,8 @@ sap.ui.define([], function() {
          this.rebuild();
       }
 
-      /** 0 = constant pixel size, 1 = shrinks exactly like geometry, in between
-       * is the readable compromise. A uniform, so no rebuild. */
+      /** Label size attenuation with distance: 0 keeps a constant pixel size,
+       * 1 shrinks like geometry. A uniform, so no rebuild. */
       setAttenuation(k) {
          this.atten = k;
          if (this.labels_obj) this.labels_obj.setAttenuation(k);
@@ -172,22 +142,16 @@ sap.ui.define([], function() {
 
       getAttenuation() { return this.atten; }
 
-      /** Label size, as a fraction of viewport height. Baked into the glyph
-       * quads, so this rebuilds the label geometry -- but only that: the lines,
-       * ticks and panels are untouched, which is why it does not go through
+      /** Label size, as a fraction of viewport height. It is baked into the
+       * glyph quads, so this rebuilds the label geometry only, not through
        * rebuild(). */
       setFontSize(sz) {
          if (!(sz > 0)) return;
          this.font_size = sz;
-         // Deliberately NOT short-circuited on sz === this.font_size. The
-         // viewer assigns font_size directly before setStyle(), so that a
-         // rebuild picks up the new size at build time -- which made an
-         // equality test here always true and this method a no-op. The label
-         // object then kept the old size until something else forced a rebuild,
-         // and in box style the only thing that does is the camera crossing a
-         // face plane. It looked like "the font size only updates when I rotate
-         // far enough". Z3DAxis.setFontSize does the real comparison, against
-         // the size its geometry was actually built with.
+         // No early return on an unchanged size. GlViewerRCore assigns
+         // font_size directly before setStyle(), so the field can already hold
+         // the new value while labels_obj still has the old one.
+         // Z3DAxis.setFontSize() compares against the size it was built with.
          if (this.labels_obj) {
             this.labels_obj.setFontSize(sz);
             this.viewer.request_render();
@@ -196,24 +160,15 @@ sap.ui.define([], function() {
 
       getFontSize() { return this.font_size; }
 
-      /** How far outside the bounding box this axis needs the camera's frustum
-       * widened, in world units.
+      /** How far past the bounding box the camera's clip box must extend for
+       * this axis, in world units.
        *
-       * Near and far are fitted tightly to the scene's bounding box, which is
-       * the right thing to do -- it spends the whole z-buffer on the scene --
-       * and that box deliberately excludes this axis, since the axis is built
-       * from it. So anything the axis draws outside the box would be clipped.
-       *
-       * The margin covers the TICK STUBS only, one tick length. It does not
-       * have to cover the numbers or the names, which stand much further out
-       * (num_out and name_out tick lengths): those are ZText glyphs, and the
-       * anchor shader clamps their depth into the frustum instead of letting
-       * them clip. Sizing this to the names instead would be a tenth of the
-       * diagonal on every side, and that much wasted depth range is paid for by
-       * every surface in the scene, not just by the chrome that asked for it.
-       *
-       * The tick stubs are RC.Stripes, ordinary world geometry with no such
-       * trick available, which is why they still need the room. */
+       * GlViewerRCore fits the perspective near and far planes to the bounding
+       * box, and the box excludes the axis, which is built from it. The margin
+       * is one tick length, for the tick stubs, which are ordinary Stripes.
+       * Numbers and names stand further out but are ZText glyphs, whose anchor
+       * shader clamps their depth into the frustum. A margin sized to the names
+       * would be a tenth of the diagonal and cost depth precision everywhere. */
       getRenderMargin() {
          if (!this.bbox || this.style === STYLE.NONE) return 0;
          const b = this.bbox;
@@ -245,10 +200,9 @@ sap.ui.define([], function() {
          this._camSig = null;
          if (this.style === STYLE.NONE || !this.bbox) return;
 
-         // Both the tick generator and the font arrive asynchronously. Chain
-         // rather than nest: whichever is slower gates the build, and a second
-         // rebuild while one is in flight is harmless because _build() starts
-         // by clearing.
+         // The tick generator and the font both load asynchronously. The build
+         // waits for the ticks, then for the font. A second rebuild while one is
+         // in flight is harmless because _build() starts by clearing.
          this.ticks.init().then(() => {
             if (this._font) return this._build();
             this._withFont(f => { this._font = f; this._build(); });
@@ -257,9 +211,7 @@ sap.ui.define([], function() {
 
       _withFont(cb) {
          // top_path, not eve_path: REveText registers the font directory with
-         // gEve->AddLocation("sdf-fonts/", ...), i.e. at the server's top level.
-         // The old makeAxis() asked under rootui5sys/eve7/ and so never got a
-         // font at all, which is why its labels never appeared.
+         // gEve->AddLocation("sdf-fonts/", ...), at the server's top level.
          const url_base = this.viewer.top_path + 'sdf-fonts/' + this.font_name;
          this.viewer.tex_cache.deliver_font(url_base,
             (texture, font_metrics) => { cb({ texture, metrics: font_metrics }); },
@@ -296,25 +248,13 @@ sap.ui.define([], function() {
          }
 
          // ---- lines and ticks ------------------------------------------------
-         // Stripes, not the label buffer: a 3D line of constant *pixel* width
-         // needs the screen-space perpendicular, which is camera-dependent and
-         // so cannot be baked into a static vertex buffer. Stripes computes it
-         // in its vertex shader, which is exactly the job.
-         // Batched by width and colour, NOT one object per segment.
+         // Stripes, not the label buffer: a 3D line of constant pixel width
+         // needs the screen-space perpendicular, which depends on the camera.
+         // Stripes computes it in its vertex shader.
          //
-         // A stripe buffer is read as independent two-vertex segments -- the
-         // prev/next setup keys on vertex parity -- so every line of the same
-         // style fits in one buffer and draws in one call. That is what
-         // REveStraightLineSet has always done with its whole plex.
-         //
-         // It matters more than it looks. One object per segment made 46 of
-         // them for a box, each with its own geometry, material, program setup
-         // and draw; measured by hiding the axis, that was 1.1 ms of a 1.81 ms
-         // frame -- 61%, for chrome, every frame an animation runs. Grouped it
-         // is three or four objects and the difference is not visible.
-         //
-         // The labels below were always built this way, and the comment there
-         // says why. This is the same argument applied to the lines.
+         // Batched by width and colour. Stripes draws each consecutive vertex
+         // pair as one instanced segment, so all lines of one style share one
+         // buffer and one draw call, as in makeStraightLineSet().
          const groups = new Map();
          for (const seg of lines) {
             const key = seg.width + "|" + seg.color.getHex();
@@ -344,9 +284,9 @@ sap.ui.define([], function() {
                atten: this.atten
             });
             lo.material.side = RC.FRONT_SIDE;
-            // An axis is chrome and must stay legible when the background
-            // flips. recolourFgElements() traverses the scene for exactly this
-            // pair, so the axis needs no special case in the viewer.
+            // The axis must stay legible when the background flips.
+            // GlViewerRCore.recolourFgElements() calls setColors() on every
+            // object with use_fg_color set, so the viewer needs no special case.
             lo.use_fg_color = true;
             lo.setLabels(labels);
             this.labels_obj = lo;
@@ -356,12 +296,10 @@ sap.ui.define([], function() {
          this.viewer.request_render();
       }
 
-      /** Rays from the origin along each axis, ticked and labelled.
+      /** Lines through the origin along each axis, ticked and labelled.
        *
-       * Each axis runs to whichever of the box's faces it actually reaches --
-       * and in both directions when the box spans the origin, since an axis
-       * that stopped at zero would misreport a scene sitting on one side of it.
-       */
+       * Each line spans [min(0, box min), max(0, box max)] along its axis, so it
+       * covers the box extent and always includes the origin. */
       _buildOrigin(lines, labels) {
          const RC = this.RC;
          const b = this.bbox;
@@ -372,15 +310,8 @@ sap.ui.define([], function() {
          const tick_len = this.tick_frac * diag;
          if (!(diag > 0)) return;
 
-         // One neutral grey for all three, the same as the box style uses.
-         //
-         // These were red / green / blue per axis, which is a way of telling
-         // the axes apart when nothing else does -- and nothing else did, back
-         // when the names never rendered at all because the font was fetched
-         // from the wrong path. Now that every ray is labelled at both ends the
-         // colour is carrying no information, and three saturated primaries
-         // through the middle of a scene compete with the data for attention.
-         // Chrome should look like chrome.
+         // One neutral grey for all three axes, as in the box style. Every ray
+         // is named at its ends, so colour does not have to tell them apart.
          const col = new RC.Color(0.55, 0.55, 0.55);
 
          const AX = [
@@ -397,7 +328,6 @@ sap.ui.define([], function() {
             const lo = Math.min(0, mn[i]), hi = Math.max(0, mx[i]);
             if (!(hi > lo)) continue;
 
-            // The axis line itself.
             lines.push({ pts: [...pt(i, lo), ...pt(i, hi)], width: 1.5, color: col });
 
             const t = this.ticks.ticks(lo, hi, this.n_ticks);
@@ -408,11 +338,10 @@ sap.ui.define([], function() {
             // of them would overlap edge-on from the commonest viewpoints.
             const j = (i + 1) % 3, k = (i + 2) % 3;
 
-            // Numbers and name step away along BOTH perpendicular axes, so they
-            // do not lie in the plane the tick marks occupy. An origin axis runs
-            // through the middle of the scene, so there is no "outward" to
-            // follow -- a consistent diagonal is the best available, and it is
-            // at least the same one for every tick on the axis.
+            // Numbers step away along both perpendicular axes, so they do not lie
+            // in the plane of the tick marks. An origin axis runs through the
+            // scene and has no outward side, so the same diagonal is used for
+            // every tick on the axis.
             const away = (p, f) => {
                const q = p.slice();
                q[j] += f * tick_len;
@@ -436,15 +365,11 @@ sap.ui.define([], function() {
                });
             }
 
-            // Names at BOTH ends, on the axis and beyond it: "x" past the
-            // positive end, "-x" past the negative one. The offset runs along
-            // the axis rather than across it, so each name reads as the
-            // continuation of its own ray leaving the scene -- which is also
-            // what makes the sign unambiguous without a tick to hang off.
-            //
-            // Nothing perpendicular is added. An origin axis is a line through
-            // the scene, and its ends are the two places that are already clear
-            // of everything, so a name there needs no further dodging.
+            // Names sit on the axis, name_out tick lengths past its ends: "x"
+            // past the positive end, and "-x" past the negative end when there
+            // is one. Each name continues its own ray, which makes the sign
+            // unambiguous. The ends are clear of the scene, so no perpendicular
+            // offset is added.
             const nout = this.name_out * tick_len;
 
             labels.push({
@@ -474,20 +399,16 @@ sap.ui.define([], function() {
       // Box style (kAxesEdge)
       //-----------------------------------------------------------------------
 
-      /** Camera position in world space, derived from the VIEW matrix.
+      /** Camera position in world space, from the view matrix.
        *
-       * Deliberately not camera.matrixWorld: the viewer runs with
-       * Object3D.sDefaultQuaternionsAndAutoUpdate off and manages matrices
-       * itself, so a camera's matrixWorld is only as fresh as the last
-       * updateMatrixWorld() that happened to reach it. matrixWorldInverse is
-       * the VMat handed to every shader each frame, so it cannot be stale.
+       * Uses matrixWorldInverse, the VMat the renderer hands to shaders and the
+       * matrix Vector3.project() applies in _degenerate() and _buildBox(), so
+       * the eye point agrees with those projections.
        *
-       * For V = [R|t], the camera sits at -R^T t; with column-major elements
-       * that is minus the dot of each of R's columns with t.
-       *
-       * Orthographic cameras have no eye point in the projective sense, but
-       * theirs still lies on the view axis on the near side, which is all the
-       * back-face test asks of it. */
+       * For V = [R|t] the camera sits at -R^T t. With column-major elements
+       * that is minus the dot of each column of R with t. For an orthographic
+       * camera the result still lies on the view axis on the near side, which
+       * is all the back-face test needs. */
       _camPos(camera) {
          const e = camera.matrixWorldInverse.elements;
          const tx = e[12], ty = e[13], tz = e[14];
@@ -496,14 +417,11 @@ sap.ui.define([], function() {
                  -(e[8]*tx + e[9]*ty + e[10]*tz)];
       }
 
-      /** Which axes are edge-on, as three booleans.
+      /** Which axes are edge-on for this camera, as three booleans.
        *
-       * Measured, not inferred from the camera type. The type names say which
-       * plane an orthographic camera faces -- XOY means x and y are in the
-       * screen plane, so z is the degenerate one -- but reading a name commits
-       * to a table that has to be kept in step with the enum, and it says
-       * nothing about a camera the user has since rotated. Projecting the axis
-       * and measuring how long it comes out answers the actual question. */
+       * Measured by projecting each axis's box extent and comparing its screen
+       * length with min_axis_ndc. Unlike reading the camera type, this also
+       * covers a camera the user has rotated. */
       _degenerate(camera) {
          const RC = this.RC, b = this.bbox;
          const out = [false, false, false];
@@ -534,14 +452,6 @@ sap.ui.define([], function() {
          return this._degenerate(camera).map(d => d ? "1" : "0").join("");
       }
 
-      /** Which half of each axis the camera is on, as a 3-character key.
-       *
-       * For an axis-aligned box the visibility of a face is decided by one
-       * comparison: the face further from the camera along that axis is the one
-       * pointing away. So the whole back-face set -- and with it the panels, the
-       * labelled edges and the tick directions -- changes only when the camera
-       * crosses a face plane. That is what makes rebuilding on the key, rather
-       * than every frame, correct and cheap. */
       /** Which axis points up, from REveViewer::SetAxesUpAxis. -1 for none. */
       setUpAxis(a) {
          a = (a >= 0 && a <= 2) ? a : -1;
@@ -551,6 +461,12 @@ sap.ui.define([], function() {
          this.rebuild();
       }
 
+      /** Which side of the box centre the camera is on along each axis, as a
+       * 3-character key such as "+-+".
+       *
+       * The back panels, labelled edges and tick directions of the box style
+       * depend on the camera only through this key, so the geometry is rebuilt
+       * when it changes rather than every frame. */
       _octantKey(camera) {
          const c = this._camPos(camera), b = this.bbox;
          const mid = [0.5 * (b.min.x + b.max.x),
@@ -561,13 +477,10 @@ sap.ui.define([], function() {
          return k;
       }
 
-      /** A box round the scene: the three faces pointing away from the camera,
-       * ruled at the tick values, with numbers along three of the silhouette
-       * edges.
-       *
-       * Only the far faces are drawn, so the panels are always behind the
-       * geometry rather than in front of it. The set flips as the camera orbits;
-       * that flip is what makes the box readable, not an artefact to suppress. */
+      /** A box round the scene: the three faces away from the camera, ruled at
+       * the tick values, with numbers along three silhouette edges. Only the
+       * far faces are drawn, so the panels stay behind the geometry. The drawn
+       * set flips as the camera crosses the box's mid-planes. */
       _buildBox(lines, labels) {
          const RC = this.RC;
          const b = this.bbox;
@@ -591,14 +504,11 @@ sap.ui.define([], function() {
             front[a] = camOnMaxSide ? mx[a] : mn[a];
          }
 
-         // ...except along an axis the viewer has named as up, where the floor
-         // is drawn whichever side the camera is on. From eye height inside a
-         // scene the far face along up is the ceiling, which leaves the one
-         // surface worth ruling -- the one everything stands on -- undrawn.
-         //
-         // Safe to override only here: the scene rests on top of the floor, so a
-         // floor panel never comes between the camera and the content. A near
-         // side wall would, which is what the back-face rule is for.
+         // Along the viewer's up axis the floor (min face) is always the back
+         // panel. From eye height inside a scene the far face along up is the
+         // ceiling, which would leave the floor unruled. A floor panel never
+         // comes between the camera and content resting on it; a near side wall
+         // would, so the other axes keep the back-face rule.
          if (this.up_axis >= 0 && this.up_axis <= 2) {
             back[this.up_axis]  = mn[this.up_axis];
             front[this.up_axis] = mx[this.up_axis];
@@ -617,9 +527,8 @@ sap.ui.define([], function() {
             tick_sets.push(this.ticks.ticks(mn[a], mx[a], this.n_ticks));
 
          // ---- the three back panels: border plus grid ------------------------
-         // Grid lines come from the same tick array as the numbers, so a grid
-         // line IS a tick extended across the panel. That alignment is the whole
-         // point of the panels; a generic grid would not have it.
+         // Grid lines use the same tick values as the numbers, so each grid line
+         // continues a tick across the panel.
          for (let a = 0; a < 3; ++a) {
             const j = (a + 1) % 3, k = (a + 2) % 3;
             const v = back[a];
@@ -652,11 +561,10 @@ sap.ui.define([], function() {
 
          // ---- numbers, on three silhouette edges -----------------------------
          // For each axis there are two candidate edges on the boundary of the
-         // drawn panels: one back / one front in each of the other two axes.
-         // Take whichever projects further from the box centre on screen, so the
-         // numbers sit on the OUTSIDE of the silhouette rather than in the inner
-         // crease where the panels meet -- there they would read as being inside
-         // the scene, and geometry would cross them.
+         // drawn panels: back in one of the other two axes and front in the
+         // other. The one whose midpoint projects further from the box centre
+         // on screen is used, so the numbers sit outside the silhouette and not
+         // in the crease where the panels meet, where geometry would cross them.
          const scr = (p) => {
             const v = new RC.Vector3(p[0], p[1], p[2]);
             v.project(camera);
@@ -695,9 +603,8 @@ sap.ui.define([], function() {
             // the plane of its own panel and reads as attached to the edge.
             const step = (p, f) => { const q = p.slice(); q[o] += f * dir; return q; };
 
-            // The numbers go further, and diagonally -- away from the box along
-            // BOTH perpendicular axes. Along one only they would sit in the
-            // plane of a panel, over its grid lines, which is where they were.
+            // The numbers stand further out, along both perpendicular axes, so
+            // they sit off the panel planes and their grid lines.
             const dj = (Math.sign(best.jv - mid[j]) || 1) * tick_len;
             const dk = (Math.sign(best.kv - mid[k]) || 1) * tick_len;
             const away = (p, f) => {
@@ -736,18 +643,13 @@ sap.ui.define([], function() {
          }
       }
 
-      /** Per-frame camera work.
+      /** Per-frame camera work, called from GlViewerRCore.render().
        *
-       * Today only the attenuation reference: the clip-space w of the box
-       * centre, i.e. the distance at which a label is drawn at its nominal
-       * size. Under an orthographic camera that w is 1 and attenuation
-       * correctly collapses to a no-op.
-       *
-       * This is where back-face selection for the box style will go -- which
-       * three faces point away from the camera, and which edges carry the
-       * numbers. Both are pure functions of the view direction, so like the
-       * projected axis's layout they stay client-local.
-       */
+       * Sets the attenuation reference, the clip-space w of the box centre,
+       * where labels are drawn at their nominal size. Under an orthographic
+       * camera w is 1 and attenuation has no effect. Then rebuilds the geometry
+       * if the edge-on axes or, in box style, the camera octant have changed.
+       * Returns true when it rebuilt. */
       updateForCamera(camera) {
          if (!this.labels_obj || !this.bbox || !camera) return false;
 
@@ -756,25 +658,17 @@ sap.ui.define([], function() {
                                   0.5 * (this.bbox.min.y + this.bbox.max.y),
                                   0.5 * (this.bbox.min.z + this.bbox.max.z));
 
-         // w of the centre under the current view-projection. A Vector4 applied
-         // in two steps, as Vector3.project() does it -- the divide must not
-         // happen behind our back, since w is the whole answer here.
+         // w of the centre under the current view-projection. A Vector4, since
+         // Vector3.project() divides by w and w is the value wanted.
          const v = new RC.Vector4(c.x, c.y, c.z, 1.0);
          v.applyMatrix4(camera.matrixWorldInverse);
          v.applyMatrix4(camera.projectionMatrix);
          this.labels_obj.setReferenceW(v.w);
 
-         // Two things about the camera change what has to be drawn, and both
-         // are cheap to test and rare to change, so the geometry is rebuilt on
-         // them rather than reconsidered every frame:
-         //
-         //   - which octant the camera is in, which picks the box's back panels
-         //     and labelled edges (box style only);
-         //   - which axes are edge-on, which decides whether an axis is drawn
-         //     at all (both styles).
-         //
-         // Orbiting without crossing a face plane or taking an axis edge-on
-         // costs the three comparisons and nothing else.
+         // The geometry depends on the camera only through the edge-on axes
+         // (both styles) and the octant (box style), so it is rebuilt when
+         // their combined key changes. The key costs six point projections and
+         // three comparisons per frame.
          const dk = this._degenKey(camera);
          const ok = (this.style === STYLE.BOX) ? this._octantKey(camera) : "";
          const sig = dk + "/" + ok;
