@@ -21,10 +21,8 @@ the interpreter so that REve does not link against RGL.
 Generation needs three things:
 
  1. REveManager must already exist, because the font directory is registered
-    with it. Called earlier, AssertSdfFont() prints an error from
-    SetSdfFontDir() and returns false. Later calls in the same session return
-    false without a message, because the failed default setup is not retried.
-    Call REveText::SetSdfFontDir() to recover.
+    with it. Called earlier, AssertSdfFont() prints an error and returns
+    false; calling it again after REveManager::Create() works.
 
  2. A real GL context, so generation cannot happen in batch mode. `root.exe -b`
     fails with "TGLWidget::CreateWindow: Display is not set!". Run once with a

@@ -159,9 +159,11 @@ bool REveText::SetSdfFontDir(const std::string &dir, bool require_write_access)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Set default SDF font directory based on write permissions in $ROOTSYS and
-/// in the current working directory.
+/// Set default SDF font directory based on write permissions in the ui5
+/// directory, WebGui.RootUi5Path or else $ROOTSYS/ui5, and in the current
+/// working directory.
 /// Alternative fallback to /tmp or user's home directory is not attempted.
+/// Needs REveManager; called before it exists, it fails and can be retried.
 
 bool REveText::SetDefaultSdfFontDir()
 {
@@ -173,10 +175,22 @@ bool REveText::SetDefaultSdfFontDir()
       return false;
    }
 
+   // Both directories are registered with the manager. Without one, fail but
+   // do not mark the setup as failed, so a call after Create() can succeed.
+   if (gEve == nullptr) {
+      static bool s_have_warned = false;
+      if (!s_have_warned) {
+         ::Error(tpfx, "REveManager needs to be initialized before font setup can begin.");
+         s_have_warned = true;
+      }
+      return false;
+   }
+
    std::string dir( gEnv->GetValue("WebGui.RootUi5Path", gSystem->ExpandPathName("${ROOTSYS}/ui5")) );
+   dir += "/eve7/sdf-fonts/";
    s_font_init_failed = true;
-   if (SetSdfFontDir(dir + "/eve7/sdf-fonts/")) {
-      ::Info(tpfx, "Using install-wide SDF font dir $ROOTSYS/ui5/eve7/sdf-fonts");
+   if (SetSdfFontDir(dir)) {
+      ::Info(tpfx, "Using SDF font dir %s", dir.c_str());
    } else if (SetSdfFontDir("./sdf-fonts/")) {
       ::Info(tpfx, "Using SDF font dir sdf_fonts/ in current directory");
    } else {
