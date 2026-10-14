@@ -72,7 +72,7 @@ namespace cling {
   /// \brief wraps an ExternalASTSource in an ExternalSemaSource. No functional
   /// difference between the original source and this wrapper intended.
   class ExternalASTSourceWrapper : public ExternalSemaSource {
-    ExternalASTSource* m_Source;
+    llvm::IntrusiveRefCntPtr<ExternalASTSource> m_Source;
 
   public:
     ExternalASTSourceWrapper(ExternalASTSource* Source) : m_Source(Source) {
@@ -284,11 +284,6 @@ namespace cling {
         // If we already have source, we need to create a multiplexer with the
         // existing source.
         if (ExistingSource) {
-          // Make sure the context is not deleting the existing source.
-          // FIXME: We should delete this, but looking at the other TODO's in
-          // the destructor we can't easily free our callbacks from here...
-          Ctx.ExternalSource.resetWithoutRelease();
-
           // Wrap the existing source in a wrapper so that it becomes an
           // external sema source. This way we can use the existing multiplexer
           // for this.
