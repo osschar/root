@@ -143,7 +143,8 @@ namespace cling {
     IncrementalExecutor(clang::DiagnosticsEngine& diags,
                         const clang::CompilerInstance& CI,
                         void *ExtraLibHandle = nullptr,
-                        bool Verbose = false);
+                        bool Verbose = false,
+                        bool ReleaseMemory = false);
 
     ~IncrementalExecutor();
 

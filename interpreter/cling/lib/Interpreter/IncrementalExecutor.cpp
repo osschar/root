@@ -36,7 +36,8 @@ namespace cling {
 
 IncrementalExecutor::IncrementalExecutor(clang::DiagnosticsEngine& /*diags*/,
                                          const clang::CompilerInstance& CI,
-                                         void *ExtraLibHandle, bool Verbose):
+                                         void *ExtraLibHandle, bool Verbose,
+                                         bool ReleaseMemory):
   m_Callbacks(nullptr)
 #if 0
   : m_Diags(diags)
@@ -50,7 +51,7 @@ IncrementalExecutor::IncrementalExecutor(clang::DiagnosticsEngine& /*diags*/,
   llvm::Error Err = llvm::Error::success();
   auto EPC = llvm::cantFail(llvm::orc::SelfExecutorProcessControl::Create());
   m_JIT.reset(new IncrementalJIT(*this, CI, std::move(EPC), Err,
-    ExtraLibHandle, Verbose));
+    ExtraLibHandle, Verbose, ReleaseMemory));
   if (Err) {
     llvm::logAllUnhandledErrors(std::move(Err), llvm::errs(), "Fatal: ");
     llvm_unreachable("Propagate this error and exit gracefully");

@@ -114,7 +114,11 @@ namespace {
   }
 
   class ClingMMapper final : public SectionMemoryManager::MemoryMapper {
+    bool m_Release;
+
   public:
+    explicit ClingMMapper(bool Release) : m_Release(Release) {}
+
     sys::MemoryBlock
     allocateMappedMemory(SectionMemoryManager::AllocationPurpose Purpose,
                          size_t NumBytes,
@@ -129,14 +133,13 @@ namespace {
     }
 
     std::error_code releaseMappedMemory(sys::MemoryBlock& M) override {
-      // Disabled until CallFunc is informed about unloading, and can
-      // re-generate the wrapper (if the decl is still available). See
+      if (m_Release)
+        return sys::Memory::releaseMappedMemory(M);
+      // Disabled, except for disposable interpreters, until CallFunc is
+      // informed about unloading, and can re-generate the wrapper (if the decl
+      // is still available). See
       // https://github.com/root-project/root/issues/10898
-#if 0
-      return sys::Memory::releaseMappedMemory(M);
-#else
       return {};
-#endif
     }
   };
 
@@ -263,15 +266,25 @@ namespace {
     bool needsToReserveAllocationSpace() override { return true; }
   };
 
-  /// A JITLinkMemoryManager for Cling that never frees its allocations.
+  /// A JITLinkMemoryManager for Cling that frees its allocations only for a
+  /// disposable interpreter.
   class ClingJITLinkMemoryManager : public InProcessMemoryManager {
+    bool m_Release;
+
   public:
-    using InProcessMemoryManager::InProcessMemoryManager;
+    ClingJITLinkMemoryManager(uint64_t PageSize, bool Release)
+        : InProcessMemoryManager(PageSize), m_Release(Release) {}
 
     void deallocate(std::vector<FinalizedAlloc> Allocs,
                     OnDeallocatedFunction OnDeallocated) override {
-      // Disabled until CallFunc is informed about unloading, and can
-      // re-generate the wrapper (if the decl is still available). See
+      if (m_Release) {
+        InProcessMemoryManager::deallocate(std::move(Allocs),
+                                           std::move(OnDeallocated));
+        return;
+      }
+      // Disabled, except for disposable interpreters, until CallFunc is
+      // informed about unloading, and can re-generate the wrapper (if the decl
+      // is still available). See
       // https://github.com/root-project/root/issues/10898
 
       // We still have to release the allocations which resets their addresses
@@ -557,7 +570,7 @@ IncrementalJIT::~IncrementalJIT() {
 IncrementalJIT::IncrementalJIT(
     IncrementalExecutor& Executor, const clang::CompilerInstance &CI,
     std::unique_ptr<llvm::orc::ExecutorProcessControl> EPC, Error& Err,
-    void *ExtraLibHandle, bool Verbose)
+    void *ExtraLibHandle, bool Verbose, bool ReleaseMemory)
     : SkipHostProcessLookup(false),
       m_JITLink(UseJITLink(CI.getTarget().getTriple())),
       m_TM(CreateTargetMachine(CI, m_JITLink)),
@@ -594,11 +607,12 @@ IncrementalJIT::IncrementalJIT(
       // together which is needed for exception handling support.
       unsigned PageSize = cantFail(sys::Process::getPageSize());
       auto ObjLinkingLayer = std::make_unique<ObjectLinkingLayer>(
-          ES, std::make_unique<ClingJITLinkMemoryManager>(PageSize));
+          ES,
+          std::make_unique<ClingJITLinkMemoryManager>(PageSize, ReleaseMemory));
       return ObjLinkingLayer;
     }
 
-    auto MMapper = std::make_unique<ClingMMapper>();
+    auto MMapper = std::make_unique<ClingMMapper>(ReleaseMemory);
     auto GetMemMgr = [MMapper = std::move(MMapper)](const llvm::MemoryBuffer &) {
       return std::make_unique<ClingMemoryManager>(*MMapper);
     };

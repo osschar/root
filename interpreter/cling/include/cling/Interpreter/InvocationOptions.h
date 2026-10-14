@@ -97,6 +97,7 @@ namespace cling {
     unsigned ShowVersion : 1;
     unsigned Help : 1;
     unsigned NoRuntime : 1;
+    unsigned Disposable : 1; /// Free all memory on destruction
     unsigned PtrCheck : 1; /// Enable NullDerefProtectionTransformer
     bool Verbose() const { return CompilerOpts.Verbose; }
 

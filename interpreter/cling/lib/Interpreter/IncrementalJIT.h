@@ -60,7 +60,8 @@ public:
   IncrementalJIT(IncrementalExecutor& Executor,
                  const clang::CompilerInstance &CI,
                  std::unique_ptr<llvm::orc::ExecutorProcessControl> EPC,
-                 llvm::Error &Err, void *ExtraLibHandle, bool Verbose);
+                 llvm::Error &Err, void *ExtraLibHandle, bool Verbose,
+                 bool ReleaseMemory = false);
 
   ~IncrementalJIT();
 
