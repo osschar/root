@@ -28,6 +28,7 @@ ROOT_OBJECT_LIBRARY(MetaCling
   TClingDataMemberInfo.cxx
   TClingDeclInfo.cxx
   TClingDiagnostics.cxx
+  TClingDisposable.cxx
   TClingMemberIter.cxx
   TClingMethodArgInfo.cxx
   TClingMethodInfo.cxx

@@ -3,6 +3,7 @@
 #include "TClass.h"
 #include "TInterpreter.h"
 #include "TROOT.h"
+#include "TString.h"
 #include "TSystem.h"
 
 #include "gmock/gmock.h"
@@ -10,6 +11,10 @@
 #include <sstream>
 #include <string>
 #include <vector>
+
+#ifdef __GLIBC__
+#include <malloc.h>
+#endif
 
 // FIXME: We should probably have such a facility in TCling.
 static void cleanup()
@@ -508,5 +513,39 @@ using func0_ret_t = typename ROOT::TypeTraits::CallableTraits<decltype(func0)>::
 })";
    auto res = gInterpreter->Declare(expression.c_str());
    EXPECT_TRUE(res);
+}
+#endif
+// A disposable interpreter finds ROOT's headers and runs code that calls into loaded libraries.
+TEST_F(TClingTests, Disposable)
+{
+   auto disposable = gInterpreter->CreateDisposable();
+   ASSERT_NE(nullptr, disposable);
+   EXPECT_TRUE(disposable->Declare("#include \"TNamed.h\""));
+   int result = 0;
+   EXPECT_TRUE(disposable->ProcessLine(
+      TString::Format("{ TNamed n(\"name\", \"title\"); *(int *)%p = n.GetTitle()[0]; }", (void *)&result)));
+   EXPECT_EQ('t', result);
+   EXPECT_FALSE(disposable->ProcessLine("TClingTests_undeclared();"));
+}
+
+// Destroying a disposable interpreter frees the memory of the code it compiled.
+#if defined(__GLIBC__) && (__GLIBC__ > 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 33))
+TEST_F(TClingTests, DisposableFreesMemory)
+{
+   int sum = 0;
+   auto run = [&sum]() {
+      auto disposable = gInterpreter->CreateDisposable();
+      for (int i = 0; i < 200; ++i)
+         disposable->ProcessLine(TString::Format("{ int v%d = %d; *(int *)%p += v%d; }", i, i, (void *)&sum, i));
+   };
+   // The first one leaves behind what stays for the process, eg the mapped module files.
+   run();
+   const long before = mallinfo2().uordblks;
+   for (int i = 0; i < 3; ++i)
+      run();
+   const long after = mallinfo2().uordblks;
+   EXPECT_EQ(4 * 19900, sum);
+   // gInterpreter keeps 5.7 MB for these 600 lines (Linux, Debug build).
+   EXPECT_LT(after - before, 1024 * 1024);
 }
 #endif

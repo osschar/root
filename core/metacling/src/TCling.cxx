@@ -23,6 +23,7 @@ clang/LLVM technology.
 
 #include "TClingBaseClassInfo.h"
 #include "TClingCallFunc.h"
+#include "TClingDisposable.h"
 #include "TClingClassInfo.h"
 #include "TClingDataMemberInfo.h"
 #include "TClingMethodArgInfo.h"
@@ -1586,6 +1587,9 @@ TCling::TCling(const char *name, const char *title, const char* const argv[], vo
    EnvOpt = llvm::sys::Process::GetEnv("ROOTDEBUG_RDICT");
    if (!EnvOpt.has_value())
       extensions.push_back(std::make_shared<TClingRdictModuleFileExtension>());
+
+   fDisposableArgs.assign(interpArgs.begin(), interpArgs.end());
+   fLlvmResourceDir = llvmResourceDir.Data();
 
    fInterpreter = std::make_unique<cling::Interpreter>(interpArgs.size(),
                                                        &(interpArgs[0]),
@@ -3199,6 +3203,18 @@ void TCling::ClearFileBusy()
 void TCling::ClearStack()
 {
    // No-op for cling due to cling::Value.
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// Create a disposable interpreter, with this interpreter's arguments. Return
+/// nullptr if it could not be created. See TInterpreter::Disposable.
+
+std::unique_ptr<TInterpreter::Disposable> TCling::CreateDisposable()
+{
+   auto disposable = std::make_unique<TClingDisposable>(fDisposableArgs, fLlvmResourceDir);
+   if (!disposable->IsValid())
+      return nullptr;
+   return disposable;
 }
 
 namespace {

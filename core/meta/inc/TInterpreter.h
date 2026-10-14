@@ -29,6 +29,7 @@
 #include "TVirtualRWMutex.h"
 
 #include <map>
+#include <memory>
 #include <typeinfo>
 #include <vector>
 #include <string>
@@ -129,6 +130,24 @@ public:
       ~SuspendAutoLoadingRAII() { fInterp->SetClassAutoLoading(fOldValue); }
    };
 
+   /// An interpreter of its own, for code that is not needed after it has run, created by
+   /// CreateDisposable(). Destroying it frees the memory of everything it compiled, which
+   /// the interpreter never does for its own code.
+   ///
+   /// It is created with the interpreter's arguments, so it finds the same headers and C++
+   /// modules. It does not see what was declared in the interpreter itself, and it does not
+   /// load libraries: the code it compiles can call into libraries that are already loaded.
+   /// Nothing may point into its code once it is destroyed, eg a std::function holding a
+   /// lambda it compiled. Its calls take gInterpreterMutex.
+   class Disposable {
+   public:
+      virtual ~Disposable() = default;
+      /// Declare code, eg #include directives. Return false on error.
+      virtual bool Declare(const char *code) = 0;
+      /// Compile and run a line. Return false on error.
+      virtual bool ProcessLine(const char *line) = 0;
+   };
+
    typedef int (*AutoLoadCallBack_t)(const char*);
    typedef std::vector<std::pair<std::string, int> > FwdDeclArgsToKeepCollection_t;
 
@@ -144,6 +163,7 @@ public:
    virtual Int_t    AutoParse(const char* cls) = 0;
    virtual void     ClearFileBusy() = 0;
    virtual void     ClearStack() = 0; // Delete existing temporary values
+   virtual std::unique_ptr<Disposable> CreateDisposable() { return nullptr; }
    virtual Bool_t   Declare(const char* code) = 0;
    virtual void     EndOfLineAction() = 0;
    virtual TClass  *GetClass(const std::type_info& typeinfo, Bool_t load) const = 0;
