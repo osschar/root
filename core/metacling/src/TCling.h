@@ -130,6 +130,8 @@ private: // Data Members
    Bool_t          fCxxModulesEnabled;// True if C++ modules was enabled
 
    std::unique_ptr<cling::Interpreter>   fInterpreter;   // The interpreter.
+   std::vector<std::string> fDisposableArgs;             // The interpreter's arguments, for CreateDisposable()
+   std::string fLlvmResourceDir;                         // The interpreter's resource directory, for CreateDisposable()
    std::unique_ptr<cling::MetaProcessor> fMetaProcessor; // The metaprocessor.
 
    std::vector<cling::Value> *fTemporaries;    // Stack of temporaries
@@ -208,6 +210,7 @@ public: // Public Interface
    Bool_t  IsAutoLoadNamespaceCandidate(const clang::NamespaceDecl* nsDecl);
    void    ClearFileBusy() final;
    void    ClearStack() final; // Delete existing temporary values
+   std::unique_ptr<Disposable> CreateDisposable() final;
    Bool_t  Declare(const char* code) final;
    void    EndOfLineAction() final;
    TClass *GetClass(const std::type_info& typeinfo, Bool_t load) const final;

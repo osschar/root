@@ -15,6 +15,8 @@ include "llvm/Option/OptParser.td"
 def _debugFlags_EQ : Joined<["--"], "debug-only=">;
 def _debugFlags : Flag<["--"], "debug-only">;
 #endif
+def _disposable : Flag<["--"], "disposable">,
+                  HelpText<"Free all memory of the interpreter, its compiled code included, when it is destroyed">;
 def _errorout : Flag<["--"], "errorout">, HelpText<"Do not recover from input errors">;
 // Re-implement to forward to our help
 def help : Flag<["-", "--"], "help">, HelpText<"Print this help text">;

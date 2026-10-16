@@ -96,6 +96,7 @@ static const char kNoStdInc[] = "-nostdinc";
     Opts.ShowVersion = Args.hasArg(OPT_version);
     Opts.Help = Args.hasArg(OPT_help);
     Opts.NoRuntime = Args.hasArg(OPT_noruntime);
+    Opts.Disposable = Args.hasArg(OPT__disposable);
     Opts.PtrCheck = Args.hasArg(OPT__ptrcheck);
     if (Arg* MetaStringArg = Args.getLastArg(OPT__metastr, OPT__metastr_EQ)) {
       Opts.MetaString = MetaStringArg->getValue();
@@ -212,7 +213,7 @@ bool CompilerOptions::DefaultLanguage(const LangOptions* LangOpts) const {
 
 InvocationOptions::InvocationOptions(int argc, const char* const* argv) :
   MetaString("."), ErrorOut(false), NoLogo(false), ShowVersion(false),
-  Help(false), NoRuntime(false) {
+  Help(false), NoRuntime(false), Disposable(false) {
 
   ArrayRef<const char *> ArgStrings(argv, argv + argc);
   unsigned MissingArgIndex, MissingArgCount;

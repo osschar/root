@@ -17,6 +17,7 @@
 #include <ROOT/RLogger.hxx>
 #include <ROOT/RWebDisplayArgs.hxx>
 
+#include "TInterpreter.h"
 #include "TSysEvtHandler.h"
 
 #include <thread>
@@ -28,6 +29,7 @@
 #include <vector>
 #include <queue>
 #include <unordered_map>
+#include <unordered_set>
 
 class TMap;
 class TExMap;
@@ -157,6 +159,12 @@ protected:
    ServerState       fServerState;
    std::unordered_map<std::string, std::shared_ptr<TMethodCall> > fMethCallMap;
 
+   // MIR execution in a disposable interpreter, see WebEve.MIRInterpreter
+   int                                       fMIRsPerInterpreter{0}; ///< 0: MIRs go through TMethodCall
+   int                                       fMIRInterpreterCalls{0};
+   std::unique_ptr<TInterpreter::Disposable> fMIRInterpreter;
+   std::unordered_set<TClass *>              fMIRInterpreterClasses; ///< Classes declared in fMIRInterpreter
+
    Logger            fLogger;
    REveServerStatus  fServerStatus;
    bool              fIsRCore{false};
@@ -171,6 +179,7 @@ protected:
 
    void MIRExecThread();
    void ExecuteMIR(std::shared_ptr<MIR> mir);
+   void AssertMIRInterpreter(TClass *cls);
 
    void StreamSceneChangesToJson();
    void SendMotionChanges();

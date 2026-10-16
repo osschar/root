@@ -33,6 +33,7 @@
 #include "TMap.h"
 #include "TExMap.h"
 #include "TEnv.h"
+#include "TString.h"
 #include "TError.h"
 #include "TColor.h"
 #include "TPRegexp.h"
@@ -48,6 +49,7 @@
 #include <memory>
 #include <sstream>
 #include <iostream>
+#include <algorithm>
 #include <regex>
 #include <system_error>
 #include <thread>
@@ -114,6 +116,8 @@ WebEve.DisableShow:   1  # do not start new web browser when REveManager::Show i
 WebEve.HTimeout:     200 # timeout in ms for elements highlight
 WebEve.DblClick:    Off  # mouse double click handling in GL viewer: Off or Reset
 WebEve.TableRowHeight: 33  # size of each row in pixels in the Table view, can be used to make design more compact
+WebEve.MIRInterpreter: TMethodCall  # how MIRs are executed: TMethodCall, or Disposable to compile them in a disposable interpreter
+WebEve.MIRsPerInterpreter: 1000     # with Disposable, the number of MIRs after which the interpreter is replaced
 */
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -213,6 +217,9 @@ REveManager::REveManager()
 
    if (strcmp(gl_viewer, "RCore") == 0)
       fIsRCore = true;
+
+   if (strcmp(gEnv->GetValue("WebEve.MIRInterpreter", "TMethodCall"), "Disposable") == 0)
+      fMIRsPerInterpreter = std::max(1, gEnv->GetValue("WebEve.MIRsPerInterpreter", 1000));
 
    // this is call-back, invoked when message received via websocket
    fWebWindow->SetCallBacks([this](unsigned connid) { WindowConnect(connid); },
@@ -1099,42 +1106,78 @@ void REveManager::ExecuteMIR(std::shared_ptr<MIR> mir)
       tag = mir->fCtype + "::" + m.str(1);
 
       std::shared_ptr<TMethodCall> mc;
-      auto mmi = fMethCallMap.find(tag);
-      if (mmi != fMethCallMap.end())
+      if (fMIRsPerInterpreter > 0)
       {
-         mc = mmi->second;
+         AssertMIRInterpreter(call_cls);
       }
       else
       {
-         const TMethod *meth = call_cls->GetMethodAllAny(m.str(1).c_str());
-         if ( ! meth)
-            throw eh + "Can not find TMethod matching '" + m.str(1) + "'.";
-         mc = std::make_shared<TMethodCall>(meth);
-         fMethCallMap.insert(std::make_pair(tag, mc));
+         auto mmi = fMethCallMap.find(tag);
+         if (mmi != fMethCallMap.end())
+         {
+            mc = mmi->second;
+         }
+         else
+         {
+            const TMethod *meth = call_cls->GetMethodAllAny(m.str(1).c_str());
+            if ( ! meth)
+               throw eh + "Can not find TMethod matching '" + m.str(1) + "'.";
+            mc = std::make_shared<TMethodCall>(meth);
+            fMethCallMap.insert(std::make_pair(tag, mc));
+         }
       }
 
       REveElement::SetMirContext(el);
 
-      R__LOCKGUARD_CLING(gInterpreterMutex);
-      mc->Execute(el_casted, m.str(2).c_str());
+      if (mc)
+      {
+         R__LOCKGUARD_CLING(gInterpreterMutex);
+         mc->Execute(el_casted, m.str(2).c_str());
+      }
+      else
+      {
+         // Compiled code, so arguments of any type TMethodCall can not handle work, too.
+         std::string line = TString::Format("((%s *)%p)->%s(%s);", mir->fCtype.c_str(), el_casted,
+                                            m.str(1).c_str(), m.str(2).c_str()).Data();
+         if ( ! fMIRInterpreter->ProcessLine(line.c_str()))
+            R__LOG_ERROR(REveLog()) << eh << "error compiling " << tag << ": '" << line << "'.";
+      }
 
       if (REveElement::stlMirError) {
          R__LOG_ERROR(REveLog()) << eh << "error executing " << tag << ":" << REveElement::stlMirErrorString << " (code " << REveElement::stlMirError << ").";
       }
       REveElement::ClearMirContext();
-
-      // Alternative implementation through Cling. "Leaks" 200 kB per call.
-      // This might be needed for function calls that involve data-types TMethodCall
-      // can not handle.
-      // std::stringstream cmd;
-      // cmd << "((" << mir->fCtype << "*)" << std::hex << std::showbase << (size_t)el << ")->" << mir->fCmd << ";";
-      // std::cout << cmd.str() << std::endl;
-      // gROOT->ProcessLine(cmd.str().c_str());
    } catch (std::exception &e) {
       R__LOG_ERROR(REveLog()) << "caught exception executing " << tag << ": " << e.what();
    } catch (...) {
       R__LOG_ERROR(REveLog()) << "caught unknown execption.";
    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// Make sure the disposable interpreter for MIRs exists and has the declaration of
+/// class `cls`. The interpreter is replaced every fMIRsPerInterpreter MIRs: destroying
+/// it frees the memory of the code compiled for the MIRs it ran.
+
+void REveManager::AssertMIRInterpreter(TClass *cls)
+{
+   static const REveException eh("");
+
+   if (!fMIRInterpreter || fMIRInterpreterCalls >= fMIRsPerInterpreter) {
+      fMIRInterpreter.reset();
+      fMIRInterpreterClasses.clear();
+      fMIRInterpreterCalls = 0;
+      fMIRInterpreter = gInterpreter->CreateDisposable();
+      if (!fMIRInterpreter)
+         throw eh + "Can not create a disposable interpreter for MIRs.";
+   }
+   if (fMIRInterpreterClasses.count(cls) == 0) {
+      const char *header = cls->GetDeclFileName();
+      if (!header || !*header || !fMIRInterpreter->Declare(TString::Format("#include \"%s\"", header)))
+         throw eh + "Can not declare class '" + cls->GetName() + "' for MIRs.";
+      fMIRInterpreterClasses.insert(cls);
+   }
+   ++fMIRInterpreterCalls;
 }
 
 // Write scene change into scenes's internal json member

@@ -268,9 +268,15 @@ namespace cling {
 
     Sema& SemaRef = getSema();
 
+    // A disposable interpreter frees its AST and its compiled code when it is
+    // destroyed. Other interpreters keep both until the process ends.
+    if (m_Opts.Disposable)
+      getCI()->getFrontendOpts().DisableFree = false;
+
     if (!isInSyntaxOnlyMode() && !m_Opts.CompilerOpts.CUDADevice) {
       m_Executor.reset(new IncrementalExecutor(SemaRef.Diags, *getCI(),
-        extraLibHandle, m_Opts.Verbose()));
+                                               extraLibHandle, m_Opts.Verbose(),
+                                               m_Opts.Disposable));
 
       if (!m_Executor)
         return;
